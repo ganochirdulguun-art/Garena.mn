@@ -172,13 +172,18 @@ function readResult(state) {
     const players = db.prepare('SELECT * FROM gameplayers WHERE gameid = ?').all(game.id);
     const dota = db.prepare('SELECT * FROM dotagames WHERE gameid = ?').get(game.id);
     const dotaPlayers = db.prepare('SELECT * FROM dotaplayers WHERE gameid = ?').all(game.id);
-    const byColour = new Map(dotaPlayers.map((p) => [Number(p.colour), p]));
-    const teamOfColour = (c) => (c >= 1 && c <= 5 ? 1 : c >= 7 && c <= 11 ? 2 : 0);
+    // gameplayers.colour = WC3 slot colour (0 red … 4 yellow = Sentinel, 5 orange … 9 light blue = Scourge),
+    // dotaplayers.colour = DotA-гийн тоглогчийн ID (1–5 Sentinel, 7–11 Scourge; 6/12 = багийн ID).
+    // Хоёр дугаарлалт өөр тул шууд тааруулбал K/D/A нэгээр зөрнө → WC3 colour → DotA ID хөрвүүлнэ.
+    const dotaIdOf = (c) => (c >= 0 && c <= 4 ? c + 1 : c >= 5 && c <= 9 ? c + 2 : c + 1);
+    const byDotaId = new Map(dotaPlayers.map((p) => [Number(p.colour), p]));
+    const teamOfDotaId = (id) => (id >= 1 && id <= 5 ? 1 : id >= 7 && id <= 11 ? 2 : 0);
     const durationSec = Number(game.duration || 0);
     const list = players.map((p) => {
       const colour = Number(p.colour);
-      const d = byColour.get(colour) || {};
-      const team = teamOfColour(colour) || (Number(p.team) + 1);
+      const dotaId = dotaIdOf(colour);
+      const d = byDotaId.get(dotaId) || byDotaId.get(colour) || {};
+      const team = teamOfDotaId(dotaId) || (Number(p.team) + 1);
       const leftAt = Number(p.left || 0);
       return {
         name: p.name, team, kills: Number(d.kills || 0), deaths: Number(d.deaths || 0), assists: Number(d.assists || 0),

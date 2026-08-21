@@ -544,11 +544,15 @@ router.get('/me', authMW, async (req, res) => {
       if (result.rows[0]) {
         const { effectiveTier, publicFx } = require('./membership');
         const { levelProgress } = require('../services/progression');
+        const adminMW = require('../middleware/admin');
         const row = result.rows[0];
+        const isOwner = adminMW.isOwnerUser(req.user);
+        const isAdmin = isOwner || await adminMW.isAdminDiscordId(req.user.discord_id);
         return res.json({
           ...row, tier: effectiveTier(row), name_effect: publicFx(row).name_effect,
           diamonds: row.diamonds || 0, ...levelProgress(row.xp || 0),
           block_games: row.block_games || 0, block_wins: row.block_wins || 0,
+          is_owner: isOwner, is_admin: isAdmin, unlimited_diamonds: isOwner,
         });
       }
     } catch (e) {

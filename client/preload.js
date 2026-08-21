@@ -141,6 +141,7 @@ contextBridge.exposeInMainWorld('api', {
   checkForUpdates:   ()   => ipcRenderer.invoke('update:check'),
   getAppVersion:     ()   => ipcRenderer.invoke('update:version'),
 
-  // Ерөнхий API хүсэлт (Банк ₮, гишүүнчлэл)
+  // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
+  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
 });

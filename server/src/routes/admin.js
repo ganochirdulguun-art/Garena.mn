@@ -36,7 +36,7 @@ router.get('/login', (req, res) => {
 
 // Би хэн бэ (admin эсэхийг баталгаажуулна).
 router.get('/api/me', adminMW, (req, res) => {
-  res.json({ id: req.user.id, username: req.user.username, discord_id: req.user.discord_id });
+  res.json({ id: req.user.id, username: req.user.username, discord_id: req.user.discord_id, is_owner: !!req.isOwner });
 });
 
 // Одоо онлайн байгаа хэрэглэгчид (real-time лоббиос).
@@ -89,7 +89,8 @@ router.get('/api/users', adminMW, async (req, res) => {
 
     const totalRes = await db.query(`SELECT COUNT(*)::int AS c FROM users ${where}`, params);
     const rowsRes = await db.query(
-      `SELECT id, username, email, discord_id, avatar_url, wins, losses, created_at
+      `SELECT id, username, email, discord_id, avatar_url, wins, losses, created_at,
+              COALESCE(diamonds, 0) AS diamonds, COALESCE(level, 1) AS level, membership, membership_until
        FROM users ${where}
        ORDER BY created_at DESC NULLS LAST
        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
@@ -97,8 +98,10 @@ router.get('/api/users', adminMW, async (req, res) => {
     );
 
     const statusByUser = new Map(livePresence().map((u) => [String(u.userId), u.status]));
+    const { effectiveTier } = require('./membership');
     const users = rowsRes.rows.map((u) => ({
       ...u,
+      tier: effectiveTier(u),
       games: (u.wins || 0) + (u.losses || 0),
       status: statusByUser.get(String(u.id)) || 'offline',
     }));

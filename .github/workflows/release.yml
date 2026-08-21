@@ -22,6 +22,16 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
+      # Release-ийг УРЬДЧИЛАН үүсгэнэ: electron-builder exe + blockmap-ийг зэрэг upload хийхдээ
+      # release-ийг хоёр удаа үүсгэж (race) нэг tag дээр 2 release гарч, latest.yml 404 болдог байсан.
+      - name: Create GitHub release (if missing)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Garena.mn $GITHUB_REF_NAME" --notes "Garena.mn client $GITHUB_REF_NAME — Setup (суулгац) болон portable exe. Апп дотроос автоматаар шинэчлэгдэнэ."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Build & publish Garena.mn installer + portable exe
         run: npx electron-builder --win --publish always
         env:

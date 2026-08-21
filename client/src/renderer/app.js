@@ -4958,15 +4958,20 @@ init();
     const bg = Number(currentUser.block_games ?? 0);
     const bw = Number(currentUser.block_wins ?? 0);
 
+    const unlimited = !!currentUser.unlimited_diamonds;
+    const diaText = unlimited ? '💎 ∞' : `💎 ${fmtN(dia)}`;
     el('user-wallet')?.classList.remove('hidden');
     const amt = el('user-wallet-amount');
-    if (amt) amt.textContent = `💎 ${fmtN(dia)}`;
+    if (amt) amt.textContent = diaText;
+    el('diamond-owner-badge')?.classList.toggle('hidden', !unlimited);
+    el('btn-admin-dashboard')?.classList.toggle('hidden', !(currentUser.is_admin || currentUser.is_owner));
+    document.querySelectorAll('.diamond-amount').forEach((n) => n.classList.toggle('unlimited', unlimited));
     const lv = el('user-level');
     if (lv) { lv.textContent = `LV ${level}`; lv.classList.remove('hidden'); }
     const tierPill = el('user-tier');
     if (tierPill) { const t = myTier(); tierPill.textContent = TIER_NAME[t]; tierPill.classList.toggle('hidden', t === 'bronze'); }
 
-    document.querySelectorAll('[data-diamonds]').forEach((n) => { n.textContent = `💎 ${fmtN(dia)}`; });
+    document.querySelectorAll('[data-diamonds]').forEach((n) => { n.textContent = diaText; });
     const need = Math.max(0, 5 - bw);
     const left = Math.max(0, 10 - bg);
     const blockText = el('diamond-block-text');
@@ -5017,7 +5022,7 @@ init();
       if (st.paid) {
         clearInterval(payPoll);
         el('pay-status').textContent = '✅ Төлбөр баталгаажлаа';
-        showToast('Төлбөр амжилттай — гишүүнчлэл идэвхжлээ', 'success');
+        showToast(st.kind === 'diamonds' ? 'Төлбөр амжилттай — Diamond 💎 нэмэгдлээ' : 'Төлбөр амжилттай — гишүүнчлэл идэвхжлээ', 'success');
         await refreshMe();
         setTimeout(closePay, 1500);
       } else if (st.status === 'CANCELLED') {
@@ -5106,6 +5111,7 @@ init();
     } catch {}
   }
   function renderAll() { renderDiamonds(); renderMembership(); }
+  window.__premium = { openPayModal, refreshMe, renderAll };
   const _setUserUI = setUserUI;
   setUserUI = function (u) { _setUserUI(u); renderAll(); };
   const _showPage = showPage;
@@ -5227,4 +5233,193 @@ init();
     if (currentRoom?.id && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadStatus(); }
   }, 800);
   window.addEventListener('beforeunload', () => { clearInterval(timer); if (bridgeOn) window.api.stopBotBridge?.().catch(() => {}); });
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Diamond 💎 — хэрэглэгч хоорондын шилжүүлэг, QPay багц, гүйлгээний түүх, эзэн/админ, socket мэдэгдэл
+// ══════════════════════════════════════════════════════════════
+(function diamondModule() {
+  const el = (id) => document.getElementById(id);
+  const api = (method, path, body) => window.api.request(method, path, body);
+  const fmtN = (n) => Number(n || 0).toLocaleString('en-US');
+  const errMsg = (e) => String(e?.message || e || 'Алдаа гарлаа').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const prem = () => window.__premium || {};
+  const refreshMe = () => prem().refreshMe?.();
+
+  // ─── Шилжүүлэх modal ───
+  let target = null;          // { id, username }
+  let searchTimer = null;
+  const modal = el('diamond-transfer-modal');
+  function setStatus(id, text, cls) { const n = el(id); if (n) { n.textContent = text || ''; n.className = `dia-status ${cls || ''}`; } }
+  function openTransfer(preset) {
+    if (!modal) return;
+    target = preset || null;
+    el('dia-to-search').value = '';
+    el('dia-search-results').innerHTML = '';
+    el('dia-amount').value = '';
+    el('dia-note').value = '';
+    setStatus('dia-status', currentUser?.unlimited_diamonds ? 'Та эзэн — шилжүүлэг үлдэгдлээс хасагдахгүй.' : `Танд ${fmtN(currentUser?.diamonds || 0)} 💎 байна.`);
+    renderTarget();
+    modal.classList.remove('hidden');
+    (target ? el('dia-amount') : el('dia-to-search')).focus();
+  }
+  function closeTransfer() { modal?.classList.add('hidden'); }
+  function renderTarget() {
+    const box = el('dia-selected');
+    const search = el('dia-to-search');
+    if (target) {
+      el('dia-selected-name').textContent = `${target.username} (#${target.id})`;
+      box.classList.remove('hidden');
+      search.classList.add('hidden');
+      el('dia-search-results').innerHTML = '';
+    } else {
+      box.classList.add('hidden');
+      search.classList.remove('hidden');
+    }
+  }
+  el('dia-to-search')?.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = el('dia-to-search').value.trim();
+    if (q.length < 2) { el('dia-search-results').innerHTML = ''; return; }
+    searchTimer = setTimeout(async () => {
+      try {
+        const rows = await window.api.searchUsers(q);
+        const list = (rows || []).slice(0, 10);
+        el('dia-search-results').innerHTML = list.length
+          ? list.map((u) => `<div class="dia-user-row" data-id="${escHtml(String(u.id))}" data-name="${escHtml(u.username)}">${u.avatar_url ? `<img src="${escHtml(u.avatar_url)}" alt="">` : '<span class="dia-avatar"></span>'}<span class="clickable-name" data-user-id="${escHtml(String(u.id))}">${escHtml(u.username)}</span><small>#${escHtml(String(u.id))}</small></div>`).join('')
+          : '<div class="dia-user-row"><span>Олдсонгүй</span></div>';
+      } catch { el('dia-search-results').innerHTML = ''; }
+    }, 250);
+  });
+  el('dia-search-results')?.addEventListener('click', (e) => {
+    const row = e.target.closest('.dia-user-row[data-id]');
+    if (!row) return;
+    e.stopPropagation();
+    target = { id: row.dataset.id, username: row.dataset.name };
+    renderTarget();
+    el('dia-amount').focus();
+  });
+  el('dia-selected-clear')?.addEventListener('click', () => { target = null; renderTarget(); el('dia-to-search').focus(); });
+  el('btn-dia-cancel')?.addEventListener('click', closeTransfer);
+  el('btn-dia-send')?.addEventListener('click', async () => {
+    const amount = parseInt(el('dia-amount').value, 10);
+    if (!target) { setStatus('dia-status', 'Хүлээн авагчаа сонгоно уу', 'error'); return; }
+    if (!Number.isInteger(amount) || amount < 1) { setStatus('dia-status', 'Дүнгээ оруулна уу (1+ 💎)', 'error'); return; }
+    const ok = await showConfirm('Diamond шилжүүлэх', `${target.username} (#${target.id}) руу ${fmtN(amount)} 💎 шилжүүлэх үү? Шилжүүлэг буцаагдахгүй.`);
+    if (!ok) return;
+    const btn = el('btn-dia-send');
+    btn.disabled = true;
+    setStatus('dia-status', 'Илгээж байна…');
+    try {
+      const r = await api('post', '/diamonds/transfer', { to: target.id, amount, note: el('dia-note').value.trim() });
+      setStatus('dia-status', `✅ ${fmtN(r.amount)} 💎 → ${r.to.username}`, 'ok');
+      showToast(`${fmtN(r.amount)} 💎 ${r.to.username}-д шилжүүллээ`, 'success');
+      if (currentUser && !r.unlimited && r.diamonds != null) currentUser.diamonds = r.diamonds;
+      prem().renderAll?.();
+      await refreshMe();
+      setTimeout(closeTransfer, 900);
+    } catch (e) {
+      setStatus('dia-status', errMsg(e), 'error');
+    } finally { btn.disabled = false; }
+  });
+  el('btn-diamond-transfer')?.addEventListener('click', () => openTransfer(null));
+
+  // Профайл popup дээрх "💎 Diamond илгээх" товч
+  let popupUser = null;
+  const _open = openUserProfile;
+  openUserProfile = async function (userId) {
+    const r = await _open(userId);
+    popupUser = { id: String(userId), username: el('popup-username')?.textContent || '' };
+    const b = el('btn-popup-diamond');
+    if (b) b.classList.toggle('hidden', !currentUser || String(currentUser.id) === String(userId));
+    return r;
+  };
+  el('btn-popup-diamond')?.addEventListener('click', () => {
+    if (!popupUser) return;
+    el('user-profile-modal')?.classList.add('hidden');
+    openTransfer({ id: popupUser.id, username: el('popup-username')?.textContent || popupUser.username });
+  });
+
+  // ─── Багц авах (QPay) ───
+  let packs = null;
+  async function openBuy() {
+    const m = el('diamond-buy-modal');
+    if (!m) return;
+    m.classList.remove('hidden');
+    setStatus('dia-buy-status', '');
+    try {
+      if (!packs) packs = await api('get', '/diamonds/packs');
+      const grid = el('dia-pack-grid');
+      grid.innerHTML = (packs.packs || []).map((p) => `<button type="button" class="dia-pack" data-pack="${escHtml(p.key)}"><b>💎 ${fmtN(p.diamonds)}</b><small>${fmtN(p.price)}₮</small></button>`).join('');
+      if (!packs.payments_enabled) setStatus('dia-buy-status', 'QPay төлбөр хараахан идэвхжээгүй — админаас Diamond авах боломжтой.', 'error');
+    } catch (e) { setStatus('dia-buy-status', errMsg(e), 'error'); }
+  }
+  el('btn-diamond-buy')?.addEventListener('click', openBuy);
+  el('btn-dia-buy-close')?.addEventListener('click', () => el('diamond-buy-modal')?.classList.add('hidden'));
+  el('dia-pack-grid')?.addEventListener('click', async (e) => {
+    const b = e.target.closest('.dia-pack[data-pack]');
+    if (!b) return;
+    b.disabled = true;
+    try {
+      const order = await api('post', '/diamonds/buy', { pack: b.dataset.pack });
+      el('diamond-buy-modal')?.classList.add('hidden');
+      prem().openPayModal?.(order, `${fmtN(order.diamonds)} 💎 — QPay`);
+    } catch (err) { setStatus('dia-buy-status', errMsg(err), 'error'); }
+    finally { b.disabled = false; }
+  });
+
+  // ─── Гүйлгээний түүх ───
+  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт' };
+  async function openHistory() {
+    const m = el('diamond-history-modal');
+    if (!m) return;
+    m.classList.remove('hidden');
+    const body = el('dia-history-body');
+    body.innerHTML = '<tr><td colspan="4">Ачааллаж байна…</td></tr>';
+    try {
+      const rows = await api('get', '/diamonds/transactions');
+      body.innerHTML = (rows || []).length
+        ? rows.map((t) => `<tr><td>${escHtml(new Date(t.created_at).toLocaleString('mn-MN'))}</td><td class="amt ${t.amount > 0 ? 'pos' : (t.amount < 0 ? 'neg' : '')}">${t.amount > 0 ? '+' : ''}${fmtN(t.amount)} 💎</td><td>${escHtml(TYPE_TEXT[t.type] || t.type)}</td><td class="note">${escHtml(t.note || '')}</td></tr>`).join('')
+        : '<tr><td colspan="4">Гүйлгээ алга — тоглоод 10 тоглолтоос 5-д хожвол +30 💎</td></tr>';
+    } catch (e) { body.innerHTML = `<tr><td colspan="4">${escHtml(errMsg(e))}</td></tr>`; }
+  }
+  el('btn-diamond-history')?.addEventListener('click', openHistory);
+  el('btn-dia-history-close')?.addEventListener('click', () => el('diamond-history-modal')?.classList.add('hidden'));
+
+  // ─── Админ самбар (вэб) ───
+  el('btn-admin-dashboard')?.addEventListener('click', () => {
+    window.api.openExternal?.(`${SERVER}/admin`);
+    showToast('Админ самбар browser дээр нээгдэнэ — Discord-оор нэвтэрнэ', 'info');
+  });
+
+  // ─── Socket мэдэгдэл: diamonds:received / diamonds:updated / membership:updated ───
+  function attach(s) {
+    s.on('diamonds:received', (d) => {
+      if (currentUser && d.diamonds != null && !currentUser.unlimited_diamonds) currentUser.diamonds = d.diamonds;
+      prem().renderAll?.();
+      const who = d.from_username || 'Garena.mn';
+      showToast(`💎 +${fmtN(d.amount)} Diamond — ${who}${d.note ? `: ${d.note}` : ''}`, 'success');
+      try { playSound?.('join'); } catch {}
+      refreshMe();
+    });
+    s.on('diamonds:updated', (d) => {
+      if (currentUser && d.diamonds != null && !currentUser.unlimited_diamonds) currentUser.diamonds = d.diamonds;
+      prem().renderAll?.();
+      if (d.reason === 'purchase') showToast(`💎 +${fmtN(d.delta)} Diamond нэмэгдлээ (QPay)`, 'success');
+      if (d.reason === 'admin_grant' && d.amount < 0) showToast(`💎 ${fmtN(d.amount)} Diamond (админ)`, 'warning');
+    });
+    s.on('membership:updated', (d) => {
+      showToast(`Гишүүнчлэл: ${String(d.tier || '').toUpperCase()}${d.membership_until ? ` — ${new Date(d.membership_until).toLocaleDateString('mn-MN')} хүртэл` : ''}`, 'success');
+      refreshMe();
+    });
+  }
+  setInterval(() => {
+    if (typeof socket !== 'undefined' && socket && !socket.__diaHandlers) { socket.__diaHandlers = true; attach(socket); }
+  }, 1000);
+
+  // Esc → modal-уудыг хаах
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    ['diamond-transfer-modal', 'diamond-buy-modal', 'diamond-history-modal'].forEach((id) => el(id)?.classList.add('hidden'));
+  });
 })();

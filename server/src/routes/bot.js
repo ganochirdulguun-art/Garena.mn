@@ -221,7 +221,8 @@ botRouter.post('/jobs/:id/result', async (req, res) => {
         players: (out.players || []).map((p) => ({ user_id: p.user_id, name: p.wc3_name, team: p.team, is_winner: p.is_winner, kills: p.kills, deaths: p.deaths, assists: p.assists, hero: p.hero, is_leaver: p.is_leaver, xp_earned: p.xp_earned, diamonds_earned: p.diamonds_earned })),
         duplicate: !!out.duplicate,
       });
-      _io.to(String(job.room_id)).emit('room:host_game_ended');
+      // 'room:host_game_ended' илгээхгүй — тэр event тоглогчдын WC3-г хүчээр хаадаг (хост WC3 хаасан горим);
+      // ботын тоглолт дуусахад тоглогчид өөрсдөө гарна, клиент room:bot_result-ээр төлөвөө шинэчилнэ.
       _io.emit('rooms:updated');
     }
     return res.status(201).json({ ok: true, game_result_id: out.result?.id, duplicate: !!out.duplicate });

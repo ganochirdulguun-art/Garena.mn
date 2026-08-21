@@ -1,4 +1,10 @@
 require('dotenv').config();
+// JWT_SECRET заавал хэрэгтэй: байхгүй бол нэвтрэлт бүр 500 болдог байсан. Түр санамсаргүй нууц үүсгэж
+// ажиллуулна (restart бүрт бүх нэвтрэлт хүчингүй болно) — Railway-д JWT_SECRET тохируулахыг лог-оор сануулна.
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = require('crypto').randomBytes(48).toString('hex');
+  console.warn('[Auth] ⚠ JWT_SECRET тохируулаагүй — түр санамсаргүй нууц үүсгэв. Railway → Variables → JWT_SECRET (урт санамсаргүй мөр) тохируулна уу!');
+}
 const express = require('express');
 const path = require('path');
 const http = require('http');
@@ -58,10 +64,11 @@ app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
 app.use('/discord-servers', discordServerRoutes);
 app.use('/streamers', streamerRoutes);
+app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
 app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэрийн эффект
-app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP
+app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP / шилжүүлэг / худалдан авалт
 app.post('/qpay/webhook', membershipRoutes.qpayWebhook); // QPay dashboard → payment.paid
 app.use('/bot', botRoutes.botRouter);           // hostbot/bridge.js (x-bot-key)
 
@@ -168,6 +175,8 @@ roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 socialRoutes.setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
+// Diamond 💎 шилжүүлэг / олголтын мэдэгдэл (diamonds:received, membership:updated)
+membershipRoutes.setIO(io);
 // Admin router-т лоббийн онлайн жагсаалт авагч дамжуулах (onlineUsersList hoisted)
 adminRoutes.setPresence(onlineUsersList);
 

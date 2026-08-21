@@ -1,5 +1,5 @@
 // ── Тоглолтын дүн бүртгэх (replay болон бот хоёулаа энд ирнэ) ──
-// game_results + game_players бичиж, wins/losses, XP/Level, Diamond бонус олгоно. Нэг өрөөнд нэг л дүн (idempotent).
+// game_results + game_players бичиж, wins/losses, XP/Level, Diamond бонус олгоно. Нэг тоглолтод нэг л дүн (10 минутын цонх, idempotent).
 const { awardGameOutcome, RULES } = require('./progression');
 
 let db;
@@ -18,11 +18,16 @@ async function recordGameResult({
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
 
-  const existing = await db.query('SELECT id FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL \'12 hours\' ORDER BY id DESC LIMIT 1', [roomId]);
+  const existing = await db.query('SELECT id, played_at, source FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL \'12 hours\' ORDER BY id DESC LIMIT 1', [roomId]);
   const roomStatus = await db.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
-  // Өрөө 'playing' биш байхад давхар бүртгэхгүй (replay watcher хожуу ирсэн гэх мэт)
-  if (existing.rows[0] && roomStatus.rows[0]?.status !== 'playing') {
-    return { duplicate: true, result: existing.rows[0] };
+  // Давхар бүртгэлээс хамгаална: (а) өрөө 'playing' биш байхад (replay watcher хожуу ирсэн гэх мэт),
+  // (б) сүүлийн 10 минутад энэ өрөөнд дүн бүртгэгдсэн бол — бот хостын дүн + хостын replay хоёулаа
+  // нэг тоглолтын төлөө ирдэг (XP/💎 давхар олгохгүй). Дараагийн жинхэнэ тоглолт 8+ минут үргэлжилнэ.
+  if (existing.rows[0]) {
+    const ageMs = Date.now() - new Date(existing.rows[0].played_at).getTime();
+    if (roomStatus.rows[0]?.status !== 'playing' || ageMs < 10 * 60 * 1000) {
+      return { duplicate: true, result: existing.rows[0] };
+    }
   }
 
   const membersResult = await db.query(
@@ -88,7 +93,9 @@ async function recordGameResult({
       }
       awards.push({ ...p, is_winner: isWinner, ...award });
     }
-    await client.query(`UPDATE rooms SET status = 'done' WHERE id = $1`, [roomId]);
+    // Өрөөг ХААХГҮЙ — 'waiting' болгоно: тоглогчид өрөөндөө үлдэж дараагийн тоглолтоо эхлүүлнэ (RGC маяг).
+    // ('done' болговол /rooms жагсаалтаас алга болж, isUserInRoom false → өрөөний чат хаагддаг байсан.)
+    await client.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status <> 'done'`, [roomId]);
     await client.query('COMMIT');
     return { duplicate: false, result, players: awards };
   } catch (e) {

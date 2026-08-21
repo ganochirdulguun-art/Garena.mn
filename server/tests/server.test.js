@@ -805,6 +805,183 @@ async function testTierBotSyncImportsRankData() {
   }
 }
 
+
+// ── Diamond 💎: шилжүүлэг, эзний unlimited, админы олголт ──────────────────
+function makeDiamondMockDb(users) {
+  const ledger = [];
+  const orders = [];
+  const query = async (sql, params = []) => {
+    const s = sql.replace(/\s+/g, ' ').trim();
+    if (s === 'SELECT 1' || s === 'BEGIN' || s === 'COMMIT' || s === 'ROLLBACK') return { rows: [{ '?column?': 1 }], rowCount: 1 };
+    if (s.startsWith('SELECT 1 FROM admin_whitelist')) return { rows: [...users.values()].some((u) => String(u.discord_id) === String(params[0]) && u.is_db_admin) ? [{ '?column?': 1 }] : [] };
+    if (s.startsWith('SELECT id, username, diamonds FROM users WHERE id = $1')) {
+      const u = users.get(Number(params[0]));
+      return { rows: u ? [{ id: u.id, username: u.username, diamonds: u.diamonds }] : [] };
+    }
+    if (s.startsWith('SELECT id, username, diamonds FROM users WHERE LOWER(username)')) {
+      const rows = [...users.values()].filter((u) => u.username.toLowerCase() === String(params[0]).toLowerCase()).map((u) => ({ id: u.id, username: u.username, diamonds: u.diamonds }));
+      return { rows };
+    }
+    if (s.startsWith('SELECT id, username, email, discord_id, discord_username, avatar_url, wins, losses, membership')) {
+      const u = users.get(Number(params[0]));
+      return { rows: u ? [{ ...u }] : [] };
+    }
+    if (s.startsWith('SELECT id, username, membership, membership_until, name_effect, diamonds')) {
+      const u = users.get(Number(params[0]));
+      return { rows: u ? [{ ...u }] : [] };
+    }
+    if (s.startsWith('UPDATE users SET diamonds = diamonds - $1 WHERE id = $2 AND COALESCE(diamonds, 0) >= $1')) {
+      const u = users.get(Number(params[1]));
+      if (!u || u.diamonds < params[0]) return { rows: [], rowCount: 0 };
+      u.diamonds -= params[0];
+      return { rows: [{ diamonds: u.diamonds }], rowCount: 1 };
+    }
+    if (s.startsWith('UPDATE users SET diamonds = GREATEST(0, COALESCE(diamonds, 0) + $1)')) {
+      const u = users.get(Number(params[1]));
+      if (!u) return { rows: [], rowCount: 0 };
+      u.diamonds = Math.max(0, u.diamonds + params[0]);
+      return { rows: [{ diamonds: u.diamonds }], rowCount: 1 };
+    }
+    if (s.startsWith('INSERT INTO diamond_transactions')) {
+      ledger.push({ user_id: params[0], amount: params[1], type: params[2], ref: params[3], note: params[4] });
+      return { rows: [], rowCount: 1 };
+    }
+    if (s.startsWith('INSERT INTO payment_orders')) { orders.push(params); return { rows: [], rowCount: 1 }; }
+    if (s.startsWith('UPDATE users SET membership = $1, membership_until = $2')) {
+      const u = users.get(Number(params[2]));
+      if (u) { u.membership = params[0]; u.membership_until = params[1]; }
+      return { rows: [], rowCount: u ? 1 : 0 };
+    }
+    return { rows: [], rowCount: 0 };
+  };
+  return { query, connect: async () => ({ query, release() {} }), ledger, orders };
+}
+
+async function testDiamondTransfer() {
+  const users = new Map([
+    [1, { id: 1, username: 'Alice', discord_id: '111', diamonds: 100, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+    [2, { id: 2, username: 'Bob', discord_id: '222', diamonds: 5, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+  ]);
+  const mockDb = makeDiamondMockDb(users);
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999' }, { mockDb });
+  const alice = makeAuthToken({ id: 1, username: 'Alice', discord_id: '111' });
+  const post = (token, body) => fetch(`${server.baseUrl}/diamonds/transfer`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    // Хүрэлцэхгүй
+    let res = await post(alice, { to: 2, amount: 500 });
+    assert.equal(res.status, 402);
+    assert.equal(users.get(1).diamonds, 100);
+    assert.equal(mockDb.ledger.length, 0);
+
+    // Өөртөө
+    res = await post(alice, { to: 'Alice', amount: 10 });
+    assert.equal(res.status, 400);
+
+    // Буруу дүн
+    res = await post(alice, { to: 2, amount: 0 });
+    assert.equal(res.status, 400);
+
+    // Амжилттай (нэрээр)
+    res = await post(alice, { to: 'bob', amount: 40, note: 'gg' });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.diamonds, 60);
+    assert.equal(body.to.id, 2);
+    assert.equal(users.get(1).diamonds, 60);
+    assert.equal(users.get(2).diamonds, 45);
+    assert.deepEqual(mockDb.ledger.map((l) => [l.user_id, l.amount, l.type]), [[1, -40, 'transfer_out'], [2, 40, 'transfer_in']]);
+
+    // Олдохгүй
+    res = await post(alice, { to: 'Nobody', amount: 1 });
+    assert.equal(res.status, 404);
+  } finally {
+    await server.stop();
+  }
+}
+
+async function testOwnerUnlimitedDiamonds() {
+  const users = new Map([
+    [1, { id: 1, username: 'Owner', discord_id: '999', diamonds: 0, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+    [2, { id: 2, username: 'Bob', discord_id: '222', diamonds: 0, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+  ]);
+  const mockDb = makeDiamondMockDb(users);
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999' }, { mockDb });
+  const owner = makeAuthToken({ id: 1, username: 'Owner', discord_id: '999' });
+  const headers = { Authorization: `Bearer ${owner}`, 'Content-Type': 'application/json' };
+  try {
+    const me = await fetch(`${server.baseUrl}/auth/me`, { headers });
+    assert.equal(me.status, 200);
+    const meJson = await me.json();
+    assert.equal(meJson.unlimited_diamonds, true);
+    assert.equal(meJson.is_owner, true);
+
+    // 0 үлдэгдэлтэй ч шилжүүлнэ — хасагдахгүй, хүлээн авагчид нэмэгдэнэ
+    const res = await fetch(`${server.baseUrl}/diamonds/transfer`, { method: 'POST', headers, body: JSON.stringify({ to: 2, amount: 1500 }) });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.unlimited, true);
+    assert.equal(users.get(1).diamonds, 0);
+    assert.equal(users.get(2).diamonds, 1500);
+
+    // Эзэн Diamond-оор Gold авахад хасагдахгүй
+    const order = await fetch(`${server.baseUrl}/membership/order`, { method: 'POST', headers, body: JSON.stringify({ tier: 'gold', months: 1, pay_with: 'diamonds' }) });
+    assert.equal(order.status, 200);
+    const oj = await order.json();
+    assert.equal(oj.paid, true);
+    assert.equal(oj.cost, 0);
+    assert.equal(users.get(1).membership, 'gold');
+  } finally {
+    await server.stop();
+  }
+}
+
+async function testAdminDiamondGrantIsOwnerOnly() {
+  const users = new Map([
+    [1, { id: 1, username: 'Owner', discord_id: '999', diamonds: 0, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+    [2, { id: 2, username: 'Staff', discord_id: '555', is_db_admin: true, diamonds: 0, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+    [3, { id: 3, username: 'Player', discord_id: '333', diamonds: 10, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }],
+  ]);
+  const mockDb = makeDiamondMockDb(users);
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999' }, { mockDb });
+  const owner = makeAuthToken({ id: 1, username: 'Owner', discord_id: '999' });
+  const staff = makeAuthToken({ id: 2, username: 'Staff', discord_id: '555' });
+  const player = makeAuthToken({ id: 3, username: 'Player', discord_id: '333' });
+  const call = (token, path, body) => fetch(`${server.baseUrl}${path}`, {
+    method: body ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
+  });
+  try {
+    // Энгийн хэрэглэгч → 403 (adminMW)
+    let res = await call(player, '/admin/api/diamonds/grant', { user: 3, amount: 100 });
+    assert.equal(res.status, 403);
+    // DB whitelist админ → дэвтэр харна, олгож чадахгүй
+    res = await call(staff, '/admin/api/diamonds/ledger');
+    assert.equal(res.status, 200);
+    res = await call(staff, '/admin/api/diamonds/grant', { user: 3, amount: 100 });
+    assert.equal(res.status, 403);
+    assert.equal(users.get(3).diamonds, 10);
+    // Эзэн → олгоно
+    res = await call(owner, '/admin/api/diamonds/grant', { user: 'player', amount: 100, note: 'дансны гүйлгээ #1' });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.diamonds, 110);
+    assert.equal(users.get(3).diamonds, 110);
+    assert.equal(mockDb.ledger[0].type, 'admin_grant');
+    // Эзэн → Gold 3 сар үнэгүй
+    res = await call(owner, '/admin/api/membership/grant', { user: 3, tier: 'gold', months: 3 });
+    assert.equal(res.status, 200);
+    assert.equal(users.get(3).membership, 'gold');
+    assert.ok(new Date(users.get(3).membership_until).getTime() > Date.now() + 80 * 24 * 3600 * 1000);
+    // Хасах (сөрөг дүн) — 0-оос доош орохгүй
+    res = await call(owner, '/admin/api/diamonds/grant', { user: 3, amount: -500 });
+    assert.equal(res.status, 200);
+    assert.equal(users.get(3).diamonds, 0);
+  } finally {
+    await server.stop();
+  }
+}
+
 (async () => {
   await runTest('server smoke flow supports register/login/me and guarded auth endpoints', testSmokeFlow);
   await runTest('Discord-linked usernames are read-only in-app', testDiscordLinkedUsernameIsReadOnly);
@@ -822,6 +999,9 @@ async function testTierBotSyncImportsRankData() {
   await runTest('stats/result rejects non-host submitters', testStatsResultRequiresHost);
   await runTest('stats/result rejects players outside the room roster', testStatsResultRejectsPlayersOutsideRoom);
   await runTest('social block checks use DB-backed blocked_users data', testDbBackedBlockCheck);
+  await runTest('diamonds/transfer moves balance atomically and writes a double ledger', testDiamondTransfer);
+  await runTest('platform owner has unlimited diamonds (transfer + membership without deduction)', testOwnerUnlimitedDiamonds);
+  await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
 
   if (process.exitCode) process.exit(process.exitCode);
 })();

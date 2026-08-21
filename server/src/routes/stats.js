@@ -232,8 +232,9 @@ router.get('/history/:userId', async (req, res) => {
       if (!tableCheck.rows[0]) return res.json({ games: [], total: 0, page: 1, totalPages: 0 });
 
       const result = await db.query(`
-        SELECT gr.id, gr.winner_team, gr.duration_minutes, gr.played_at,
-          gp.team, gp.is_winner,
+        SELECT gr.id, gr.winner_team, gr.duration_minutes, gr.played_at, gr.source, gr.map_name,
+          gp.team, gp.is_winner, gp.kills, gp.deaths, gp.assists, gp.hero, gp.is_leaver,
+          gp.xp_earned, gp.diamonds_earned,
           r.name AS room_name, r.game_type
         FROM game_players gp
         JOIN game_results gr ON gp.game_result_id = gr.id
@@ -404,17 +405,17 @@ router.post('/result', auth, async (req, res) => {
       return res.status(403).json({ error: 'Зөвхөн host үр дүн бүртгэнэ' });
     }
     if (room.rows[0].status !== 'playing') {
+      // Бот хостын дүн (эсвэл өөр replay) аль хэдийн бүртгэгдэж өрөө 'waiting' болсон байж болно —
+      // тэр тохиолдолд 400 биш duplicate (200) буцаана, клиент алдаа харуулахгүй.
+      const recent = await db.query(
+        `SELECT id FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL '10 minutes' ORDER BY id DESC LIMIT 1`, [room_id]
+      );
+      if (recent.rows[0]) return res.json({ message: 'Үр дүн аль хэдийн бүртгэгдсэн', result: recent.rows[0], duplicate: true });
       return res.status(400).json({ error: 'Тоглолт эхлээгүй эсвэл аль хэдийн дууссан байна' });
     }
 
-    const existing = await db.query(
-      'SELECT id FROM game_results WHERE room_id=$1',
-      [room_id]
-    );
-    if (existing.rows[0]) {
-      return res.json({ message: 'Үр дүн аль хэдийн бүртгэгдсэн', result: existing.rows[0], duplicate: true });
-    }
-
+    // Давхар дүнгийн шалгалт services/results.js дотор (12 цаг / 10 минутын цонх) — өрөөг дахин
+    // ашиглахад (нэг өрөөнд олон тоглолт) хуучин "өрөөнд нэг л дүн" хориг саад болохгүй.
     const membersResult = await db.query(
       `SELECT u.id, u.username, u.discord_id
        FROM room_players rp

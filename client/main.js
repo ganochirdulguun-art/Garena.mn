@@ -875,6 +875,12 @@ ipcMain.handle('streamers:edit', async (_, id, data) => {
 ipcMain.handle('streamers:delete', async (_, id) => {
   try { return await apiService.deleteStreamer(id); } catch (err) { throw apiError(err); }
 });
+// Ерөнхий https холбоос нээх (админ самбар, QPay төлбөрийн холбоос)
+ipcMain.handle('app:openExternal', async (_, url) => {
+  if (typeof url === 'string' && /^https:\/\/[^\s]+$/i.test(url)) { await shell.openExternal(url); return true; }
+  return false;
+});
+
 ipcMain.handle('streamers:openUrl', async (_, url) => {
   if (/^https?:\/\/.+/i.test(url)) {
     await shell.openExternal(url);

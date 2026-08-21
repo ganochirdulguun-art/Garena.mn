@@ -75,13 +75,15 @@ async function runMigrations(db) {
       paid_at     TIMESTAMP
     );
     CREATE INDEX IF NOT EXISTS idx_payment_orders_user ON payment_orders(user_id, created_at DESC);
+    -- Diamond багц худалдан авалт (kind='diamonds'): төлөгдмөгц олгох 💎 тоо
+    ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS diamonds INTEGER DEFAULT 0;
 
     -- Diamond-ийн дэвтэр: 10 тоглолтын бонус, гишүүнчлэл, админ засвар
     CREATE TABLE IF NOT EXISTS diamond_transactions (
       id          SERIAL PRIMARY KEY,
       user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
       amount      INTEGER NOT NULL,                -- +орлого / -зарлага (💎)
-      type        VARCHAR(24) NOT NULL,            -- block_bonus | membership | adjust | reward
+      type        VARCHAR(24) NOT NULL,            -- block_bonus | membership | purchase | transfer_in | transfer_out | admin_grant
       ref         VARCHAR(128),
       note        TEXT,
       created_at  TIMESTAMP DEFAULT NOW()

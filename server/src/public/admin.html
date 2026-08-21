@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Admin — WC3 Platform</title>
+<title>Admin — Garena.mn</title>
 <!-- AG Grid Community (the same grid engine the Entry Accounting DataGrid wraps) -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-grid.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.3.3/styles/ag-theme-quartz.css">
@@ -12,7 +12,7 @@
 <style>
   :root {
     --bg: #0d0d1a; --panel: #16162a; --panel2: #1e1e38; --border: #2a2a48;
-    --text: #e6e6f0; --dim: #9a9ab5; --accent: #5865F2; --ok: #43b581;
+    --text: #e6e6f0; --dim: #9a9ab5; --accent: #d8232a; --ok: #43b581;
     --warn: #faa61a; --game: #f04747;
   }
   * { box-sizing: border-box; }
@@ -62,6 +62,12 @@
   .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--panel2); object-fit: cover; flex: none; }
   .badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
   .badge.online { background: rgba(67,181,129,.15); color: var(--ok); }
+  .badge.gold { background: rgba(217,169,58,.18); color: #f1c563; }
+  .badge.silver { background: rgba(185,190,200,.16); color: #d6dae3; }
+  .badge.bronze { background: rgba(154,154,181,.12); color: var(--dim); }
+  .dia { color: #8fd3ff; font-variant-numeric: tabular-nums; }
+  .amt.pos { color: var(--ok); } .amt.neg { color: var(--game); }
+  select.inp, input.inp { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; color: var(--text); font-size: 14px; }
   .badge.in_room { background: rgba(250,166,26,.15); color: var(--warn); }
   .badge.in_game { background: rgba(240,71,71,.15); color: var(--game); }
   .badge.offline { background: rgba(154,154,181,.12); color: var(--dim); }
@@ -130,7 +136,7 @@
   <!-- Login gate -->
   <div id="login" class="center hidden">
     <div style="font-size:44px">🛡️</div>
-    <div class="title" style="font-size:22px">WC3 Platform — <span style="color:var(--accent)">Admin</span></div>
+    <div class="title" style="font-size:22px">Garena.mn — <span style="color:var(--accent)">Admin</span></div>
     <p class="muted">Хянах самбарт нэвтрэхийн тулд админ эрхтэй Discord акаунтаараа нэвтэрнэ үү.</p>
     <a class="btn" href="/admin/login">
       <svg width="18" height="18" viewBox="0 0 127 96" fill="#fff"><path d="M107.7 8.07A105.15 105.15 0 0 0 81.47 0a72.06 72.06 0 0 0-3.36 6.83 97.68 97.68 0 0 0-29.11 0A72.37 72.37 0 0 0 45.64 0a105.89 105.89 0 0 0-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0 0 32.17 16.15 77.7 77.7 0 0 0 6.89-11.11 68.42 68.42 0 0 1-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0 0 64.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 0 1-10.87 5.19 77 77 0 0 0 6.89 11.1 105.25 105.25 0 0 0 32.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15ZM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69Zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69Z"/></svg>
@@ -150,7 +156,7 @@
   <!-- Dashboard -->
   <div id="app" class="hidden">
     <header>
-      <div class="title">WC3 Platform <span>Admin</span></div>
+      <div class="title">Garena.mn <span>Admin</span> <span id="ownerTag" class="badge in_room hidden" style="margin-left:8px">👑 Эзэн</span></div>
       <div class="who">
         <span id="whoName"></span>
         <button class="btn ghost" style="padding:7px 14px;font-size:13px" onclick="logout()">Гарах</button>
@@ -201,6 +207,43 @@
       </div>
 
       <div class="section">
+        <h2>💎 Diamond ба гишүүнчлэл <span id="diaOwnerNote" class="mono"></span></h2>
+        <div class="cards" style="margin-bottom:12px">
+          <div class="card"><div class="label">Эргэлтэд буй 💎</div><div class="value dia" id="cDia">–</div></div>
+          <div class="card"><div class="label">💎-тэй хэрэглэгч</div><div class="value" id="cDiaHolders">–</div></div>
+          <div class="card"><div class="label">Silver / Gold идэвхтэй</div><div class="value" id="cMembers">–</div></div>
+          <div class="card"><div class="label">QPay орлого (₮)</div><div class="value ok" id="cRevenue">–</div></div>
+        </div>
+        <div id="grantPanel" class="panel hidden" style="padding:14px 16px;margin-bottom:12px">
+          <div class="toolbar" style="margin-bottom:8px">
+            <input type="search" id="grantUser" placeholder="Хэрэглэгчийн ID эсвэл яг нэр" style="max-width:240px">
+            <input type="number" id="grantAmount" class="inp" placeholder="± 💎 дүн" style="width:130px">
+            <input type="search" id="grantNote" placeholder="Тэмдэглэл (дансны гүйлгээ №, ажилтан…)" style="max-width:260px">
+            <button class="btn" style="padding:9px 16px;font-size:14px" onclick="grantDiamonds()">💎 Олгох / хасах</button>
+          </div>
+          <div class="toolbar" style="margin-bottom:0">
+            <input type="search" id="memUser" placeholder="Хэрэглэгчийн ID эсвэл яг нэр" style="max-width:240px">
+            <select id="memTier" class="inp"><option value="gold">Gold</option><option value="silver">Silver</option><option value="bronze">Bronze (цуцлах)</option></select>
+            <select id="memMonths" class="inp"><option value="1">1 сар</option><option value="3">3 сар</option><option value="6">6 сар</option><option value="12">12 сар</option></select>
+            <input type="search" id="memNote" placeholder="Тэмдэглэл" style="max-width:200px">
+            <button class="btn" style="padding:9px 16px;font-size:14px" onclick="grantMembership()">👑 Гишүүнчлэл өгөх</button>
+          </div>
+          <div id="grantMsg" class="muted" style="margin:10px 0 0;display:none;max-width:none"></div>
+        </div>
+        <p id="grantLocked" class="muted hidden" style="max-width:none">💎 олгох / гишүүнчлэл өгөх нь зөвхөн платформын эзэнд (серверийн <span class="mono">ADMIN_DISCORD_IDS</span> / <span class="mono">OWNER_USER_IDS</span>) нээлттэй. Та дэвтрийг харж болно.</p>
+        <div class="toolbar">
+          <input type="search" id="ledgerSearch" placeholder="Дэвтэр: хэрэглэгчийн ID эсвэл нэрээр шүүх…" style="max-width:320px">
+          <button class="btn ghost" style="padding:9px 14px;font-size:13px" onclick="loadLedger()">Шинэчлэх</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Огноо</th><th>Хэрэглэгч</th><th>Дүн</th><th>Төрөл</th><th>Тэмдэглэл</th></tr></thead>
+            <tbody id="ledgerBody"><tr><td colspan="5" class="empty">Ачааллаж байна…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
         <h2>🛡️ Админ эрх</h2>
         <div class="toolbar">
           <input type="search" id="newAdminId" placeholder="Discord ID (жишээ: 123456789012345678)" style="max-width:280px">
@@ -240,6 +283,7 @@
   const $ = (id) => document.getElementById(id);
   let token = localStorage.getItem('admin_token') || '';
   let usersGridApi = null, wkGridApi = null, bannedGridApi = null;
+  let isOwner = false;
 
   // OAuth callback: токен URL fragment-аар ирнэ → хадгалаад hash-ыг цэвэрлэнэ.
   (function grabTokenFromHash() {
@@ -336,11 +380,15 @@
     { headerName: 'Хож', field: 'wins', width: 78, filter: 'agNumberColumnFilter' },
     { headerName: 'Ялагдал', field: 'losses', width: 88, filter: 'agNumberColumnFilter' },
     { headerName: 'Тоглолт', field: 'games', width: 88, filter: 'agNumberColumnFilter' },
+    { headerName: '💎', field: 'diamonds', width: 84, filter: 'agNumberColumnFilter', cellClass: 'dia' },
+    { headerName: 'LV', field: 'level', width: 60, filter: 'agNumberColumnFilter' },
+    { headerName: 'Түвшин', field: 'tier', width: 92, cellRenderer: comp((p) => el(`<span class="badge ${esc(p.value || 'bronze')}">${esc((p.value || 'bronze').toUpperCase())}</span>`)) },
     { headerName: 'Бүртгүүлсэн', field: 'created_at', width: 116, valueFormatter: (p) => fmtDate(p.value) },
     { headerName: 'Төлөв', field: 'status', width: 104, cellRenderer: comp((p) => el(statusBadge(p.value))) },
-    { headerName: '', colId: 'actions', width: 82, sortable: false, filter: false,
+    { headerName: '', colId: 'actions', width: 108, sortable: false, filter: false,
       cellRenderer: comp((p) => el(
         `<span><button class="iconbtn" title="Засах" onclick="openEditUser(${p.data.id})">✏️</button>` +
+        (isOwner ? `<button class="iconbtn" title="💎 олгох" onclick="prefillGrant(${p.data.id})">💎</button>` : '') +
         `<button class="iconbtn danger" title="Устгах" onclick="deleteUser(${p.data.id})">🗑</button></span>`)) },
   ];
 
@@ -545,6 +593,72 @@
     });
   }
 
+  // ── 💎 Diamond / гишүүнчлэл ──
+  function fmtN(n) { return Number(n || 0).toLocaleString('en-US'); }
+  function grantNote(text, isError) {
+    const n = $('grantMsg');
+    n.textContent = text;
+    n.style.color = isError ? 'var(--game)' : 'var(--ok)';
+    n.style.display = text ? '' : 'none';
+  }
+  async function loadDiamondSummary() {
+    const res = await api('/admin/api/diamonds/summary');
+    if (!res.ok) return handleAuth(res);
+    const s = await res.json();
+    $('cDia').textContent = fmtN(s.diamonds_in_circulation);
+    $('cDiaHolders').textContent = s.holders;
+    const mem = Object.fromEntries((s.active_members || []).map((m) => [m.membership, m.n]));
+    $('cMembers').textContent = `${mem.silver || 0} / ${mem.gold || 0}`;
+    const rev = (s.paid_orders || []).filter((o) => o.currency === 'MNT').reduce((a, o) => a + Number(o.amount || 0), 0);
+    $('cRevenue').textContent = fmtN(rev);
+  }
+  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт' };
+  async function loadLedger() {
+    const q = $('ledgerSearch').value.trim();
+    const res = await api('/admin/api/diamonds/ledger?' + new URLSearchParams({ limit: '200', user: q }));
+    if (!res.ok) return handleAuth(res);
+    const { rows } = await res.json();
+    $('ledgerBody').innerHTML = rows.length
+      ? rows.map((t) => `<tr>
+          <td class="mono">${esc(fmtTime(t.created_at))}</td>
+          <td>${esc(t.username || '')} <span class="mono">#${esc(t.user_id)}</span></td>
+          <td class="amt ${t.amount > 0 ? 'pos' : (t.amount < 0 ? 'neg' : '')}">${t.amount > 0 ? '+' : ''}${fmtN(t.amount)} 💎</td>
+          <td>${esc(TYPE_TEXT[t.type] || t.type)}</td>
+          <td class="muted" style="max-width:none">${esc(t.note || '')}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="5" class="empty">Гүйлгээ алга</td></tr>`;
+  }
+  function prefillGrant(id) {
+    $('grantUser').value = String(id);
+    $('memUser').value = String(id);
+    $('grantAmount').focus();
+    $('grantPanel').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  async function grantDiamonds() {
+    const user = $('grantUser').value.trim();
+    const amount = parseInt($('grantAmount').value, 10);
+    const note = $('grantNote').value.trim();
+    if (!user || !Number.isInteger(amount) || amount === 0) { grantNote('Хэрэглэгч ба 0-ээс ялгаатай дүн оруулна уу', true); return; }
+    if (!confirm(`${user} → ${amount > 0 ? '+' : ''}${fmtN(amount)} 💎 олгох уу?`)) return;
+    const res = await apiSend('POST', '/admin/api/diamonds/grant', { user, amount, note });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { grantNote(`✓ ${j.user.username} (#${j.user.id}): ${amount > 0 ? '+' : ''}${fmtN(amount)} 💎 → үлдэгдэл ${fmtN(j.diamonds)} 💎`, false); $('grantAmount').value = ''; loadLedger(); loadDiamondSummary(); loadUsers(); }
+    else grantNote(j.error || 'Олгож чадсангүй', true);
+  }
+  async function grantMembership() {
+    const user = $('memUser').value.trim();
+    const tier = $('memTier').value;
+    const months = parseInt($('memMonths').value, 10) || 1;
+    const note = $('memNote').value.trim();
+    if (!user) { grantNote('Хэрэглэгчээ оруулна уу', true); return; }
+    if (!confirm(`${user} → ${tier.toUpperCase()} ${tier === 'bronze' ? '(гишүүнчлэл цуцлах)' : months + ' сар үнэгүй'}?`)) return;
+    const res = await apiSend('POST', '/admin/api/membership/grant', { user, tier, months, note });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) { grantNote(`✓ ${j.user.username} (#${j.user.id}): ${tier.toUpperCase()}${j.membership_until ? ' — ' + fmtDate(j.membership_until) + ' хүртэл' : ''}`, false); loadDiamondSummary(); loadUsers(); }
+    else grantNote(j.error || 'Өгч чадсангүй', true);
+  }
+  $('ledgerSearch').addEventListener('input', () => { clearTimeout(window.__ledgerT); window.__ledgerT = setTimeout(loadLedger, 350); });
+
   function adminNote(text, isError) {
     const el = $('adminMsg');
     el.textContent = text;
@@ -613,14 +727,20 @@
     }
     if (!me.ok) { logout(); return; }
     const admin = await me.json();
+    isOwner = !!admin.is_owner;
     $('whoName').textContent = admin.username || 'Admin';
+    $('ownerTag').classList.toggle('hidden', !isOwner);
+    $('grantPanel').classList.toggle('hidden', !isOwner);
+    $('grantLocked').classList.toggle('hidden', isOwner);
     show('app');
     loadSummary(); loadOnline(); loadUsers(); loadAdmins();
     loadWarkeySummary(); loadWarkeyUsers(); loadBannedUsers();
+    loadDiamondSummary(); loadLedger();
     // Cards + online жагсаалтыг 5 сек тутам сэргээнэ; хүснэгтүүдийг тогтвортой
     // байлгахын тулд давтан татахгүй (хуудаслалт/гүйлгээ эвдэхгүй).
     clearInterval(refreshTimer);
     refreshTimer = setInterval(() => { loadSummary(); loadOnline(); loadWarkeySummary(); }, 5000);
+    setInterval(loadDiamondSummary, 30000);
   }
 
   boot();
