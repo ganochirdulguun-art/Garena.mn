@@ -10,6 +10,16 @@ let currentRoomId = null;
 let resultCallback = null;
 let roomMembers = []; // [{id, name}] — өрөөний гишүүд (user_id + username)
 let processedReplays = new Set(); // аль хэдийн parse хийсэн файлуудыг давтахгүй
+const extraReplayDirs = new Set();  // 1.26a: <WC3>\replay (game:launch үед нэмэгдэнэ)
+
+// WC3 1.26a replay хавтас нэмэх (Documents биш, тоглоомын хавтас дотор)
+function addReplayDir(dir) {
+  if (dir && !extraReplayDirs.has(dir)) {
+    extraReplayDirs.add(dir);
+    console.log(`[Replay] хавтас нэмэгдлээ: ${dir}`);
+    if (watcher) { try { watcher.add(`${dir.replace(/\\/g, '/')}/**/*.w3g`); } catch {} }
+  }
+}
 
 // WC3 replays хавтас автоматаар олох
 function getReplayPath() {
@@ -68,7 +78,9 @@ function startWatcher(roomId) {
 
   console.log(`[Replay] Хавтас хянаж байна: ${replayDir}`);
 
-  watcher = chokidar.watch(`${replayDir}/**/*.w3g`, {
+  const dirs = [replayDir, ...extraReplayDirs, 'C:/Program Files (x86)/Warcraft 3/replay', 'C:/Program Files (x86)/Warcraft III/replay', 'C:/Warcraft III/replay'];
+  const globs = [...new Set(dirs.filter(Boolean).map((d) => `${String(d).replace(/\\/g, '/')}/**/*.w3g`))];
+  watcher = chokidar.watch(globs, {
     ignoreInitial: true,
     awaitWriteFinish: {
       stabilityThreshold: 3000,
@@ -193,4 +205,4 @@ function onResult(cb) {
   resultCallback = cb;
 }
 
-module.exports = { startWatcher, stopWatcher, onResult, setMembers };
+module.exports = { startWatcher, stopWatcher, onResult, setMembers, addReplayDir };

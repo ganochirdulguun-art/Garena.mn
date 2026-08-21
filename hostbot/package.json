@@ -1,0 +1,14 @@
+{
+  "name": "garena-hostbot-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Garena.mn — GHost++ хост ботыг платформтой холбох bridge (RGC маяг)",
+  "main": "bridge.js",
+  "scripts": {
+    "start": "node bridge.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  }
+}

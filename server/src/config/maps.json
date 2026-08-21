@@ -1,0 +1,15 @@
+{
+  "_comment": "Бот хостын map каталог. key → hostbot/mapcfgs/<key>.cfg. map_path нь тоглогчийн WC3 хавтас дахь зам (GAMEINFO-д явна); файл байхгүй тоглогч ботоос татна (bot_allowdownloads=1). type=dota → GHost++ dota stats (K/D/A, ялагч).",
+  "maps": [
+    {
+      "key": "lod-674c-5e",
+      "name": "DotA v6.74c LoD v5e",
+      "file": "DotA v6.74c LoD v5e.w3x",
+      "map_path": "Maps\\Downloads\\DotA v6.74c LoD v5e.w3x",
+      "type": "dota",
+      "game_types": ["Warcraft III", "Warcraft III: TFT", "DotA", "LoD"],
+      "players": 10,
+      "default": true
+    }
+  ]
+}

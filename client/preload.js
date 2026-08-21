@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld('api', {
   startGameFinder: (hostIp)    => ipcRenderer.invoke('relay:startFinder', hostIp),
   stopRelay:       ()          => ipcRenderer.invoke('relay:stop'),
   addRelayPlayer:  (ip)        => ipcRenderer.invoke('relay:addHostPlayer', ip),
+  startBotBridge:  (opts)      => ipcRenderer.invoke('relay:startBotBridge', opts),
+  stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
 
   // Тоглоом эхлүүлэх
   launchGame: (gameType) => ipcRenderer.invoke('game:launch', gameType),
@@ -138,4 +140,7 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateError:     (cb) => ipcRenderer.on('update:error', (_, msg) => cb(msg)),
   checkForUpdates:   ()   => ipcRenderer.invoke('update:check'),
   getAppVersion:     ()   => ipcRenderer.invoke('update:version'),
+
+  // Ерөнхий API хүсэлт (Банк ₮, гишүүнчлэл)
+  request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
 });

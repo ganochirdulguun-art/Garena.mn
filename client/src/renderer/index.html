@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https://cdn.discordapp.com data:; connect-src 'self' http://localhost:3000 ws://localhost:3000 https://garenamn-production.up.railway.app wss://garenamn-production.up.railway.app;" />
+    content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' http://localhost:3000 ws://localhost:3000 https://garenamn-production.up.railway.app wss://garenamn-production.up.railway.app;" />
   <title>Garena.mn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -159,37 +159,49 @@
     </defs>
   </svg>
 
-  <!-- ① Нэвтрэх / Бүртгэл -->
+  <!-- ① Нэвтрэх / Бүртгэл — Garena Plus маяг -->
   <div id="page-login" class="page active">
     <div class="login-box">
-      <img class="login-logo" src="logo.gif" alt="" />
-      <h1>Garena.mn</h1>
-      <p class="subtitle">Монголын WC3 &amp; DotA 1 тоглогчдын платформ</p>
-
-      <div class="auth-tabs">
-        <button type="button" class="auth-tab active" data-auth="login">Нэвтрэх</button>
-        <button type="button" class="auth-tab" data-auth="register">Бүртгүүлэх</button>
+      <div class="login-head">
+        <img class="login-logo" src="logo.png" alt="" />
+        <div>
+          <span class="login-brand">Garena<small>.mn</small></span>
+          <span class="login-tag">Монгол gameranger платформ</span>
+        </div>
       </div>
+      <img class="login-mascot" src="mascot.png" alt="" aria-hidden="true" />
 
       <div id="auth-login" class="auth-form">
-        <input id="login-email" type="email" placeholder="Имэйл хаяг" class="input" />
+        <input id="login-email" type="email" placeholder="Имэйл хаяг" class="input" autocomplete="username" />
         <div class="input-pw-wrap">
-          <input id="login-password" type="password" placeholder="Нууц үг" class="input" />
+          <input id="login-password" type="password" placeholder="Нууц үг" class="input" autocomplete="current-password" />
           <button type="button" class="btn-eye" data-target="login-password" title="Нууц үг харах">👁</button>
         </div>
+        <button type="button" id="btn-forgot-password" class="login-link"><i class="q">?</i>Нууц үгээ мартсан?</button>
+        <label class="login-check"><input type="checkbox" id="login-remember" />Имэйлийг сануулах</label>
+        <div class="login-status-row">
+          <span>Нэвтрэх төлөв</span>
+          <select id="login-status" class="login-status" title="Нэвтрэх төлөв">
+            <option value="online">Онлайн</option>
+            <option value="busy">Завгүй</option>
+            <option value="invisible">Үл үзэгдэх</option>
+          </select>
+        </div>
         <p id="login-error" class="form-error"></p>
-        <button type="button" id="btn-email-login" class="btn btn-primary btn-block">Нэвтрэх</button>
-        <button type="button" id="btn-forgot-password" class="btn-link mt-4">Нууц үгээ мартсан уу?</button>
-        <div class="login-divider"><span>эсвэл</span></div>
-        <button type="button" id="btn-login" class="btn btn-discord btn-block">Discord-ээр нэвтрэх</button>
-        <div class="qr-section">
-          <p class="qr-label">Утасны камераар QR уншуулж нэвтрэх</p>
+        <button type="button" id="btn-email-login" class="btn-garena">Нэвтрэх</button>
+        <button type="button" id="btn-login" class="btn btn-discord">Discord-ээр нэвтрэх</button>
+        <button type="button" id="btn-qr-toggle" class="login-link">📱 QR кодоор нэвтрэх</button>
+        <div id="qr-section" class="qr-section hidden">
+          <div class="qr-head">
+            <span>Утсаар QR уншуулах</span>
+            <button type="button" id="btn-qr-close" class="qr-close" title="Хаах">✕</button>
+          </div>
           <div class="qr-box">
             <img id="qr-img" src="" alt="QR" />
             <div id="qr-loading" class="qr-loading">Ачааллаж байна...</div>
           </div>
-          <p class="qr-hint">📱 Утасны камер эсвэл QR скан апп ашиглана уу — холбоос нээгдээд Discord-оор баталгаажуулна. (Discord апп доторх QR scanner ажиллахгүй)</p>
-          <button type="button" id="btn-refresh-qr" class="btn btn-sm btn-with-icon mt-8">
+          <p class="qr-hint">Утасны камер эсвэл QR скан апп ашиглана — холбоос нээгдээд Discord-оор баталгаажуулна. (Discord апп доторх QR scanner ажиллахгүй)</p>
+          <button type="button" id="btn-refresh-qr" class="btn btn-sm btn-with-icon">
             <svg class="btn-icon-svg"><use href="#ico-refresh"/></svg>
             Шинэчлэх
           </button>
@@ -198,27 +210,28 @@
 
       <!-- Нууц үг сэргээх form -->
       <div id="auth-forgot" class="auth-form hidden">
-        <h3 class="mb-8">🔑 Нууц үг сэргээх</h3>
+        <h3>🔑 Нууц үг сэргээх</h3>
         <div id="forgot-step-1">
           <input id="forgot-email" type="email" placeholder="Бүртгэлтэй имэйл хаяг" class="input" />
           <p id="forgot-error" class="form-error"></p>
-          <button type="button" id="btn-forgot-send" class="btn btn-primary btn-block mt-4">Код авах</button>
+          <button type="button" id="btn-forgot-send" class="btn-garena">Код авах</button>
         </div>
         <div id="forgot-step-2" class="hidden">
-          <p class="hint mb-8">Доорх кодыг хадгалж авна уу:</p>
+          <p class="hint">Доорх кодыг хадгалж авна уу:</p>
           <div id="forgot-token-display" class="reset-token-box"></div>
-          <input id="forgot-token-input" type="text" placeholder="Дээрх кодыг оруулна уу" class="input mt-8" />
-          <div class="input-pw-wrap mt-4">
+          <input id="forgot-token-input" type="text" placeholder="Дээрх кодыг оруулна уу" class="input" />
+          <div class="input-pw-wrap">
             <input id="forgot-new-password" type="password" placeholder="Шинэ нууц үг (6+ тэмдэгт)" class="input" />
             <button type="button" class="btn-eye" data-target="forgot-new-password" title="Нууц үг харах">👁</button>
           </div>
           <p id="forgot-reset-error" class="form-error"></p>
-          <button type="button" id="btn-forgot-reset" class="btn btn-primary btn-block mt-4">Нууц үг шинэчлэх</button>
+          <button type="button" id="btn-forgot-reset" class="btn-garena">Нууц үг шинэчлэх</button>
         </div>
-        <button type="button" id="btn-back-to-login" class="btn-link mt-8">← Нэвтрэх хуудас руу буцах</button>
+        <button type="button" id="btn-back-to-login" class="login-link">← Нэвтрэх хуудас руу буцах</button>
       </div>
 
       <div id="auth-register" class="auth-form hidden">
+        <h3>Бүртгэл үүсгэх</h3>
         <input id="reg-username" type="text"  placeholder="Хоч нэр (Nickname)" class="input" />
         <input id="reg-email"    type="email" placeholder="Имэйл хаяг"         class="input" />
         <div class="input-pw-wrap">
@@ -230,72 +243,85 @@
           <button type="button" class="btn-eye" data-target="reg-password-confirm" title="Нууц үг харах">👁</button>
         </div>
         <p id="reg-error" class="form-error"></p>
-        <button type="button" id="btn-register" class="btn btn-primary btn-block">Бүртгүүлэх</button>
+        <button type="button" id="btn-register" class="btn-garena">Бүртгүүлэх</button>
         <div class="login-divider"><span>эсвэл</span></div>
-        <button type="button" id="btn-discord-reg" class="btn btn-discord btn-block">Discord-ээр бүртгүүлэх</button>
+        <button type="button" id="btn-discord-reg" class="btn btn-discord">Discord-ээр бүртгүүлэх</button>
+      </div>
+
+      <div class="login-foot">
+        <button type="button" class="auth-tab active" data-auth="login">Нэвтрэх</button>
+        <button type="button" class="auth-tab" data-auth="register">Бүртгэл үүсгэх</button>
+        <button type="button" id="btn-login-check-update" class="login-foot-link">Шинэчлэлт шалгах</button>
+        <span id="login-version" class="login-ver"></span>
       </div>
     </div>
   </div>
 
   <!-- ② Үндсэн хуудас -->
   <div id="page-main" class="page">
-    <aside class="app-sidebar">
-      <div class="sidebar-brand">
-        <img src="logo.gif" alt="" />
-        <div>
-          <strong>Warcraft Platform</strong>
-          <span>Mongolian community</span>
-        </div>
-      </div>
-      <nav class="app-nav" aria-label="Үндсэн цэс">
-        <button type="button" class="nav-btn active" data-tab="lobby">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-rooms"/></svg></span>
-          <span class="nav-label">Өрөөнүүд</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="chat">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg></span>
-          <span class="nav-label">Чат</span>
-          <span id="chat-badge" class="nav-badge hidden">0</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="ranking">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-rank"/></svg></span>
-          <span class="nav-label">Rank</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="discord">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-discord"/></svg></span>
-          <span class="nav-label">Discord</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="streamers">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-streamers"/></svg></span>
-          <span class="nav-label">Стримерүүд</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="profile">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-profile"/></svg></span>
-          <span class="nav-label">Профайл</span>
-        </button>
-        <button type="button" class="nav-btn" data-tab="settings">
-          <span class="nav-icon"><svg class="btn-icon-svg"><use href="#ico-nav-settings"/></svg></span>
-          <span class="nav-label">Тохиргоо</span>
-        </button>
-      </nav>
-      <div class="sidebar-footer">
-        <div class="sidebar-status-row">
-          <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон">
-            <span class="connection-status-dot" aria-hidden="true"></span>
+    <!-- Дээд баннер + табууд (мокап №2 — DotA lobby бүтэц, sidebar байхгүй) -->
+    <header class="topbanner">
+      <button type="button" class="brand" data-goto-tab="lobby" title="Өрөөнүүд">
+        <img src="logo.png" alt="" />
+        <span class="brand-text">
+          <strong>GARENA.MN</strong>
+          <span>Монгол gameranger платформ</span>
+        </span>
+      </button>
+      <div class="banner-right">
+        <button type="button" class="userchip" data-goto-tab="profile" title="Профайл">
+          <span class="userchip-avatar">
+            <svg class="btn-icon-svg"><use href="#ico-nav-profile"/></svg>
+            <img id="user-avatar" src="" alt="" class="hidden" />
           </span>
-          <button type="button" id="btn-sidebar-toggle" class="btn btn-icon-only sidebar-toggle" title="Sidebar хаах" aria-label="Sidebar хаах" aria-expanded="true">
-            <svg class="btn-icon-svg"><use id="sidebar-toggle-icon" href="#ico-sidebar-collapse"/></svg>
+          <span class="userchip-text">
+            <span id="user-name"></span>
+            <span class="userchip-sub">
+              <span id="user-level" class="pill-lv hidden"></span>
+              <span id="user-tier" class="pill-tier hidden"></span>
+            </span>
+          </span>
+          <span id="user-wallet" class="wallet hidden" title="Diamond — 10 тоглолтоос 5-д хожвол +30"><b id="user-wallet-amount">💎 0</b><span>Diamond</span></span>
+        </button>
+        <div class="banner-actions">
+          <button type="button" id="btn-open-friends-main" class="ibtn" title="Найзууд (тусдаа цонх)">
+            <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M22 20a7 7 0 0 0-5-6.7"/></svg>
           </button>
-        </div>
-        <div class="user-info">
-          <img id="user-avatar" src="" alt="" class="hidden" />
-          <span id="user-name"></span>
-          <button type="button" id="btn-logout" class="btn btn-icon-only btn-danger-soft" title="Гарах">
+          <button type="button" class="nav-btn ibtn" data-tab="chat" title="Нийтийн чат / DM">
+            <svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg>
+            <span id="chat-badge" class="nav-badge hidden">0</span>
+          </button>
+          <button type="button" id="btn-open-settings" class="ibtn" data-settings-jump="app" title="Тохиргоо">
+            <svg class="btn-icon-svg"><use href="#ico-nav-settings"/></svg>
+          </button>
+          <button type="button" id="btn-logout" class="ibtn ibtn-danger" title="Гарах">
             <svg class="btn-icon-svg"><use href="#ico-logout"/></svg>
           </button>
         </div>
       </div>
-    </aside>
+    </header>
+    <nav class="maintabs" aria-label="Үндсэн цэс">
+      <button type="button" class="nav-btn maintab" data-tab="discord"><svg class="btn-icon-svg"><use href="#ico-nav-discord"/></svg><span class="nav-label">Discord</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="settings" data-settings-jump="games"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 4 4v2a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-2a4 4 0 0 1 4-4z"/><path d="M7 12v2M6 13h2M16 12.5h.01M18 14h.01"/></svg><span class="nav-label">Тоглоом</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="lobby"><svg class="btn-icon-svg"><use href="#ico-nav-rooms"/></svg><span class="nav-label">Өрөөнүүд</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="room"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="nav-label">Өрөө</span></button>
+      <span class="maintabs-spacer"></span>
+      <span class="conn">
+        <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон">
+          <span class="connection-status-dot" aria-hidden="true"></span>
+        </span>
+        <span class="conn-label">Холбогдсон</span>
+      </span>
+      <!-- Хуучин табууд: UI-д харагдахгүй, гэхдээ showTab() эвдрэхгүй -->
+      <button type="button" class="nav-btn hidden-tab" data-tab="ranking" tabindex="-1" aria-hidden="true"></button>
+      <button type="button" class="nav-btn hidden-tab" data-tab="streamers" tabindex="-1" aria-hidden="true"></button>
+      <button type="button" class="nav-btn hidden-tab" data-tab="profile" tabindex="-1" aria-hidden="true"></button>
+      <span hidden>
+        <button type="button" id="btn-sidebar-toggle" class="btn btn-icon-only sidebar-toggle" aria-expanded="true">
+          <svg class="btn-icon-svg"><use id="sidebar-toggle-icon" href="#ico-sidebar-collapse"/></svg>
+        </button>
+      </span>
+    </nav>
     <div class="fire-sparks" aria-hidden="true">
       <span style="--x:6%;--s:3px;--d:8s;--delay:-1s;--drift:34px;--o:.55"></span>
       <span style="--x:14%;--s:2px;--d:10s;--delay:-7s;--drift:-26px;--o:.45"></span>
@@ -372,6 +398,8 @@
         </select>
         <input id="room-max" type="number" value="10" min="2" max="12" class="input" title="Тоглогчдын дээд тоо" placeholder="Тоглогчдын дээд тоо" />
         <textarea id="room-desc" class="input" placeholder="Тайлбар (заавал биш) — дүрэм, нөхцөл гэх мэт..." maxlength="200" rows="2"></textarea>
+        <input id="room-bg" type="url" class="input hidden" placeholder="Өрөөний дэвсгэр зураг — https://… (GOLD гишүүн)" maxlength="500" />
+        <p id="room-bg-hint" class="hint">GOLD гишүүд өрөөндөө өөрийн дэвсгэр зураг тавьж болно.</p>
         <div class="password-row">
           <label class="checkbox-label">
             <input id="room-has-password" type="checkbox" />
@@ -387,22 +415,15 @@
 
       <div class="room-board-layout no-selection">
         <div class="room-board-main">
-          <section class="rooms-section room-grid-panel">
-            <div class="room-section-head">
-              <h3 class="section-title"><span class="room-state-dot waiting"></span>Нэгдэж болно</h3>
-              <span id="rooms-waiting-count" class="lobby-filters-count">0 өрөө</span>
+          <section class="rooms-section room-grid-panel room-list-panel">
+            <div id="rooms-waiting" class="rooms-grid room-list">
+              <div class="room-grid-empty">Ачааллаж байна...</div>
             </div>
-            <div id="rooms-waiting" class="rooms-grid">
-              <p class="empty-text">Ачааллаж байна...</p>
-            </div>
-          </section>
-          <section class="rooms-section room-grid-panel">
-            <div class="room-section-head">
-              <h3 class="section-title"><span class="room-state-dot playing"></span>Тоглолт явагдаж байна</h3>
-              <span id="rooms-playing-count" class="lobby-filters-count">0 өрөө</span>
-            </div>
-            <div id="rooms-playing" class="rooms-grid">
-              <p class="empty-text">Одоогоор тоглолт явагдахгүй байна</p>
+            <div id="rooms-playing" class="hidden"></div>
+            <div class="room-list-foot">
+              <span id="rooms-waiting-count">0 өрөө</span>
+              <span id="rooms-playing-count" class="hidden">0 өрөө</span>
+              <span>Мөр дээр дарж дэлгэрэнгүй · давхар товшиж нэгдэнэ</span>
             </div>
           </section>
         </div>
@@ -411,6 +432,26 @@
             <div class="room-detail-icon">i</div>
             <p>Өрөө сонгоход дэлгэрэнгүй мэдээлэл энд гарна.</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Өрөө tab (мокап №2 — 4-р таб). Өрөө өөрөө тусдаа цонхонд нээгддэг. -->
+    <div id="tab-room" class="tab">
+      <div id="room-tab-empty" class="card room-tab-box">
+        <h2>Та одоогоор өрөөнд ороогүй байна</h2>
+        <p>Өрөөнүүд табаас өрөө сонгож нэгдээрэй, эсвэл өөрөө өрөө үүсгээрэй. Өрөөнд орсны дараа өрөөний цонх тусдаа нээгдэнэ.</p>
+        <div class="room-tab-actions">
+          <button type="button" class="btn btn-primary" data-goto-tab="lobby">Өрөөнүүд рүү очих</button>
+          <button type="button" class="btn" id="btn-room-tab-create">Өрөө үүсгэх</button>
+        </div>
+      </div>
+      <div id="room-tab-current" class="card room-tab-box hidden">
+        <span class="room-eyebrow">Таны өрөө</span>
+        <h2 id="room-tab-name"></h2>
+        <p id="room-tab-meta"></p>
+        <div class="room-tab-actions">
+          <button type="button" class="btn btn-primary" id="btn-room-tab-open">Өрөөний цонх нээх</button>
         </div>
       </div>
     </div>
@@ -583,6 +624,64 @@
           <p id="pw-change-success" class="form-success"></p>
           <button type="button" id="btn-change-password" class="btn btn-primary mt-8">Солих</button>
         </section>
+
+        <!-- Diamond 💎 + XP -->
+        <section class="card diamond-card profile-diamond-card">
+          <h3>Diamond 💎 · XP</h3>
+          <div class="diamond-row">
+            <span class="diamond-amount" data-diamonds>💎 0</span>
+            <span class="hint hint-no-margin">10 тоглолт тутамд <b>5-аас олон хожвол +30 💎</b>. Silver = 800 💎 · Gold = 1500 💎 (эсвэл QPay).</span>
+          </div>
+          <div class="diamond-progress">
+            <div class="row"><span id="diamond-block-text">Энэ блок: 0/0</span></div>
+            <div class="bar"><i id="diamond-block-bar"></i></div>
+            <div class="row"><span id="diamond-level-text">LV 1 · 0 XP</span></div>
+            <div class="bar xp"><i id="diamond-xp-bar"></i></div>
+          </div>
+          <p class="bank-note">XP: хожил +40 · хожигдол +10 · leaver −30 · kill +1, assist +0.5 (хамгийн ихдээ +30). Дүнг replay эсвэл бот хост автоматаар бүртгэнэ; 8 минутаас богино тоглолт тоологдохгүй.</p>
+        </section>
+
+        <!-- Гишүүнчлэл -->
+        <section class="card profile-membership-card">
+          <div class="membership-head">
+            <h3 class="mb-0">Premium гишүүнчлэл</h3>
+            <span id="membership-current" class="tier-badge tier-bronze">Bronze</span>
+            <span id="membership-until" class="hint"></span>
+          </div>
+          <div class="tier-grid">
+            <div class="tier-card" data-tier="bronze">
+              <div class="tier-head"><span class="tier-badge tier-bronze">Bronze</span><span class="tier-price">Үнэгүй</span></div>
+              <ul><li>Өрөө үүсгэх, өрөөнд нэгдэх</li><li>50 найз хүртэл</li></ul>
+            </div>
+            <div class="tier-card" data-tier="silver">
+              <div class="tier-head"><span class="tier-badge tier-silver">Silver</span><span class="tier-price">20,000₮ <small>/ сар · эсвэл 800 💎</small></span></div>
+              <ul><li>Хөдөлгөөнт neon аватарын хүрээ</li><li>Нэрийн эффект (neon / солонго) — өрөө, DM, нийтийн чатад</li><li>100 найз хүртэл</li></ul>
+              <button type="button" class="btn btn-primary" data-buy-tier="silver">Silver авах</button>
+            </div>
+            <div class="tier-card" data-tier="gold">
+              <div class="tier-head"><span class="tier-badge tier-gold">Gold</span><span class="tier-price">40,000₮ <small>/ сар · эсвэл 1500 💎</small></span></div>
+              <ul><li>Хөдөлгөөнт GIF аватар</li><li>Алтан хүрээ + нэрийн эффект</li><li>Өөрийн өрөөний дэвсгэр зураг</li><li>200 найз хүртэл</li></ul>
+              <button type="button" class="btn btn-primary" data-buy-tier="gold">Gold авах</button>
+            </div>
+          </div>
+          <div class="membership-pay-row">
+            <span>Төлбөрийн хэлбэр:</span>
+            <select id="membership-pay-with" class="input input-sm">
+              <option value="qpay">QPay (QR) — 20,000₮ / 40,000₮</option>
+              <option value="diamonds">Diamond — 800 💎 / 1500 💎</option>
+            </select>
+            <span class="hint hint-no-margin">1 сар = 30 хоног. Ижил түвшин дахин авбал хугацаа дээр нь нэмэгдэнэ.</span>
+          </div>
+          <h3 class="mt-8">Нэрийн эффект</h3>
+          <div id="fx-picker" class="fx-picker" role="group" aria-label="Нэрийн эффект">
+            <button type="button" class="fx-btn" data-fx="solid">Энгийн</button>
+            <button type="button" class="fx-btn name-fx-gradient" data-fx="gradient">Градиент</button>
+            <button type="button" class="fx-btn name-fx-neon" data-fx="neon">Neon</button>
+            <button type="button" class="fx-btn name-fx-rainbow" data-fx="rainbow">Солонго</button>
+            <button type="button" class="fx-btn name-fx-toon" data-fx="toon">Toon</button>
+          </div>
+          <p id="fx-lock-note" class="fx-lock-note">Нэрийн эффект Silver / Gold гишүүдэд нээгдэнэ — сонгосон эффект таны нэр гарах газар бүрт (өрөө, DM, нийтийн чат) харагдана.</p>
+        </section>
       </div>
     </div>
 
@@ -590,7 +689,7 @@
     <div id="tab-settings" class="tab">
       <div class="tab-header section-header">
         <div class="section-title-group">
-          <h2>Тохиргоо</h2>
+          <h2>Тоглоом ба тохиргоо</h2>
           <span class="section-subtitle">Тоглоом, сүлжээ, мэдэгдэл, апп арчилгааны тохиргоо</span>
         </div>
       </div>
@@ -740,7 +839,11 @@
                   Сургалт эхлүүлэх
                 </button>
               </div>
-              <p class="hint mt-4" style="font-size:0.72rem">15 алхам — Өмнөх / Дараах товчоор удирдана</p>
+              <p class="hint mt-4" style="font-size:0.72rem">12 алхам — Өмнөх / Дараах товчоор удирдана</p>
+              <ul class="hint mt-4" style="font-size:0.74rem; line-height:1.5; padding-left:18px">
+                <li><strong>Diamond 💎</strong> — 10 тоглолт тутамд 5-аас олон хожвол +30 💎. Silver = 800 💎 (эсвэл 20,000₮), Gold = 1500 💎 (эсвэл 40,000₮), 30 хоног. Профайл хэсгээс харна.</li>
+                <li><strong>Бот хост</strong> — өрөөний host "Тоглоом" картаас map сонгоод "Бот хост хийх" дарна; бусад нь "WC3 нээж нэгдэх" → LAN жагсаалтаас орно. Host lobby-д <code>!start</code> бичнэ; дүн, K/D/A, XP, 💎 автоматаар бүртгэгдэнэ.</li>
+              </ul>
             </div>
           </section>
         </div>
@@ -892,6 +995,17 @@
             </div>
           </div>
           <p class="hint" id="room-info-text"></p>
+          <div id="bot-host-panel" class="bot-host-panel hidden">
+            <div class="bot-host-head"><span class="bot-host-title">🤖 Бот хост</span><span id="bot-host-state" class="bot-host-state" data-state="idle">БЭЛЭН</span></div>
+            <select id="bot-host-map" class="input input-sm" title="Map"></select>
+            <p id="bot-host-text" class="hint"></p>
+            <div class="bot-host-actions">
+              <button type="button" id="btn-bot-host" class="btn btn-primary btn-sm">Бот хост хийх</button>
+              <button type="button" id="btn-bot-cancel" class="btn btn-sm hidden">Цуцлах</button>
+              <button type="button" id="btn-bot-join" class="btn btn-primary btn-sm hidden">WC3 нээж нэгдэх</button>
+            </div>
+            <div id="bot-host-result" class="bot-host-result hidden"></div>
+          </div>
           <div class="room-action-row">
             <button type="button" id="btn-launch-wc3" class="btn btn-primary btn-block btn-with-icon" title="Тоглолт эхлүүлэх">
               <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
@@ -935,9 +1049,10 @@
     <div class="modal-box shortcuts-content">
       <h3>Товчлол</h3>
       <div class="shortcuts-list">
-        <span class="shortcut-key">Alt + 1</span><span class="shortcut-desc">Өрөөнүүд таб</span>
-        <span class="shortcut-key">Alt + 2</span><span class="shortcut-desc">Rank таб</span>
-        <span class="shortcut-key">Alt + 3</span><span class="shortcut-desc">Settings таб</span>
+        <span class="shortcut-key">Alt + 1</span><span class="shortcut-desc">Discord таб</span>
+        <span class="shortcut-key">Alt + 2</span><span class="shortcut-desc">Тоглоом таб</span>
+        <span class="shortcut-key">Alt + 3</span><span class="shortcut-desc">Өрөөнүүд таб</span>
+        <span class="shortcut-key">Alt + 4</span><span class="shortcut-desc">Өрөө таб</span>
         <span class="shortcut-key">Ctrl + K</span><span class="shortcut-desc">Өрөө хайх</span>
         <span class="shortcut-key">Alt + N</span><span class="shortcut-desc">Шинэ өрөө</span>
         <span class="shortcut-key">Alt + Q</span><span class="shortcut-desc">Хурдан тоглолт</span>
@@ -992,6 +1107,23 @@
           <svg class="btn-icon-svg"><use href="#ico-send"/></svg>
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- QPay төлбөрийн modal (Банк цэнэглэх / гишүүнчлэл) -->
+  <div id="pay-modal" class="modal hidden">
+    <div class="modal-box pay-box">
+      <h2 id="pay-title">Төлбөр</h2>
+      <div id="pay-amount" class="pay-amount">0₮</div>
+      <img id="pay-qr" class="pay-qr" src="" alt="QPay QR" />
+      <span id="pay-link" class="pay-link"></span>
+      <p id="pay-status" class="pay-status">Төлбөр хүлээж байна…</p>
+      <div class="pay-actions">
+        <button type="button" id="btn-pay-check" class="btn btn-primary">Төлбөр шалгах</button>
+        <button type="button" id="btn-pay-copy" class="btn">Холбоос хуулах</button>
+        <button type="button" id="btn-pay-close" class="btn">Хаах</button>
+      </div>
+      <p class="pay-qpay-note">QPay — Монголын бүх банкны аппаар төлнө. Төлбөр баталгаажмагц автоматаар шинэчлэгдэнэ.</p>
     </div>
   </div>
 

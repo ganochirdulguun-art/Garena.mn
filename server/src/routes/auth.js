@@ -402,6 +402,14 @@ router.put('/avatar', authMW, async (req, res) => {
   if (!avatarUrl.startsWith('data:image/') && !avatarUrl.startsWith('https://')) {
     return res.status(400).json({ error: 'Unsupported avatar format' });
   }
+  // Хөдөлгөөнт GIF аватар — зөвхөн GOLD гишүүн
+  if (/^data:image\/gif/i.test(avatarUrl) || /\.gif(\?|$)/i.test(avatarUrl)) {
+    const { tierOf, perksOf } = require('./membership');
+    const tier = await tierOf(req.user.id);
+    if (!perksOf(tier).gifAvatar) {
+      return res.status(403).json({ error: 'Хөдөлгөөнт GIF аватар зөвхөн GOLD гишүүнд нээлттэй', code: 'TIER_REQUIRED' });
+    }
+  }
 
   if (await dbOk()) {
     try {
@@ -530,10 +538,19 @@ router.get('/me', authMW, async (req, res) => {
   if (await dbOk()) {
     try {
       const result = await db.query(
-        'SELECT id, username, email, discord_id, discord_username, avatar_url, wins, losses FROM users WHERE id = $1',
+        'SELECT id, username, email, discord_id, discord_username, avatar_url, wins, losses, membership, membership_until, name_effect, diamonds, xp, level, block_games, block_wins FROM users WHERE id = $1',
         [req.user.id]
       );
-      if (result.rows[0]) return res.json(result.rows[0]);
+      if (result.rows[0]) {
+        const { effectiveTier, publicFx } = require('./membership');
+        const { levelProgress } = require('../services/progression');
+        const row = result.rows[0];
+        return res.json({
+          ...row, tier: effectiveTier(row), name_effect: publicFx(row).name_effect,
+          diamonds: row.diamonds || 0, ...levelProgress(row.xp || 0),
+          block_games: row.block_games || 0, block_wins: row.block_wins || 0,
+        });
+      }
     } catch (e) {
       console.error(e);
     }

@@ -1,0 +1,57 @@
+### Garena.mn hostbot — GHost++ тохиргооны загвар (bridge.js ажил бүрт бөглөж run/ghost-<id>.cfg болгоно)
+### {{PORT}} {{GAMENAME}} {{OWNER}} {{MAPCFG}} {{DB}} {{LOG}} {{WAR3PATH}} {{STARTPLAYERS}}
+
+bot_log = {{LOG}}
+bot_language = language.cfg
+bot_war3path = {{WAR3PATH}}
+bot_tft = 1
+bot_bindaddress =
+bot_hostport = {{PORT}}
+bot_reconnect = 1
+bot_reconnectport = 6300
+bot_reconnectwaittime = 3
+bot_maxgames = 1
+bot_commandtrigger = !
+bot_mapcfgpath = mapcfgs/
+bot_savereplays = 1
+bot_replaypath = replays/
+bot_mappath = maps/
+bot_savegamepath = savegames/
+bot_defaultmap = {{MAPCFG}}
+bot_allowdownloads = 1
+bot_pingduringdownloads = 0
+bot_maxdownloaders = 3
+bot_maxdownloadspeed = 2048
+bot_lcpings = 1
+bot_autokickping = 400
+bot_banmethod = 1
+bot_ipblacklistfile = ipblacklist.txt
+bot_lobbytimelimit = 30
+bot_latency = 100
+bot_synclimit = 50
+bot_votekickallowed = 1
+bot_votekickpercentage = 70
+bot_autolock = 1
+bot_autosave = 0
+bot_refreshmessages = 0
+bot_motdfile = motd.txt
+bot_gameloadedfile = gameloaded.txt
+bot_gameoverfile = gameover.txt
+bot_localadminmessages = 0
+
+# Garena.mn bridge UDP 6112 дээр GAMEINFO-г барина → broadcast зөвхөн өөрийн машин руу
+udp_broadcasttarget = 127.0.0.1
+udp_dontroute = 0
+
+# Autohost: ажил бүрт нэг тоглоом; өрөөний host (owner) lobby-д !start бичиж эхлүүлнэ
+autohost_maxgames = 1
+autohost_startplayers = {{STARTPLAYERS}}
+autohost_gamename = {{GAMENAME}}
+autohost_owner = {{OWNER}}
+
+# Статистик (dota: K/D/A, ялагч) — sqlite
+db_type = sqlite3
+db_sqlite3_file = {{DB}}
+
+# Battle.net ашиглахгүй (зөвхөн LAN/интернэт шууд холболт)
+bnet_server =

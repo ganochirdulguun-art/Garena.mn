@@ -2,6 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
+const { recordGameResult } = require('../services/results');
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
@@ -448,43 +449,15 @@ router.post('/result', auth, async (req, res) => {
       };
     });
 
-    // Үр дүн хадгалах
-    const resultRow = await db.query(
-      `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [room_id, winner_team, duration_minutes, replay_path]
-    );
-
-    // Тоглогчдын win/loss шинэчлэх + game_players-д бичих
-    const ALLOWED_COLUMNS = ['wins', 'losses'];
-    const gameResultId = resultRow.rows[0].id;
-    for (const player of resolvedPlayers) {
-      const isWinner = Number(player.team) === Number(winner_team);
-      const column   = isWinner ? 'wins' : 'losses';
-      if (!ALLOWED_COLUMNS.includes(column)) continue;
-
-      if (player.user_id) {
-        await db.query(
-          `UPDATE users SET ${column} = ${column} + 1 WHERE id = $1`,
-          [player.user_id]
-        );
-      }
-
-      // game_players-д хадгалах (user_id байгаа бол)
-      if (player.user_id) {
-        await db.query(
-          `INSERT INTO game_players (game_result_id, user_id, team, is_winner)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT DO NOTHING`,
-          [gameResultId, player.user_id, player.team, isWinner]
-        );
-      }
+    // Үр дүн хадгалах — services/results.js (game_results, game_players K/D/A, wins/losses, XP/Level, Diamond бонус)
+    const saved = await recordGameResult({
+      roomId: room_id, winnerTeam: Number(winner_team), durationMinutes: duration_minutes, replayPath: replay_path,
+      players: resolvedPlayers, source: 'replay',
+    });
+    if (saved.duplicate) {
+      return res.json({ message: 'Үр дүн аль хэдийн бүртгэгдсэн', result: saved.result, duplicate: true });
     }
-
-    // Өрөөний статус дуусгах
-    if (room_id) {
-      await db.query("UPDATE rooms SET status = 'done' WHERE id = $1", [room_id]);
-    }
+    const resultRow = { rows: [saved.result] };
 
     // RZR Bot-д мэдэгдэх (оноо шинэчлэх + Discord нийтлэх)
     await notifyRZRBot({ winner_team, duration_minutes, players });

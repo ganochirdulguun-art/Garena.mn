@@ -1325,7 +1325,8 @@ document.getElementById('btn-submit-room').onclick = async () => {
   if (!game_type)        { showToast('Тоглоом сонгоно уу (Тохируулга таб-д тоглоом нэмнэ үү)', 'warning'); return; }
   if (hasPass && !password) { showToast('Нууц үг оруулна уу', 'warning'); return; }
   async function _doCreateRoom() {
-    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode });
+    const background_url = (document.getElementById('room-bg')?.value || '').trim();
+    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode, background_url });
     document.getElementById('create-room-form').style.display = 'none';
     document.getElementById('room-name').value = '';
     document.getElementById('room-desc').value = '';
@@ -1418,6 +1419,7 @@ function enterRoom(id, name, gameType, isHost, hostId, status, ztNetId) {
     status: status || '',
     zerotierNetworkId: ztNetId || '',
     maxPlayers: cached.max_players || cached.maxPlayers || 10,
+    backgroundUrl: cached.background_url || '',
   });
 }
 
@@ -4115,9 +4117,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '?') { toggleShortcutsModal(); return; }
 
   // Alt+1/2/3 → tab шилжих
-  if (e.altKey && e.key === '1' && mainActive) { e.preventDefault(); showTab('lobby'); return; }
-  if (e.altKey && e.key === '2' && mainActive) { e.preventDefault(); showTab('ranking'); return; }
-  if (e.altKey && e.key === '3' && mainActive) { e.preventDefault(); showTab('settings'); return; }
+  if (e.altKey && e.key === '1' && mainActive) { e.preventDefault(); showTab('discord'); return; }
+  if (e.altKey && e.key === '2' && mainActive) { e.preventDefault(); showTab('settings'); return; }
+  if (e.altKey && e.key === '3' && mainActive) { e.preventDefault(); showTab('lobby'); return; }
+  if (e.altKey && e.key === '4' && mainActive) { e.preventDefault(); showTab('room'); return; }
 
   // Alt+N → create room toggle
   if (e.altKey && (e.key === 'n' || e.key === 'N') && mainActive) {
@@ -4174,15 +4177,12 @@ const ONBOARDING_STEPS = [
   { target: '#lobby-chat-input',     title: 'Нийтийн чат',    text: 'Бүх хэрэглэгчидтэй чатлах боломжтой. @нэр бичвэл mention хийнэ.', category: 'Чат', icon: '🌐' },
 
   // ── Бусад табууд ──
-  { target: '[data-tab="ranking"]',  title: 'Rank',           text: 'Тоглогчдын TierBot rating, хожил/хожигдол, win% зэрэг статистикийг энд харна.', category: 'Табууд', icon: '🏆' },
   { target: '[data-tab="discord"]',  title: 'Discord серверүүд', text: 'Монголын Warcraft Discord серверүүдийн жагсаалт. Өөрийн серверээ нэмж болно.', category: 'Табууд', icon: '🎙️' },
-  { target: '[data-tab="streamers"]', title: 'Стримерүүд',    text: 'Стримерүүдийн Twitch/YouTube холбоосууд. Шууд үзэх боломжтой.', category: 'Табууд', icon: '📺' },
-  { target: '[data-tab="profile"]',  title: 'Профайл',        text: 'Өөрийн статистик, тоглоомын түүх, аватар зураг зэргийг энд харж засварлана.', category: 'Табууд', icon: '👤' },
+  { target: '.userchip',             title: 'Профайл',        text: 'Баннер дээрх нэр/зураг дээрээ дарж профайлаа харж, аватараа солино.', category: 'Табууд', icon: '👤' },
 
   // ── Тохиргоо ──
-  { target: '[data-tab="settings"]', title: 'Тохиргоо',       text: 'Тоглоом нэмэх, ZeroTier сүлжээ, нууц үг солих зэрэг бүх тохиргоо энд.', category: 'Тохиргоо', icon: '⚙️' },
-  { target: '#btn-sidebar-toggle',   title: 'Sidebar',        text: 'Цэсийг нарийсгаж дэлгэцийн зай гаргах эсвэл буцааж бүтнээр нь нээнэ.', category: 'Тохиргоо', icon: '☰' },
-  { target: '.user-info',            title: 'Хэрэглэгчийн мэдээлэл', text: 'Таны профайл зураг, нэр энд харагдана. Гарах товч мөн энд байна.', category: 'Тохиргоо', icon: '🔑' },
+  { target: '[data-tab="settings"]', title: 'Тоглоом',        text: 'Тоглоомын exe бүртгэх, ZeroTier сүлжээ, апп болон мэдэгдлийн тохиргоо — бүгд энэ табд.', category: 'Тохиргоо', icon: '🎮' },
+  { target: '.banner-actions',       title: 'Найзууд · Чат · Тохиргоо · Гарах', text: 'Баннерын баруун булангийн товчнууд: найзуудын цонх, нийтийн чат/DM, тохиргоо, гарах.', category: 'Тохиргоо', icon: '🔑' },
 ];
 
 let _onboardStep = 0;
@@ -4678,3 +4678,553 @@ document.getElementById('btn-str-submit').onclick = async () => {
 
 // ── Эхлүүлэх ─────────────────────────────────────────────
 init();
+
+// ── Garena Plus маягийн нэвтрэх цонхны нэмэлтүүд (2026-08-21) ──
+(function loginExtras() {
+  const emailEl  = document.getElementById('login-email');
+  const remember = document.getElementById('login-remember');
+  const statusEl = document.getElementById('login-status');
+
+  // "Имэйлийг сануулах" — зөвхөн имэйлийг localStorage-д хадгална (нууц үг хадгалахгүй)
+  if (emailEl && remember) {
+    const saved = localStorage.getItem('login_remember_email');
+    if (saved) { emailEl.value = saved; remember.checked = true; }
+    const persist = () => {
+      const v = emailEl.value.trim();
+      if (remember.checked && v) localStorage.setItem('login_remember_email', v);
+      else localStorage.removeItem('login_remember_email');
+    };
+    remember.addEventListener('change', persist);
+    emailEl.addEventListener('change', persist);
+  }
+
+  // "Нэвтрэх төлөв" (Sign in as) — сонголтыг хадгална; presence-д дараа холбоно
+  if (statusEl) {
+    statusEl.value = localStorage.getItem('login_status') || 'online';
+    statusEl.addEventListener('change', () => localStorage.setItem('login_status', statusEl.value));
+  }
+
+  // QR панел нээх/хаах
+  const qrSection = document.getElementById('qr-section');
+  document.getElementById('btn-qr-toggle')?.addEventListener('click', () => {
+    if (!qrSection) return;
+    const opening = qrSection.classList.contains('hidden');
+    qrSection.classList.toggle('hidden', !opening);
+    if (opening && typeof loadQR === 'function') loadQR();
+  });
+  document.getElementById('btn-qr-close')?.addEventListener('click', () => qrSection?.classList.add('hidden'));
+
+  // Доод мөрний "Шинэчлэлт шалгах"
+  document.getElementById('btn-login-check-update')?.addEventListener('click', async () => {
+    try {
+      const res = await window.api.checkForUpdates();
+      if (res?.error === 'dev')  showToast('Dev горимд шинэчлэл шалгах боломжгүй.', 'warning');
+      else if (res?.error)       showToast('Шинэчлэл шалгахад алдаа: ' + res.error, 'error');
+      else                       showToast('Шинэчлэл шалгаж байна — шинэ хувилбар байвал автоматаар татна.', 'info');
+    } catch {
+      showToast('Серверт холбогдож чадсангүй.', 'error');
+    }
+  });
+
+  // Хувилбар (баруун доод булан)
+  window.api?.getAppVersion?.().then(v => {
+    const el = document.getElementById('login-version');
+    if (el && v) el.textContent = 'v' + v;
+  }).catch(() => {});
+})();
+
+// ── Мокап №2-ын үндсэн цонх: баннер + 4 таб (2026-08-22) ──
+(function mainShell() {
+  // data-goto-tab товчнууд (brand, userchip, "Өрөөнүүд рүү очих")
+  document.querySelectorAll('[data-goto-tab]').forEach(el => {
+    el.addEventListener('click', () => showTab(el.dataset.gotoTab));
+  });
+  // "Тоглоом" таб → Тохиргооны "Тоглоом" хэсэг; араа → "Апп" хэсэг
+  const jumpSection = (sec) => document.querySelector(`.settings-menu-item[data-settings-section="${sec}"]`)?.click();
+  document.querySelectorAll('[data-settings-jump]').forEach(el => {
+    el.addEventListener('click', () => {
+      if (!el.classList.contains('nav-btn')) showTab('settings');
+      jumpSection(el.dataset.settingsJump);
+    });
+  });
+  // Найзуудын тусдаа цонх
+  document.getElementById('btn-open-friends-main')?.addEventListener('click', () => window.api.openFriendsWindow?.());
+  // Холболтын текст
+  const connLabel = document.querySelector('.maintabs .conn-label');
+  if (connLabel) {
+    const st = document.getElementById('connection-status');
+    new MutationObserver(() => {
+      connLabel.textContent = st.classList.contains('online') ? 'Холбогдсон' : 'Салсан';
+    }).observe(st, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  // "Өрөө" таб — миний одоогийн өрөө (өрөө өөрөө тусдаа цонхонд нээгдэнэ)
+  async function renderRoomTab() {
+    const empty = document.getElementById('room-tab-empty');
+    const cur   = document.getElementById('room-tab-current');
+    let r = null;
+    try {
+      const res = await window.api.getMyRoom?.();
+      r = Array.isArray(res) ? res[0] : (res && (res.room || res.id ? res : null));
+      if (r && !r.id) r = null;
+    } catch { r = null; }
+    empty?.classList.toggle('hidden', !!r);
+    cur?.classList.toggle('hidden', !r);
+    if (!r) return;
+    const name = document.getElementById('room-tab-name');
+    const meta = document.getElementById('room-tab-meta');
+    if (name) name.textContent = r.name || 'Өрөө';
+    const players = r.current_players ?? r.player_count ?? r.players?.length;
+    if (meta) meta.textContent = [r.game_type || r.gameType, players != null ? `${players}/${r.max_players || r.maxPlayers || 10} тоглогч` : null].filter(Boolean).join(' · ');
+    const open = document.getElementById('btn-room-tab-open');
+    if (open) open.onclick = () => enterRoom(r.id, r.name, r.game_type || r.gameType,
+      String(r.host_id ?? r.hostId) === String(currentUser?.id), r.host_id ?? r.hostId, r.status, r.zerotier_network_id || r.zerotierNetworkId);
+  }
+  const _showTab = showTab;
+  showTab = function (name) { _showTab(name); if (name === 'room') renderRoomTab(); };
+  document.getElementById('btn-room-tab-create')?.addEventListener('click', () => {
+    showTab('lobby');
+    document.getElementById('btn-create-room')?.click();
+  });
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Premium (2026-08-22): GameRanger шиг шахмал өрөөний list · Diamond 💎 + XP/Level ·
+// Bronze/Silver/Gold гишүүнчлэл (QPay эсвэл Diamond) · нэрийн эффект · аватарын хүрээ · өрөөний дэвсгэр (GOLD)
+// ══════════════════════════════════════════════════════════════
+(function premiumModule() {
+  const TIER_NAME = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' };
+  const TIER_DIAMONDS = { silver: 800, gold: 1500 };
+  const FX_CLASSES = ['name-fx-gradient', 'name-fx-neon', 'name-fx-rainbow', 'name-fx-toon'];
+  const el = (id) => document.getElementById(id);
+  const fmtN = (n) => Number(n || 0).toLocaleString('en-US');
+  const errMsg = (e) => String(e?.message || e || 'Алдаа гарлаа').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const api = (method, path, body) => window.api.request(method, path, body);
+  const myTier = () => (currentUser?.tier && TIER_NAME[currentUser.tier]) ? currentUser.tier : 'bronze';
+
+  // ─── 1. GameRanger маягийн шахмал list (нэг жагсаалт: нээлттэй → тоглож байгаа) ───
+  function gameAbbr(t) {
+    const s = String(t || '');
+    if (/warcraft/i.test(s)) return 'W3';
+    if (/counter|cs/i.test(s)) return 'CS';
+    if (/red alert/i.test(s)) return 'RA';
+    if (/quake/i.test(s)) return 'Q3';
+    if (/dota|lod/i.test(s)) return 'DT';
+    return s.replace(/[^A-Za-zА-Яа-яӨөҮү0-9]/g, '').slice(0, 2).toUpperCase() || '?';
+  }
+  const LOCK_SVG = '<svg class="rl-lock-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
+
+  renderRoomsSkeleton = function () {
+    return '<div class="room-grid-empty">Ачааллаж байна...</div>';
+  };
+
+  roomGridRow = function (r, inProgress, idx = 0) {
+    const myId = String(currentUser?.id);
+    const isMyRoom = String(r.host_id) === myId || (r.members || []).some((m) => String(m.id) === myId);
+    const selected = String(r.id) === String(selectedRoomId);
+    const desc = (r.description || '').trim();
+    const full = (r.player_count || 0) >= (r.max_players || 0);
+    const state = inProgress ? 'playing' : (full ? 'full' : 'waiting');
+    const stateTitle = inProgress ? 'Тоглолт явагдаж байна' : (full ? 'Дүүрсэн' : 'Хүлээж байна');
+    return `
+    <div class="room-grid-row room-list-row ${inProgress ? 'room-playing' : ''} ${isMyRoom ? 'room-mine' : ''} ${selected ? 'selected' : ''}" role="row" tabindex="0" data-room-id="${r.id}" style="animation-delay:${Math.min(idx, 40) * 0.012}s">
+      <div class="room-cell rl-game" role="cell" title="${escHtml(r.game_type || '')}"><i class="rl-gt" style="background:${gameTypeColor(r.game_type)}">${gameAbbr(r.game_type)}</i><span>${escHtml(r.game_type || '-')}</span></div>
+      <div class="room-cell rl-host" role="cell"><span class="clickable-name" data-user-id="${escHtml(String(r.host_id || ''))}">${escHtml(r.host_name || '-')}</span></div>
+      <div class="room-cell rl-name" role="cell" title="${escHtml(r.name)}${desc ? ' — ' + escHtml(desc) : ''}"><b>${escHtml(r.name)}</b>${desc ? `<span class="rl-desc"> — ${escHtml(desc)}</span>` : ''}${isMyRoom ? '<span class="my-room-tag">Миний</span>' : ''}${r.game_mode ? `<span class="rl-mode">${escHtml(r.game_mode)}</span>` : ''}</div>
+      <div class="room-cell rl-net" role="cell">${r.zerotier_network_id ? 'ZT' : 'LAN'}</div>
+      <div class="room-cell rl-players" role="cell">${r.player_count || 0}/${r.max_players || '-'}</div>
+      <div class="room-cell rl-state" role="cell" title="${stateTitle}"><span class="room-state-dot ${state}"></span></div>
+      <div class="room-cell rl-lock" role="cell" title="${r.has_password ? 'Нууц үгтэй' : ''}">${r.has_password ? LOCK_SVG : ''}</div>
+      <div class="room-cell rl-action" role="cell">${roomActionButton(r, inProgress, isMyRoom, myId)}</div>
+    </div>`;
+  };
+
+  renderFilteredRooms = function () {
+    const list = el('rooms-waiting');
+    const playing = el('rooms-playing');
+    const detail = el('room-detail-panel');
+    const board = document.querySelector('.room-board-layout');
+    if (!list) return;
+    if (playing) playing.innerHTML = '';
+
+    const filtered = getFilteredRooms(Object.values(roomsCache));
+    const waitRooms = filtered.filter((r) => r.status === 'waiting');
+    const playRooms = filtered.filter((r) => r.status === 'playing');
+    const rooms = [...waitRooms, ...playRooms];
+
+    const search = (el('room-search')?.value || '').trim();
+    const filterType = el('room-filter-type')?.value || '';
+    const hasFilter = Boolean(search || filterType);
+
+    if (!filtered.some((r) => String(r.id) === String(selectedRoomId))) {
+      selectedRoomId = rooms[0]?.id ?? null;
+    }
+
+    if (!rooms.length) {
+      list.innerHTML = `<div class="room-grid-empty">${hasFilter ? 'Хайлтад тохирох өрөө олдсонгүй' : 'Одоогоор нээлттэй өрөө байхгүй — эхний өрөөг та үүсгээрэй'}</div>`;
+    } else {
+      list.innerHTML = `
+      <div class="room-data-grid room-list-grid" role="table">
+        <div class="room-grid-header room-list-head" role="row">
+          <div>Тоглоом</div><div>Хост</div><div>Өрөө / Тайлбар</div><div>Net</div><div>Тоглогч</div><div title="Төлөв">●</div><div title="Нууц үг">${LOCK_SVG}</div><div></div>
+        </div>
+        ${rooms.map((r, i) => roomGridRow(r, r.status === 'playing', i)).join('')}
+      </div>`;
+    }
+
+    const cnt = el('rooms-waiting-count');
+    if (cnt) cnt.textContent = `${rooms.length} өрөө · ${waitRooms.length} нээлттэй · ${playRooms.length} тоглож байна`;
+    const cnt2 = el('rooms-playing-count');
+    if (cnt2) cnt2.textContent = `${playRooms.length} өрөө`;
+
+    const selectedRoom = filtered.find((r) => String(r.id) === String(selectedRoomId));
+    if (board) board.classList.toggle('no-selection', !selectedRoom);
+    if (detail) detail.innerHTML = renderRoomDetail(selectedRoom);
+  };
+
+  // ─── 2. Нэрийн эффект + аватарын хүрээ (бусад тоглогчдынх /membership/public-оос) ───
+  const fxCache = new Map();          // userId -> { tier, name_effect, level }
+  let fxPending = new Set();
+  let fxTimer = null;
+
+  function applyFx(node, info) {
+    node.classList.remove(...FX_CLASSES);
+    const fx = info?.name_effect;
+    if (fx && fx !== 'solid') node.classList.add(`name-fx-${fx}`);
+    node.dataset.tier = info?.tier || 'bronze';
+  }
+  function applyFrame(node, tier) {
+    if (!node) return;
+    node.classList.remove('avatar-frame', 'silver', 'gold');
+    if (tier === 'silver' || tier === 'gold') node.classList.add('avatar-frame', tier);
+  }
+  const FX_SEL = '.clickable-name[data-user-id], .dm-username[data-user-id], [data-fx-user]';
+  function decorate(root) {
+    if (!root?.querySelectorAll) return;
+    const nodes = [...root.querySelectorAll(FX_SEL)];
+    if (root.matches?.(FX_SEL)) nodes.push(root);
+    nodes.forEach((node) => {
+      const id = String(node.dataset.userId || node.dataset.fxUser || '');
+      if (!id || id === 'undefined' || id === 'null') return;
+      if (fxCache.has(id)) applyFx(node, fxCache.get(id));
+      else { fxPending.add(id); scheduleFxFetch(); }
+    });
+  }
+  function scheduleFxFetch() {
+    clearTimeout(fxTimer);
+    fxTimer = setTimeout(async () => {
+      const ids = [...fxPending].slice(0, 200);
+      fxPending.clear();
+      if (!ids.length || !window.api?.request) return;
+      try {
+        const rows = await api('get', `/membership/public?ids=${ids.join(',')}`);
+        (rows || []).forEach((r) => fxCache.set(String(r.id), { tier: r.tier, name_effect: r.name_effect, level: r.level }));
+      } catch {}
+      ids.forEach((id) => { if (!fxCache.has(id)) fxCache.set(id, { tier: 'bronze', name_effect: 'solid', level: 1 }); });
+      decorate(document);
+    }, 150);
+  }
+  new MutationObserver((muts) => {
+    for (const m of muts) m.addedNodes.forEach((n) => { if (n.nodeType === 1) decorate(n); });
+  }).observe(document.body, { childList: true, subtree: true });
+
+  function tagOwnName() {
+    const id = currentUser?.id;
+    if (!id) return;
+    ['user-name', 'profile-name'].forEach((i) => { const n = el(i); if (n) n.dataset.fxUser = String(id); });
+  }
+
+  const _openUserProfile = openUserProfile;
+  openUserProfile = async function (userId) {
+    const r = await _openUserProfile(userId);
+    const name = el('popup-username');
+    if (name) { name.dataset.fxUser = String(userId); decorate(name); }
+    const av = el('popup-avatar');
+    const paint = () => applyFrame(av, fxCache.get(String(userId))?.tier);
+    paint();
+    setTimeout(paint, 700);
+    return r;
+  };
+
+  // ─── 3. Diamond 💎 + XP/Level ───
+  function renderDiamonds() {
+    if (!currentUser) return;
+    const dia = Number(currentUser.diamonds ?? 0);
+    const xp = Number(currentUser.xp ?? 0);
+    const level = Number(currentUser.level ?? 1);
+    const nextXp = currentUser.next_level_xp || Math.round(100 * Math.pow(level + 1, 1.5));
+    const curXp = Math.round(100 * Math.pow(level, 1.5));
+    const prog = Math.max(0, Math.min(1, (xp - curXp) / Math.max(1, nextXp - curXp)));
+    const bg = Number(currentUser.block_games ?? 0);
+    const bw = Number(currentUser.block_wins ?? 0);
+
+    el('user-wallet')?.classList.remove('hidden');
+    const amt = el('user-wallet-amount');
+    if (amt) amt.textContent = `💎 ${fmtN(dia)}`;
+    const lv = el('user-level');
+    if (lv) { lv.textContent = `LV ${level}`; lv.classList.remove('hidden'); }
+    const tierPill = el('user-tier');
+    if (tierPill) { const t = myTier(); tierPill.textContent = TIER_NAME[t]; tierPill.classList.toggle('hidden', t === 'bronze'); }
+
+    document.querySelectorAll('[data-diamonds]').forEach((n) => { n.textContent = `💎 ${fmtN(dia)}`; });
+    const need = Math.max(0, 5 - bw);
+    const left = Math.max(0, 10 - bg);
+    const blockText = el('diamond-block-text');
+    if (blockText) {
+      blockText.textContent = bg === 0
+        ? 'Шинэ 10 тоглолтын блок эхэлж байна — 5 хожвол +30 💎'
+        : `Энэ блок: ${bw} хожил / ${bg} тоглолт · ${need === 0 ? '+30 💎 баталгаажсан ✓' : `+30 💎-д ${need} хожил дутуу`} · ${left} тоглолт үлдлээ`;
+    }
+    const bar = el('diamond-block-bar');
+    if (bar) bar.style.width = `${Math.round((bg / 10) * 100)}%`;
+    const lvText = el('diamond-level-text');
+    if (lvText) lvText.textContent = `LV ${level} · ${fmtN(xp)} XP · дараагийн түвшин ${fmtN(nextXp)} XP`;
+    const xpBar = el('diamond-xp-bar');
+    if (xpBar) xpBar.style.width = `${Math.round(prog * 100)}%`;
+  }
+
+  // ─── 4. QPay төлбөрийн modal ───
+  let payPoll = null;
+  function openPayModal(order, title) {
+    const m = el('pay-modal');
+    if (!m) return;
+    m.classList.remove('hidden');
+    m.dataset.orderId = order.invoice_id;
+    el('pay-title').textContent = title;
+    el('pay-amount').textContent = `${fmtN(order.amount)}₮`;
+    const qr = el('pay-qr');
+    if (order.qr_image) {
+      qr.src = String(order.qr_image).startsWith('data:') ? order.qr_image : `data:image/png;base64,${order.qr_image}`;
+      qr.style.display = 'block';
+    } else {
+      qr.style.display = 'none';
+    }
+    const link = el('pay-link');
+    link.textContent = order.short_url || '';
+    link.dataset.url = order.short_url || '';
+    el('pay-status').textContent = 'Төлбөр хүлээж байна… (QPay апп-аар QR уншуулна)';
+    clearInterval(payPoll);
+    let ticks = 0;
+    payPoll = setInterval(() => { if (++ticks > 120) { clearInterval(payPoll); return; } checkPay(); }, 5000);
+  }
+  function closePay() { clearInterval(payPoll); el('pay-modal')?.classList.add('hidden'); }
+  async function checkPay() {
+    const m = el('pay-modal');
+    const id = m?.dataset.orderId;
+    if (!id || m.classList.contains('hidden')) return;
+    try {
+      const st = await api('get', `/membership/order/${encodeURIComponent(id)}`);
+      if (st.paid) {
+        clearInterval(payPoll);
+        el('pay-status').textContent = '✅ Төлбөр баталгаажлаа';
+        showToast('Төлбөр амжилттай — гишүүнчлэл идэвхжлээ', 'success');
+        await refreshMe();
+        setTimeout(closePay, 1500);
+      } else if (st.status === 'CANCELLED') {
+        clearInterval(payPoll);
+        el('pay-status').textContent = 'Нэхэмжлэх цуцлагдсан';
+      }
+    } catch {}
+  }
+  el('btn-pay-check')?.addEventListener('click', checkPay);
+  el('btn-pay-close')?.addEventListener('click', closePay);
+  el('btn-pay-copy')?.addEventListener('click', () => {
+    const u = el('pay-link')?.dataset.url;
+    if (u) { navigator.clipboard?.writeText(u); showToast('Төлбөрийн холбоос хуулагдлаа', 'success'); }
+  });
+
+  // ─── 5. Гишүүнчлэл + нэрийн эффект сонголт ───
+  function renderMembership() {
+    const tier = myTier();
+    const until = currentUser?.membership_until;
+    const cur = el('membership-current');
+    if (cur) { cur.textContent = TIER_NAME[tier]; cur.className = `tier-badge tier-${tier}`; }
+    const untilEl = el('membership-until');
+    if (untilEl) {
+      untilEl.textContent = tier === 'bronze'
+        ? 'Үнэгүй · хугацаагүй'
+        : (until ? `${new Date(until).toLocaleDateString('mn-MN', { year: 'numeric', month: '2-digit', day: '2-digit' })} хүртэл` : '');
+    }
+    document.querySelectorAll('.tier-card').forEach((c) => c.classList.toggle('current', c.dataset.tier === tier));
+    const canFx = tier !== 'bronze';
+    const fx = canFx ? (currentUser?.name_effect || 'solid') : 'solid';
+    document.querySelectorAll('#fx-picker [data-fx]').forEach((b) => {
+      b.classList.toggle('active', b.dataset.fx === fx);
+      b.disabled = !canFx && b.dataset.fx !== 'solid';
+    });
+    el('fx-lock-note')?.classList.toggle('hidden', canFx);
+    if (currentUser?.id) fxCache.set(String(currentUser.id), { tier, name_effect: fx, level: currentUser.level || 1 });
+    tagOwnName();
+    decorate(document);
+    applyFrame(document.querySelector('.userchip-avatar'), tier);
+    applyFrame(document.querySelector('.profile-avatar-wrap'), tier);
+    el('room-bg')?.classList.toggle('hidden', tier !== 'gold');
+    el('room-bg-hint')?.classList.toggle('hidden', tier === 'gold');
+  }
+  document.querySelectorAll('#fx-picker [data-fx]').forEach((b) => b.addEventListener('click', async () => {
+    try {
+      const r = await api('put', '/membership/name-effect', { effect: b.dataset.fx });
+      if (currentUser) currentUser.name_effect = r.name_effect;
+      renderMembership();
+    } catch (e) { showToast(errMsg(e), 'error'); }
+  }));
+  document.querySelectorAll('[data-buy-tier]').forEach((b) => b.addEventListener('click', async () => {
+    const tier = b.dataset.buyTier;
+    const payWith = el('membership-pay-with')?.value || 'qpay';
+    if (payWith === 'diamonds') {
+      const ok = await showConfirm(`${TIER_NAME[tier]} гишүүнчлэл`, `${fmtN(TIER_DIAMONDS[tier])} 💎-оор 30 хоногийн ${TIER_NAME[tier]} гишүүнчлэл авах уу? (Танд ${fmtN(currentUser?.diamonds || 0)} 💎 байна)`);
+      if (!ok) return;
+    }
+    b.disabled = true;
+    try {
+      const r = await api('post', '/membership/order', { tier, months: 1, pay_with: payWith });
+      if (r.paid) { showToast(`${TIER_NAME[tier]} гишүүнчлэл идэвхжлээ 🎉`, 'success'); await refreshMe(); }
+      else openPayModal({ ...r, kind: 'membership' }, `${TIER_NAME[tier]} гишүүнчлэл — QPay`);
+    } catch (e) { showToast(errMsg(e), 'error'); }
+    finally { b.disabled = false; }
+  }));
+
+  // ─── 6. Өрөөний дэвсгэр (GOLD, room цонхонд) ───
+  if (isRoomMode()) {
+    const bg = new URLSearchParams(window.location.search).get('backgroundUrl') || '';
+    if (/^https:\/\/\S+$/i.test(bg)) {
+      const pr = el('page-room');
+      if (pr) {
+        pr.style.backgroundImage = `linear-gradient(rgba(8,4,5,.55), rgba(8,4,5,.8)), url("${bg.replace(/"/g, '%22')}")`;
+        pr.style.backgroundSize = 'cover';
+        pr.style.backgroundPosition = 'center';
+      }
+    }
+  }
+
+  // ─── Холбох ───
+  async function refreshMe() {
+    try {
+      await window.api.refreshUser?.();
+      const u = await window.api.getUser();
+      if (u) { currentUser = { ...currentUser, ...u }; renderAll(); }
+    } catch {}
+  }
+  function renderAll() { renderDiamonds(); renderMembership(); }
+  const _setUserUI = setUserUI;
+  setUserUI = function (u) { _setUserUI(u); renderAll(); };
+  const _showPage = showPage;
+  showPage = function (id) { _showPage(id); if (id === 'page-main') refreshMe(); };
+  window.addEventListener('focus', () => { if (currentUser && !isRoomMode()) refreshMe(); });
+  if (currentUser) renderAll();
+})();
+
+// ══════════════════════════════════════════════════════════════
+// Бот хост (RGC маяг) — өрөөний цонх: "Бот хост хийх" → бот GHost++-ээр map-ийг хостолно →
+// клиент ботын тоглоомыг WC3 LAN жагсаалтад харуулна (UDP GAMEINFO + TCP proxy) → дүн автоматаар
+// ══════════════════════════════════════════════════════════════
+(function botHostModule() {
+  if (!isRoomMode()) return;
+  const el = (id) => document.getElementById(id);
+  const api = (method, path, body) => window.api.request(method, path, body);
+  const errMsg = (e) => String(e?.message || e || 'Алдаа гарлаа').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const panel = el('bot-host-panel');
+  if (!panel) return;
+  let job = null;
+  let bridgeOn = false;
+  let status = null;
+
+  const STATE_TEXT = {
+    queued: 'Бот хүлээж байна… (дараалалд)',
+    hosting: 'Бот тоглоомыг нээж байна…',
+    lobby: 'Lobby нээлттэй — "WC3 нээж нэгдэх" дараад LAN-аас тоглоомд орно. Host lobby чатад !start бичиж эхлүүлнэ.',
+    started: 'Тоглолт явагдаж байна — дуусахад дүн автоматаар бүртгэгдэнэ.',
+    finished: 'Тоглолт дууслаа — дүн бүртгэгдсэн.',
+    failed: 'Бот хостолж чадсангүй.',
+    cancelled: 'Цуцлагдсан.',
+  };
+
+  function render() {
+    const isHost = Boolean(currentRoom?.isHost);
+    const st = job?.status || null;
+    el('bot-host-state').textContent = st ? st.toUpperCase() : 'БЭЛЭН';
+    el('bot-host-state').dataset.state = st || 'idle';
+    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Тоглоомыг бот хостолно: ZeroTier хэрэггүй, ялагч/K/D/A автоматаар, XP + Diamond.' : 'Host "Бот хост хийх" дарвал энд харагдана.');
+    const active = st && ['queued', 'hosting', 'lobby', 'started'].includes(st);
+    el('btn-bot-host').classList.toggle('hidden', !isHost || active);
+    el('bot-host-map').classList.toggle('hidden', !isHost || active);
+    el('btn-bot-cancel').classList.toggle('hidden', !isHost || !active || st === 'started');
+    el('btn-bot-join').classList.toggle('hidden', !(st === 'lobby' || st === 'started'));
+    const online = (status?.bots || []).length;
+    if (isHost && !active) el('btn-bot-host').disabled = !online;
+    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — энгийн "Эхлүүлэх"-ийг ашиглана уу.';
+  }
+
+  async function loadStatus() {
+    try {
+      status = await api('get', '/rooms/bot-host/status');
+      if (!status?.enabled) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      const sel = el('bot-host-map');
+      sel.innerHTML = (status.maps || []).map((m) => `<option value="${m.key}" ${m.default ? 'selected' : ''}>${m.name}</option>`).join('');
+      job = await api('get', `/rooms/${currentRoom.id}/bot-host`);
+      render();
+    } catch { panel.classList.add('hidden'); }
+  }
+
+  async function startBridgeAndJoin() {
+    if (!job?.gameinfo_b64 || !job.host_ip) { showToast('Ботын тоглоомын мэдээлэл хараахан ирээгүй', 'warning'); return; }
+    const btn = el('btn-bot-join');
+    btn.disabled = true;
+    try {
+      if (!bridgeOn) {
+        await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
+        bridgeOn = true;
+        appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" LAN жагсаалтад харагдана (${job.host_ip}:${job.host_port})`);
+      }
+      await window.api.launchGame(currentRoom?.gameType || '');
+      if (socket) socket.emit('room:game_started');
+      appendSysMsg('✓ WC3 нээгдлээ → Local Area Network → "' + job.game_name + '" → Join');
+    } catch (e) { showToast(errMsg(e), 'error'); }
+    finally { btn.disabled = false; }
+  }
+
+  el('btn-bot-host').addEventListener('click', async () => {
+    const btn = el('btn-bot-host');
+    btn.disabled = true;
+    try {
+      job = await api('post', `/rooms/${currentRoom.id}/bot-host`, { map_key: el('bot-host-map').value });
+      appendSysMsg('🤖 Бот хост хүсэгдлээ — бот тоглоомыг нээмэгц мэдэгдэнэ.');
+      render();
+    } catch (e) { showToast(errMsg(e), 'error'); }
+    finally { btn.disabled = false; }
+  });
+  el('btn-bot-cancel').addEventListener('click', async () => {
+    try { await api('delete', `/rooms/${currentRoom.id}/bot-host`); job = { ...job, status: 'cancelled' }; render(); }
+    catch (e) { showToast(errMsg(e), 'error'); }
+  });
+  el('btn-bot-join').addEventListener('click', startBridgeAndJoin);
+
+  function showResult(r) {
+    const box = el('bot-host-result');
+    if (!box) return;
+    const side = (t) => (t === 1 ? 'Sentinel' : 'Scourge');
+    const rows = (r.players || []).map((p) => `<tr class="${p.is_winner ? 'win' : ''}"><td>${escHtml(p.name || '')}</td><td>${side(p.team)}</td><td>${p.kills}/${p.deaths}/${p.assists}</td><td>${p.is_leaver ? 'leaver' : (p.is_winner ? 'хожил' : 'хожигдол')}</td><td>${p.xp_earned > 0 ? '+' : ''}${p.xp_earned} XP${p.diamonds_earned ? ` · +${p.diamonds_earned} 💎` : ''}</td></tr>`).join('');
+    box.innerHTML = `<div class="bot-result-head">🏆 ${side(r.winner_team)} ялав · ${r.duration_minutes} мин</div><table class="bot-result-table"><thead><tr><th>Тоглогч</th><th>Баг</th><th>K/D/A</th><th>Дүн</th><th>Шагнал</th></tr></thead><tbody>${rows}</tbody></table>`;
+    box.classList.remove('hidden');
+  }
+
+  function attach(s) {
+    s.on('room:bot_job', (j) => { job = j; render(); });
+    s.on('room:bot_lobby', (j) => { job = j; render(); appendSysMsg(`🤖 Бот "${j.bot_name || ''}" тоглоом нээлээ: "${j.game_name}" — "WC3 нээж нэгдэх" дарна уу.`); playSound?.('join'); });
+    s.on('room:bot_started', () => { if (job) job.status = 'started'; render(); appendSysMsg('▶ Ботын тоглолт эхэллээ.'); });
+    s.on('room:bot_result', (r) => {
+      if (job) job.status = 'finished';
+      render();
+      showResult(r);
+      appendSysMsg(`🏁 Дүн бүртгэгдлээ: ${r.winner_team === 1 ? 'Sentinel' : 'Scourge'} ялав (${r.duration_minutes} мин).`);
+      if (bridgeOn) { window.api.stopBotBridge?.().catch(() => {}); bridgeOn = false; }
+      window.api.refreshUser?.().catch(() => {});
+    });
+  }
+  const timer = setInterval(() => {
+    if (typeof socket !== 'undefined' && socket && !socket.__botHandlers) { socket.__botHandlers = true; attach(socket); }
+    if (currentRoom?.id && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadStatus(); }
+  }, 800);
+  window.addEventListener('beforeunload', () => { clearInterval(timer); if (bridgeOn) window.api.stopBotBridge?.().catch(() => {}); });
+})();

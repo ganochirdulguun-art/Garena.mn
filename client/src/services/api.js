@@ -23,6 +23,12 @@ function friendlyError(err) {
   return err.response.data?.error || err.response.data?.message || 'Алдаа гарлаа';
 }
 
+// Ерөнхий хүсэлт (шинэ endpoint бүрт тусдаа функц бичихгүй): request('get', '/diamonds/me')
+async function request(method, urlPath, body) {
+  const { data } = await getClient().request({ method, url: urlPath, data: body });
+  return data;
+}
+
 async function getRooms() {
   const { data } = await getClient().get('/rooms');
   return data;
@@ -33,8 +39,8 @@ async function getMyRoom() {
   return data;
 }
 
-async function createRoom({ name, max_players, game_type, password, description, game_mode }) {
-  const { data } = await getClient().post('/rooms', { name, max_players, game_type, password, description, game_mode });
+async function createRoom({ name, max_players, game_type, password, description, game_mode, background_url }) {
+  const { data } = await getClient().post('/rooms', { name, max_players, game_type, password, description, game_mode, background_url });
   return data;
 }
 
@@ -238,6 +244,7 @@ async function deleteStreamer(id) {
 }
 
 module.exports = {
+  request,
   SERVER_URL,
   friendlyError,
   changePassword,

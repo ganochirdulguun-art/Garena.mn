@@ -1,0 +1,7 @@
+run/
+maps/*.w3x
+replays/
+savegames/
+node_modules/
+*.sqlite
+*.log

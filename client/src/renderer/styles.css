@@ -1,49 +1,56 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* ── Dark горим (default) ──────────────────────────── */
+/* ── Dark горим (default) — Garena Plus улаан/хар + улаан хүрэн ── */
 :root {
-  --bg:      #0d0d1a;
-  --bg2:     #1a1a2e;
-  --card:    rgba(16, 22, 48, 0.82);
-  --accent:  #7289da;
-  --accent2: #5865f2;
-  --text:    #e0e0e0;
-  --text2:   #a0a0b0;
-  --green:   #43b581;
+  --bg:      #0c0b0f;
+  --bg2:     #1c1317;
+  --card:    rgba(32, 17, 21, 0.84);
+  --accent:  #f0323a;
+  --accent2: #d8232a;
+  --accent-hover: #ff5a60;
+  --maroon:  #5a1016;
+  --maroon2: #3a0b0f;
+  --gold:    #d9a93a;
+  --text:    #f2eee9;
+  --text2:   #b3a6aa;
+  --green:   #3fcf7a;
   --red:     #f04747;
-  --border:  rgba(60, 60, 100, 0.7);
-  --shadow:  rgba(0,0,0,0.55);
-  --login-bg1: #1a1a3e;
-  --login-bg2: #0d0d1a;
+  --border:  rgba(170, 60, 70, 0.32);
+  --shadow:  rgba(0,0,0,0.6);
+  --login-bg1: #7a0f14;
+  --login-bg2: #160408;
+  --font-d:  'Oswald', 'Segoe UI', Arial, sans-serif;
+  --font-b:  'Noto Sans', 'Segoe UI', Arial, sans-serif;
 }
 
-/* ── Light горим ───────────────────────────────────── */
+/* ── Light горим (дулаан цагаан-улаан) ────────────── */
 body.light {
-  --bg:      #f0f4ff;
+  --bg:      #f6f1f1;
   --bg2:     #ffffff;
   --card:    #ffffff;
-  --accent:  #5865f2;
-  --accent2: #5865f2;
-  --text:    #1e2030;
-  --text2:   #64748b;
+  --accent:  #c8202a;
+  --accent2: #d8232a;
+  --accent-hover: #a3151b;
+  --text:    #221a1c;
+  --text2:   #6b5e62;
   --green:   #16a34a;
   --red:     #dc2626;
-  --border:  #e2e8f0;
-  --shadow:  rgba(88,101,242,0.08);
-  --login-bg1: #e8eaf6;
-  --login-bg2: #f0f4ff;
+  --border:  #ead9dc;
+  --shadow:  rgba(216,35,42,0.08);
+  --login-bg1: #f3e3e4;
+  --login-bg2: #f6f1f1;
 }
 
 body {
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  font-family: var(--font-b);
   /* ── Үндсэн background зураг ── */
-  background-image: url('bg.png');
+  background-image: url('bg.jpg');
   background-size: cover;
   background-position: center top;
   background-attachment: fixed;
   background-repeat: no-repeat;
   /* Зураг дээр бараан overlay — текст болон UI уншигдахаар */
-  background-color: rgba(5, 5, 18, 0.58);
+  background-color: rgba(18, 6, 8, 0.62);
   background-blend-mode: darken;
   color: var(--text);
   height: 100vh;
@@ -57,7 +64,7 @@ body {
 
 /* Light горимд арай тунгалаг overlay */
 body.light {
-  background-color: rgba(220, 230, 255, 0.55);
+  background-color: rgba(250, 236, 237, 0.6);
   background-blend-mode: lighten;
 }
 
@@ -315,76 +322,313 @@ body.light {
   }
 }
 
-/* ── Login ─────────────────────────────────────────── */
+/* ── Login — Garena Plus маяг (520×640 улаан цонх, маскот, G лого) ── */
 #page-login {
   justify-content: center;
   align-items: center;
-  /* Нэвтрэх хуудасны gradient-г арилгав — body-н bg зураг харагдана */
   background: transparent;
   overflow-y: auto;
+  padding: 12px;
 }
 .login-box {
-  text-align: center;
-  padding: 36px 48px;
-  /* Тунгалаг нэвтрэх хайрцаг — backdrop blur-тай */
-  background: rgba(12, 14, 40, 0.7);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  border-radius: 20px;
-  border: 1px solid rgba(114, 137, 218, 0.25);
-  max-width: 420px;
-  width: 90%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-  margin: 20px 0;
-  transition: background 0.2s, border-color 0.2s;
+  position: relative;
+  width: 520px;
+  max-width: 100%;
+  height: 640px;
+  max-height: calc(100vh - 24px);
+  overflow: hidden;
+  padding: 26px 30px 22px;
+  text-align: left;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 520 640' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23fff' stroke-linecap='round'%3E%3Cpath d='M-20 470 C 120 380, 300 430, 560 300' stroke-width='2' opacity='.16'/%3E%3Cpath d='M-20 520 C 140 420, 330 500, 560 360' stroke-width='1.4' opacity='.11'/%3E%3Cpath d='M-20 420 C 160 330, 260 390, 560 230' stroke-width='1' opacity='.08'/%3E%3Cpath d='M60 660 C 200 520, 420 560, 560 440' stroke-width='1.6' opacity='.12'/%3E%3C/g%3E%3C/svg%3E") center / 100% 100% no-repeat,
+    radial-gradient(ellipse 64% 52% at 68% 44%, rgba(255, 64, 64, 0.55), transparent 70%),
+    radial-gradient(ellipse 110% 90% at 26% 22%, #b8151d 0%, #7d0f15 42%, #3d080b 78%, #160408 100%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.login-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .login-logo {
-  display: block;
-  width: 84px;
-  height: 84px;
-  margin: 0 auto 14px;
+  width: 78px;
+  height: 62px;
   object-fit: contain;
-  filter: drop-shadow(0 0 14px rgba(255, 121, 36, 0.38)) drop-shadow(0 0 18px rgba(88, 101, 242, 0.22));
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.55));
 }
-.login-box h1 { font-size: 1.8rem; margin-bottom: 8px; font-family: 'Cinzel Decorative', serif; letter-spacing: 0.03em; }
-.subtitle { color: var(--text2); margin-bottom: 16px; font-size: 0.95rem; line-height: 1.5; }
+.login-brand {
+  display: block;
+  font: 600 42px/1 var(--font-d);
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+.login-brand small { font-size: 0.62em; font-weight: 500; opacity: 0.92; }
+.login-tag {
+  display: block;
+  margin-top: 5px;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.92);
+}
+.login-mascot {
+  position: absolute;
+  right: -44px;
+  top: 118px;
+  width: 420px;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  filter: drop-shadow(0 0 28px rgba(255, 40, 40, 0.35));
+}
+.login-box .auth-form:not(.hidden) {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 250px;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: 30px;
+}
+.login-box #forgot-step-1:not(.hidden),
+.login-box #forgot-step-2:not(.hidden) { display: flex; flex-direction: column; gap: 9px; }
+.login-box .auth-form h3 { font: 500 1.15rem var(--font-d); letter-spacing: 0.04em; margin: 0; }
+#page-login .login-box .input {
+  height: 36px;
+  margin: 0;
+  padding: 0 11px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: #fff;
+  color: #1d1d1d;
+  font-size: 0.9rem;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+#page-login .login-box .input::placeholder { color: #8a8a8a; }
+#page-login .login-box .input:focus {
+  border-color: #ffb3b5;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.35);
+}
+.login-box .input-pw-wrap { width: 100%; }
+.login-box .btn-eye { color: #666; }
+.login-box .btn-eye:hover { color: #b3141c; }
+.login-link {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: 500 0.83rem var(--font-b);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.login-link:hover { color: #ffd9da; }
+.login-link .q {
+  display: inline-grid;
+  width: 15px;
+  height: 15px;
+  place-items: center;
+  border-radius: 50%;
+  background: #fff;
+  color: #b3141c;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+}
+.login-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #fff;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+.login-check input { width: 14px; height: 14px; margin: 0; accent-color: #d8232a; }
+.login-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-size: 0.84rem;
+}
+.login-status {
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: #fff;
+  color: #1d1d1d;
+  font: 500 0.8rem var(--font-b);
+  cursor: pointer;
+}
+/* Том гялгар "Нэвтрэх" товч (Login Garena ➜) */
+.btn-garena {
+  position: relative;
+  display: flex;
+  width: 190px;
+  height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 12px 0 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(180deg, #4d4d4d 0%, #232323 48%, #0e0e0e 52%, #1c1c1c 100%);
+  color: #fff;
+  font: 700 1rem var(--font-b);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: border-color 0.15s, filter 0.15s;
+}
+.btn-garena::after {
+  content: '➜';
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #ff6b6b, #b3141c 70%);
+  color: #fff;
+  font-size: 13px;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4);
+}
+.btn-garena:hover { border-color: rgba(255, 255, 255, 0.45); filter: brightness(1.15); }
+.btn-garena:active { transform: scale(0.98); }
+.btn-garena:disabled { opacity: 0.7; cursor: wait; }
+#page-login .login-box .btn-discord {
+  width: 190px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, #6d7aff 0%, #5865f2 50%, #4752c4 100%);
+  color: #fff;
+  font: 700 0.86rem var(--font-b);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+#page-login .login-box .btn-discord:hover { filter: brightness(1.1); background: linear-gradient(180deg, #6d7aff 0%, #5865f2 50%, #4752c4 100%); }
+.login-box .login-divider {
+  display: flex;
+  width: 190px;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.login-box .login-divider::before,
+.login-box .login-divider::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.25); }
+.login-box .form-error {
+  margin: 0;
+  min-height: 16px;
+  color: #ffd166;
+  font-size: 0.8rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+.login-box .form-error:empty { min-height: 0; }
+.login-box .hint { color: rgba(255, 255, 255, 0.85); font-size: 0.82rem; }
 
-.auth-tabs {
-  display: flex; margin-bottom: 16px;
-  border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+/* QR панел — маскотын дээр нээгдэнэ */
+.login-box .qr-section {
+  position: absolute;
+  left: 262px;   /* form-ын баруун талд (form нь 250px, position:relative) */
+  top: 6px;
+  z-index: 3;
+  width: 212px;
+  padding: 12px 12px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(12, 6, 8, 0.88);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
-.auth-tab {
-  flex: 1; padding: 8px; background: none; border: none; color: var(--text2);
-  cursor: pointer; font-size: 0.9rem; transition: all 0.15s;
+.login-box .qr-section.hidden { display: none; }
+.qr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
 }
-.auth-tab.active { background: var(--accent2); color: white; }
-
-.auth-form .input { text-align: left; }
-.form-error { color: var(--red); font-size: 0.82rem; margin-bottom: 8px; min-height: 18px; }
-
-.qr-section { margin-bottom: 20px; }
-.qr-label { font-size: 0.82rem; color: var(--text2); margin-bottom: 12px; }
-.qr-hint {
-  font-size: 0.72rem; color: var(--text2); opacity: 0.8;
-  margin: 8px auto 0; max-width: 300px; line-height: 1.4;
-}
+.qr-close { padding: 0 2px; border: 0; background: none; color: rgba(255, 255, 255, 0.7); font-size: 1rem; line-height: 1; cursor: pointer; }
+.qr-close:hover { color: #fff; }
 .qr-box {
-  width: 200px; height: 200px; margin: 0 auto;
-  background: #ffffff; border-radius: 12px;
-  border: 2px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  position: relative; overflow: hidden;
+  position: relative;
+  display: flex;
+  width: 160px;
+  height: 160px;
+  margin: 0 auto;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
 }
-.qr-box img { width: 180px; height: 180px; border-radius: 8px; }
-.qr-loading { color: var(--text2); font-size: 0.82rem; position: absolute; }
+.qr-box img { width: 148px; height: 148px; border-radius: 4px; }
+.qr-loading { position: absolute; color: #555; font-size: 0.78rem; }
+.qr-hint { margin: 8px 0 0; color: rgba(255, 255, 255, 0.7); font-size: 0.66rem; line-height: 1.35; }
+#page-login .login-box .qr-section .btn {
+  margin-top: 8px;
+  height: 28px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 0.76rem;
+}
 
-.login-divider {
-  display: flex; align-items: center; gap: 12px;
-  color: var(--text2); font-size: 0.82rem; margin: 16px 0;
+/* Доод мөр: Бүртгэл үүсгэх | Шинэчлэлт шалгах …… v1.8.0 */
+.login-foot {
+  position: absolute;
+  left: 30px;
+  right: 26px;
+  bottom: 16px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.login-divider::before, .login-divider::after {
-  content: ''; flex: 1; height: 1px; background: var(--border);
+.login-foot .auth-tab,
+.login-foot .login-foot-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: 700 0.95rem var(--font-b);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
+.login-foot .auth-tab:hover,
+.login-foot .login-foot-link:hover { color: #ffd9da; }
+.login-foot .auth-tab.active { display: none; }
+.login-foot button:not(:last-of-type)::after {
+  content: '|';
+  display: inline-block;
+  margin-left: 8px;
+  color: rgba(255, 255, 255, 0.45);
+  font-weight: 400;
+}
+.login-ver { margin-left: auto; color: rgba(255, 255, 255, 0.55); font-size: 0.7rem; }
+.login-ver:empty { display: none; }
 
 /* ── Sidebar navigation ─────────────────────────────── */
 #page-main {
@@ -401,7 +645,7 @@ body.light {
   width: 238px;
   height: 100vh;
   padding: 14px 12px;
-  background: rgba(13, 13, 35, 0.76);
+  background: rgba(16, 9, 11, 0.8);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   border-right: 1px solid var(--border);
@@ -427,7 +671,7 @@ body.light .app-sidebar {
   border-radius: 10px;
   border: 1px solid rgba(255, 164, 76, 0.26);
   background: radial-gradient(circle at 50% 44%, rgba(255, 118, 28, 0.18), rgba(5, 6, 16, 0.34));
-  box-shadow: 0 0 0 1px rgba(114, 137, 218, 0.12), 0 10px 22px rgba(0, 0, 0, 0.26);
+  box-shadow: 0 0 0 1px rgba(214, 72, 80, 0.12), 0 10px 22px rgba(0, 0, 0, 0.26);
 }
 .sidebar-brand div {
   display: flex;
@@ -446,7 +690,7 @@ body.light .app-sidebar {
   font-size: 0.72rem;
 }
 .sidebar-toggle { background: rgba(255,255,255,0.04); }
-.sidebar-toggle:hover { background: rgba(88, 101, 242, 0.22); }
+.sidebar-toggle:hover { background: rgba(216, 35, 42, 0.22); }
 .app-nav { display: flex; flex-direction: column; gap: 6px; }
 .nav-btn {
   position: relative;
@@ -468,12 +712,12 @@ body.light .app-sidebar {
   flex: 0 0 30px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(126, 149, 255, 0.22);
+  border: 1px solid rgba(214, 72, 80, 0.3);
   border-radius: 9px;
   background:
     linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
-    rgba(10, 12, 30, 0.34);
-  color: rgba(196, 205, 255, 0.82);
+    rgba(20, 8, 10, 0.34);
+  color: rgba(255, 200, 203, 0.85);
   line-height: 1;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.09);
   transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
@@ -490,25 +734,25 @@ body.light .app-sidebar {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.nav-btn:hover { background: rgba(114, 137, 218, 0.09); border-color: var(--border); color: var(--text); }
+.nav-btn:hover { background: rgba(214, 72, 80, 0.09); border-color: var(--border); color: var(--text); }
 .nav-btn:hover .nav-icon {
-  border-color: rgba(150, 166, 255, 0.42);
+  border-color: rgba(240, 90, 96, 0.5);
   background:
-    linear-gradient(180deg, rgba(114,137,218,0.2), rgba(255,255,255,0.04)),
-    rgba(10, 12, 30, 0.44);
-  color: #dfe4ff;
+    linear-gradient(180deg, rgba(214,72,80,0.2), rgba(255,255,255,0.04)),
+    rgba(20, 8, 10, 0.44);
+  color: #ffe3e4;
 }
 .nav-btn.active {
-  background: rgba(88, 101, 242, 0.2);
+  background: rgba(216, 35, 42, 0.2);
   border-color: var(--accent);
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .nav-btn.active .nav-icon {
-  border-color: rgba(142, 161, 255, 0.72);
-  background: linear-gradient(135deg, rgba(88,101,242,0.58), rgba(111,133,255,0.22));
+  border-color: rgba(255, 120, 126, 0.75);
+  background: linear-gradient(135deg, rgba(216,35,42,0.58), rgba(255,120,126,0.22));
   color: #fff;
-  box-shadow: 0 0 0 3px rgba(88,101,242,0.12), inset 0 1px 0 rgba(255,255,255,0.2);
+  box-shadow: 0 0 0 3px rgba(216,35,42,0.12), inset 0 1px 0 rgba(255,255,255,0.2);
 }
 
 .sidebar-footer {
@@ -719,7 +963,7 @@ body.light .app-sidebar {
   margin-bottom: 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(15, 17, 28, 0.76);
+  background: rgba(20, 12, 14, 0.78);
   box-shadow: 0 10px 26px rgba(0,0,0,0.18);
 }
 body.light .room-grid-panel {
@@ -785,18 +1029,18 @@ body.light .room-grid-row {
 }
 .room-grid-row:last-child { border-bottom: 0; }
 .room-grid-row:hover {
-  background: rgba(46, 132, 255, 0.08);
+  background: rgba(216, 35, 42, 0.08);
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .room-grid-row.selected {
-  background: rgba(46, 132, 255, 0.14);
+  background: rgba(216, 35, 42, 0.14);
   box-shadow: inset 3px 0 0 var(--accent);
 }
 .room-grid-row.room-playing {
   opacity: 0.9;
 }
 .room-grid-row.room-mine {
-  background: rgba(46, 132, 255, 0.1);
+  background: rgba(216, 35, 42, 0.1);
 }
 .room-cell {
   overflow: hidden;
@@ -1028,8 +1272,8 @@ body.light .room-grid-row {
 .btn-primary { background: var(--accent2); border-color: var(--accent2); color: white; }
 .btn-primary:hover { opacity: 0.88; }
 .btn-primary:active { transform: scale(0.96); opacity: 0.8; }
-.btn-discord { background: #5865f2; border: none; color: white; font-size: 1rem; padding: 12px 32px; border-radius: 10px; }
-.btn-discord:hover { background: #4752c4; }
+.btn-discord { background: #d8232a; border: none; color: white; font-size: 1rem; padding: 12px 32px; border-radius: 10px; }
+.btn-discord:hover { background: #b51d23; }
 .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
 .btn-danger { background: var(--red); border-color: var(--red); color: white; }
 .btn-danger:hover { opacity: 0.88; }
@@ -1082,7 +1326,7 @@ tr:hover td { background: var(--card); }
   border-collapse: separate;
   border-spacing: 0;
   overflow: hidden;
-  background: rgba(15, 17, 28, 0.76);
+  background: rgba(20, 12, 14, 0.78);
 }
 body.light #ranking-table,
 body.light #game-history-table {
@@ -1120,9 +1364,9 @@ body.light #game-history-table {
   margin: 0;
   padding: 22px;
   background:
-    radial-gradient(circle at 76% 20%, rgba(88, 101, 242, 0.18), transparent 38%),
-    linear-gradient(145deg, rgba(16, 20, 45, 0.9), rgba(20, 20, 42, 0.78));
-  border: 1px solid rgba(114, 137, 218, 0.32);
+    radial-gradient(circle at 76% 20%, rgba(216, 35, 42, 0.18), transparent 38%),
+    linear-gradient(145deg, rgba(40, 16, 20, 0.9), rgba(24, 14, 16, 0.8));
+  border: 1px solid rgba(214, 72, 80, 0.32);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 .profile-card::before {
@@ -1138,7 +1382,7 @@ body.light #game-history-table {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow: inset 0 0 34px rgba(88, 101, 242, 0.08);
+  box-shadow: inset 0 0 34px rgba(216, 35, 42, 0.08);
   pointer-events: none;
 }
 .profile-identity {
@@ -1203,7 +1447,7 @@ body.light #game-history-table {
 }
 .stat:hover {
   background: rgba(255, 255, 255, 0.065);
-  border-color: rgba(114, 137, 218, 0.32);
+  border-color: rgba(214, 72, 80, 0.32);
 }
 .stat::before {
   content: '';
@@ -1316,10 +1560,10 @@ body.light #game-history-table {
   height: 92px;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 50% 34%, rgba(114, 137, 218, 0.35), transparent 52%),
+    radial-gradient(circle at 50% 34%, rgba(214, 72, 80, 0.35), transparent 52%),
     rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(114, 137, 218, 0.38);
-  box-shadow: 0 0 0 4px rgba(88, 101, 242, 0.1);
+  border: 1px solid rgba(214, 72, 80, 0.38);
+  box-shadow: 0 0 0 4px rgba(216, 35, 42, 0.1);
 }
 .profile-avatar-wrap img {
   width: 100%;
@@ -1338,7 +1582,7 @@ body.light #game-history-table {
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent2), #6f7cff);
+  background: linear-gradient(135deg, var(--accent2), #ff5a60);
   border: 1px solid rgba(255, 255, 255, 0.24);
   color: white;
   cursor: pointer;
@@ -1371,11 +1615,11 @@ body.light .profile-card {
   background: linear-gradient(145deg, rgba(240,244,255,0.95), rgba(255,255,255,0.92));
 }
 body.light .stat {
-  background: rgba(88,101,242,0.05);
-  border-color: rgba(88,101,242,0.1);
+  background: rgba(216,35,42,0.05);
+  border-color: rgba(216,35,42,0.1);
 }
 body.light .profile-avatar-wrap img {
-  box-shadow: 0 0 16px rgba(88,101,242,0.2), 0 0 32px rgba(88,101,242,0.08);
+  box-shadow: 0 0 16px rgba(216,35,42,0.2), 0 0 32px rgba(216,35,42,0.08);
 }
 
 /* ── Room layout ─────────────────────────────────────────── */
@@ -1386,15 +1630,15 @@ body.light .profile-avatar-wrap img {
   padding: 14px;
   background:
     radial-gradient(circle at 18% 8%, rgba(255, 118, 28, 0.14), transparent 28%),
-    radial-gradient(circle at 82% 18%, rgba(88, 101, 242, 0.16), transparent 32%),
-    rgba(5, 5, 18, 0.24);
+    radial-gradient(circle at 82% 18%, rgba(216, 35, 42, 0.16), transparent 32%),
+    rgba(8, 4, 5, 0.24);
 }
 #page-room::before {
   content: '';
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(180deg, rgba(5,5,18,0.08), rgba(5,5,18,0.38));
+  background: linear-gradient(180deg, rgba(8,4,5,0.08), rgba(8,4,5,0.38));
   pointer-events: none;
 }
 .room-layout {
@@ -1412,9 +1656,9 @@ body.light .profile-avatar-wrap img {
   min-height: 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid rgba(114, 137, 218, 0.26);
+  border: 1px solid rgba(214, 72, 80, 0.26);
   border-radius: 14px;
-  background: rgba(12, 14, 34, 0.68);
+  background: rgba(16, 10, 12, 0.72);
   -webkit-backdrop-filter: blur(7px);
   backdrop-filter: blur(7px);
   box-shadow: 0 18px 42px rgba(0,0,0,0.32);
@@ -1425,9 +1669,9 @@ body.light .profile-avatar-wrap img {
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
-  border-bottom: 1px solid rgba(114, 137, 218, 0.24);
+  border-bottom: 1px solid rgba(214, 72, 80, 0.24);
   background:
-    linear-gradient(90deg, rgba(22,26,56,0.96), rgba(18,20,44,0.82)),
+    linear-gradient(90deg, rgba(58,14,18,0.96), rgba(28,12,14,0.86)),
     linear-gradient(180deg, rgba(255,255,255,0.06), transparent);
   flex-shrink: 0;
   transition: background 0.2s;
@@ -1465,7 +1709,7 @@ body.light .profile-avatar-wrap img {
   height: 23px;
   align-items: center;
   padding: 0 8px;
-  border: 1px solid rgba(114, 137, 218, 0.25);
+  border: 1px solid rgba(214, 72, 80, 0.25);
   border-radius: 999px;
   background: rgba(255,255,255,0.04);
   color: var(--text2);
@@ -1497,7 +1741,7 @@ body.light .profile-avatar-wrap img {
   gap: 8px;
   background:
     linear-gradient(180deg, rgba(6,8,20,0.16), rgba(6,8,20,0.44)),
-    radial-gradient(circle at 50% 2%, rgba(88,101,242,0.1), transparent 34%);
+    radial-gradient(circle at 50% 2%, rgba(216,35,42,0.1), transparent 34%);
 }
 .chat-messages::-webkit-scrollbar { width: 5px; }
 .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -1595,7 +1839,7 @@ body.light .profile-avatar-wrap img {
 
 /* @mention */
 .mention { color: var(--accent); font-weight: 600; }
-.mention-me { background: rgba(88,101,242,0.15); padding: 0 3px; border-radius: 3px; }
+.mention-me { background: rgba(216,35,42,0.15); padding: 0 3px; border-radius: 3px; }
 
 /* Mention autocomplete */
 .mention-dropdown { position: absolute; bottom: 100%; left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; max-height: 150px; overflow-y: auto; z-index: 50; margin-bottom: 4px; }
@@ -1609,7 +1853,7 @@ body.light .profile-avatar-wrap img {
   font-size: 0.78rem;
   color: rgba(224,224,224,0.78);
   padding: 6px 12px;
-  border: 1px solid rgba(114,137,218,0.16);
+  border: 1px solid rgba(214,72,80,0.16);
   border-radius: 999px;
   background: rgba(10, 12, 28, 0.36);
   font-style: italic;
@@ -1628,7 +1872,7 @@ body.light .profile-avatar-wrap img {
 .chat-input-row .input { margin-bottom: 0; }
 #page-room .chat-input-row {
   padding: 12px 14px;
-  border-top-color: rgba(114, 137, 218, 0.22);
+  border-top-color: rgba(214, 72, 80, 0.22);
   background: rgba(14, 16, 36, 0.94);
 }
 
@@ -1647,7 +1891,7 @@ body.light .profile-avatar-wrap img {
   margin: 0;
   padding: 18px;
   overflow: visible;
-  border-color: rgba(114, 137, 218, 0.26);
+  border-color: rgba(214, 72, 80, 0.26);
   border-radius: 14px;
   background: rgba(13, 16, 40, 0.72);
   -webkit-backdrop-filter: blur(8px);
@@ -1751,7 +1995,7 @@ body.light .profile-avatar-wrap img {
   width: 92px;
   min-height: 34px;
   padding: 0 10px 0 12px;
-  border: 1px solid rgba(114,137,218,0.34);
+  border: 1px solid rgba(214,72,80,0.34);
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
   color: var(--text);
@@ -1792,7 +2036,7 @@ body.light .profile-avatar-wrap img {
   z-index: 120;
   width: 92px;
   padding: 6px;
-  border: 1px solid rgba(114,137,218,0.38);
+  border: 1px solid rgba(214,72,80,0.38);
   border-radius: 12px;
   background: rgba(13, 15, 35, 0.96);
   box-shadow: 0 18px 34px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.08);
@@ -1821,7 +2065,7 @@ body.light .profile-avatar-wrap img {
   color: var(--text);
 }
 .room-select-options button.active {
-  background: linear-gradient(135deg, #2f7df1 0%, #5c66ff 100%);
+  background: linear-gradient(135deg, #d8232a 0%, #8a1218 100%);
   color: #fff;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
 }
@@ -1899,7 +2143,7 @@ body.light .profile-avatar-wrap img {
   white-space: nowrap;
 }
 #page-room .room-game-card #btn-launch-wc3 {
-  background: linear-gradient(135deg, #6977ff 0%, #4d5cf2 56%, #3c45c6 100%);
+  background: linear-gradient(135deg, #f0323a 0%, #c41c23 56%, #8a1218 100%);
   border-color: rgba(154, 166, 255, 0.38);
   color: #fff;
 }
@@ -1929,12 +2173,12 @@ body.light .profile-avatar-wrap img {
   transform: none;
 }
 #page-room #btn-invite-friends {
-  border-color: rgba(114, 137, 218, 0.28);
+  border-color: rgba(214, 72, 80, 0.28);
   background: rgba(255,255,255,0.04);
 }
 #page-room #btn-invite-friends:hover {
   border-color: var(--accent);
-  background: rgba(88,101,242,0.16);
+  background: rgba(216,35,42,0.16);
 }
 
 .hint { font-size: 0.82rem; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
@@ -2051,7 +2295,7 @@ body.light .profile-avatar-wrap img {
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(15, 17, 28, 0.76);
+  background: rgba(20, 12, 14, 0.78);
 }
 body.light .settings-menu {
   background: rgba(255, 255, 255, 0.88);
@@ -2073,12 +2317,12 @@ body.light .settings-menu {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .settings-menu-item:hover {
-  background: rgba(114, 137, 218, 0.08);
+  background: rgba(214, 72, 80, 0.08);
   border-color: var(--border);
   color: var(--text);
 }
 .settings-menu-item.active {
-  background: rgba(88, 101, 242, 0.18);
+  background: rgba(216, 35, 42, 0.18);
   border-color: var(--accent);
   color: var(--text);
   box-shadow: inset 3px 0 0 var(--accent);
@@ -2089,7 +2333,7 @@ body.light .settings-menu {
   justify-content: center;
   width: 38px;
   height: 38px;
-  --icon-rgb: 142 160 255;
+  --icon-rgb: 255 120 126;
   border: 1px solid rgb(var(--icon-rgb) / 0.36);
   border-radius: 10px;
   background:
@@ -2324,14 +2568,14 @@ body.light .settings-menu {
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: 16px 16px 0 0;
-  box-shadow: 0 -6px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(114,137,218,0.12);
+  box-shadow: 0 -6px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(214,72,80,0.12);
   overflow: hidden;
   pointer-events: auto;
   animation: dm-popup-up 0.28s cubic-bezier(.22,1,.36,1);
   transition: height 0.25s cubic-bezier(.22,1,.36,1), box-shadow 0.2s;
 }
 .dm-popup:hover {
-  box-shadow: 0 -6px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(114,137,218,0.25);
+  box-shadow: 0 -6px 36px rgba(0,0,0,0.55), 0 0 0 1px rgba(214,72,80,0.25);
 }
 .dm-popup.minimized { height: 46px; }
 .dm-popup.minimized .dm-popup-body { display: none; }
@@ -2367,7 +2611,7 @@ body.light .settings-menu {
   flex-shrink: 0;
 }
 .dm-popup-status.online  { background: #43b581; box-shadow: 0 0 6px #43b581; }
-.dm-popup-status.offline { background: #747f8d; }
+.dm-popup-status.offline { background: #6f6468; }
 .dm-popup-username {
   font-weight: 600; font-size: 0.9rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -2545,7 +2789,7 @@ body.light .settings-menu {
   color: var(--text-muted, #888); font-size: 1rem; padding: 2px 4px;
   line-height: 1;
 }
-.btn-eye:hover { color: var(--accent, #7289da); }
+.btn-eye:hover { color: var(--accent, #f0323a); }
 
 /* ── Form success message ──────────────────────────── */
 .form-success { color: #43b581; font-size: 0.82rem; margin-top: 4px; min-height: 1.1em; }
@@ -2633,7 +2877,7 @@ body.light .settings-menu {
 .ranking-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .ranking-controls { display: flex; gap: 8px; align-items: center; }
 .ranking-controls .input { margin-bottom: 0; }
-.ranking-self { background: rgba(114,137,218,0.12); font-weight: 600; }
+.ranking-self { background: rgba(214,72,80,0.12); font-weight: 600; }
 .ranking-row:hover { background: var(--bg2); }
 
 /* ── Pagination ─────────────────────────────────────── */
@@ -2738,16 +2982,16 @@ body.light .settings-menu {
   padding: 0;
   text-decoration: underline;
 }
-.btn-link:hover { color: var(--accent-hover, #8ab4f8); }
+.btn-link:hover { color: var(--accent-hover, #ff8a8f); }
 
 /* ── Profile name ───────────────────────────────────── */
 .username-display-row { display: flex; align-items: center; gap: 8px; }
 .profile-name-source {
-  border: 1px solid rgba(88,101,242,0.35);
+  border: 1px solid rgba(216,35,42,0.35);
   border-radius: 999px;
   padding: 4px 9px;
-  background: rgba(88,101,242,0.12);
-  color: #cfd4ff;
+  background: rgba(216,35,42,0.12);
+  color: #ffd3d5;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0;
@@ -2826,7 +3070,7 @@ body.light .settings-menu {
 .toast.success { background: #43b581; }
 .btn-success { background: #43b581 !important; border-color: #43b581 !important; color: #fff !important; }
 .toast.error   { background: #f04747; }
-.toast.info    { background: #5865f2; }
+.toast.info    { background: #d8232a; }
 .toast.warning { background: #faa61a; color: #000; }
 @keyframes toast-in  { from { transform: translateX(100%); opacity:0; } to { transform: translateX(0); opacity:1; } }
 @keyframes toast-out { from { opacity:1; } to { opacity:0; } }
@@ -2883,23 +3127,23 @@ body.light .settings-menu {
   max-width: 760px;
   margin-bottom: 14px;
 }
-.discord-server-card { border-left: 3px solid #5865f2; }
-.discord-server-card:hover { border-color: #7289da; }
+.discord-server-card { border-left: 3px solid #d8232a; }
+.discord-server-card:hover { border-color: #f0323a; }
 .discord-server-card .room-card-header { display: flex; align-items: center; gap: 10px; }
 .discord-guild-icon {
   width: 42px; height: 42px; border-radius: 50%; object-fit: cover;
-  flex-shrink: 0; background: #36393f;
+  flex-shrink: 0; background: #2a1f22;
 }
 .discord-guild-icon-placeholder {
   display: flex; align-items: center; justify-content: center;
   width: 42px; height: 42px; border-radius: 50%;
-  background: #36393f; font-size: 1.3rem; flex-shrink: 0;
+  background: #2a1f22; font-size: 1.3rem; flex-shrink: 0;
 }
 .discord-header-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .discord-header-text strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .discord-meta-counts { display: flex; gap: 10px; font-size: 0.75rem; color: var(--muted); }
 .discord-members, .discord-online, .discord-voice { white-space: nowrap; }
-.discord-voice { color: #5865f2; font-weight: 600; }
+.discord-voice { color: #d8232a; font-weight: 600; }
 .discord-card-footer { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
 .discord-expired { opacity: 0.75; border-left-color: #ed4245 !important; }
 .discord-expired-warning { color: #ed4245; font-size: 0.78rem; margin: 4px 0 2px; }
@@ -3111,3 +3355,557 @@ body.light .settings-menu {
     display: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   Garena Plus маягийн өнгө төрх — бүх цэс/цонхонд (2026-08-21)
+   Улаан/хар + улаан хүрэн (maroon) панел, гялгар улаан идэвхтэй таб.
+   body:not(.light) — light горимыг эвдэхгүй.
+   ══════════════════════════════════════════════════════════════ */
+h1, h2, h3,
+.sidebar-brand strong,
+.dm-window-header h3,
+.friends-window-header h3 {
+  font-family: var(--font-d);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+h3 { font-weight: 500; }
+
+/* Sidebar */
+body:not(.light) .app-sidebar {
+  background: linear-gradient(180deg, rgba(58, 12, 17, 0.94) 0%, rgba(24, 9, 12, 0.93) 32%, rgba(12, 7, 9, 0.93) 100%);
+  border-right: 1px solid rgba(216, 35, 42, 0.28);
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+}
+.sidebar-brand { border-bottom-color: rgba(216, 35, 42, 0.3); }
+.sidebar-brand img {
+  width: 48px;
+  height: 38px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
+}
+.sidebar-brand strong { font-size: 1.2rem; line-height: 1; }
+.sidebar-brand span { font-size: 0.68rem; letter-spacing: 0.03em; }
+.nav-btn {
+  border-radius: 6px;
+  font-family: var(--font-d);
+  font-size: 0.98rem;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+body:not(.light) .nav-btn:hover {
+  background: rgba(216, 35, 42, 0.14);
+  border-color: rgba(216, 35, 42, 0.35);
+}
+body:not(.light) .nav-btn.active {
+  background: linear-gradient(180deg, #e63a41 0%, #bf1a21 48%, #8f1016 52%, #a5141b 100%);
+  border-color: rgba(255, 140, 146, 0.55);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+body:not(.light) .nav-btn.active .nav-icon {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+body:not(.light) .sidebar-toggle:hover { background: rgba(216, 35, 42, 0.25); }
+
+/* Товч / input / card */
+body:not(.light) .btn {
+  background: linear-gradient(180deg, #2c1b1f 0%, #1a1114 100%);
+  border-color: rgba(216, 35, 42, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+body:not(.light) .btn:hover { border-color: var(--accent); }
+.btn-primary,
+body:not(.light) .btn-primary {
+  background: linear-gradient(180deg, #ee3b42 0%, #c91d24 52%, #a3151b 100%);
+  border-color: #e0343b;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(216, 35, 42, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+.btn-primary:hover { opacity: 1; filter: brightness(1.1); }
+.btn-discord { background: #5865f2; }          /* Discord брэнд өнгө хэвээр */
+.btn-discord:hover { background: #4752c4; }
+body:not(.light) .input {
+  background: rgba(14, 8, 10, 0.78);
+  border-color: rgba(216, 35, 42, 0.28);
+}
+.input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(216, 35, 42, 0.18); }
+body:not(.light) .card {
+  background: linear-gradient(180deg, rgba(44, 17, 21, 0.86) 0%, rgba(22, 12, 14, 0.9) 100%);
+  border-color: rgba(216, 35, 42, 0.22);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Толгой мөрүүд — гялгар улаан хүрэн (Garena+ найзын цонхны толгой шиг) */
+body:not(.light) .room-grid-header,
+body:not(.light) .room-section-head,
+body:not(.light) .lobby-chat-header,
+body:not(.light) .dm-window-header,
+body:not(.light) .friends-window-header,
+body:not(.light) .dm-popup-header {
+  background: linear-gradient(180deg, #6b1118 0%, #4a0c11 52%, #3a0a0e 100%);
+  border-bottom: 1px solid rgba(240, 50, 58, 0.35);
+  color: #f6dcdd;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+body:not(.light) .room-grid-header { color: #f0c9cc; }
+body:not(.light) .room-grid-panel,
+body:not(.light) .settings-menu {
+  background: rgba(22, 11, 13, 0.8);
+  border-color: rgba(216, 35, 42, 0.22);
+}
+body:not(.light) .room-grid-row { border-bottom-color: rgba(216, 35, 42, 0.1); }
+.lobby-header,
+.section-header {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(216, 35, 42, 0.28);
+}
+
+/* Modal / confirm / scrollbar */
+body:not(.light) .modal-box,
+body:not(.light) .confirm-box {
+  background: linear-gradient(180deg, #2a1216 0%, #170d0f 100%);
+  border-color: rgba(216, 35, 42, 0.4);
+}
+::-webkit-scrollbar-thumb { background: rgba(216, 35, 42, 0.45); }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* ══════════════════════════════════════════════════════════════
+   Үндсэн цонхны бүтэц — мокап №2: дээд баннер + 4 таб, sidebar байхгүй
+   ══════════════════════════════════════════════════════════════ */
+#page-main { flex-direction: column; }
+.app-sidebar { display: none; }
+.topbanner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 104px;
+  padding: 0 22px;
+  background:
+    linear-gradient(90deg, rgba(12, 11, 15, 0.94) 0%, rgba(12, 11, 15, 0.6) 42%, rgba(122, 15, 20, 0.72) 100%),
+    url('banner.jpg') center / cover no-repeat;
+  border-bottom: 1px solid rgba(216, 35, 42, 0.35);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.topbanner .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.topbanner .brand img { width: 64px; height: 50px; object-fit: contain; filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.6)); }
+.topbanner .brand strong {
+  display: block;
+  font: 700 30px/1 var(--font-d);
+  letter-spacing: 0.06em;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+.topbanner .brand-text > span {
+  display: block;
+  margin-top: 5px;
+  font: 500 11.5px var(--font-b);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.banner-right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.userchip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 7px 12px 7px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 11, 15, 0.72);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.userchip:hover { border-color: rgba(255, 140, 146, 0.6); }
+.userchip-avatar {
+  position: relative;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  background: linear-gradient(135deg, #3a2b5c, #7a0f14);
+  color: #fff;
+}
+.userchip-avatar .btn-icon-svg { width: 20px; height: 20px; opacity: 0.85; }
+.userchip-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 0; }
+.userchip-text { display: flex; min-width: 0; flex-direction: column; }
+.userchip #user-name {
+  display: block;
+  max-width: 170px;
+  overflow: hidden;
+  color: var(--text);
+  font: 600 14px/1.2 var(--font-b);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userchip-sub { display: flex; gap: 6px; margin-top: 4px; }
+.userchip-sub:not(:has(:not(.hidden))) { display: none; }
+.pill-lv, .pill-tier {
+  display: inline-flex;
+  height: 20px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  font: 600 10.5px var(--font-b);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pill-lv { background: rgba(216, 35, 42, 0.16); color: #ff8a8f; border: 1px solid rgba(216, 35, 42, 0.45); }
+.pill-tier { background: rgba(217, 169, 58, 0.16); color: #f1c563; border: 1px solid rgba(217, 169, 58, 0.45); }
+.wallet { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; padding-left: 12px; border-left: 1px solid rgba(255, 255, 255, 0.12); }
+.wallet b { font: 600 16px var(--font-d); color: var(--gold); letter-spacing: 0.03em; }
+.wallet span { color: var(--text2); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.banner-actions { display: flex; align-items: center; gap: 6px; }
+.ibtn {
+  position: relative;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  min-height: 0;
+  flex: 0 0 38px;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(12, 11, 15, 0.72);
+  color: var(--text2);
+  cursor: pointer;
+}
+.ibtn .btn-icon-svg { width: 18px; height: 18px; }
+.ibtn:hover { color: #fff; border-color: rgba(255, 140, 146, 0.6); background: rgba(216, 35, 42, 0.25); }
+.ibtn-danger:hover { border-color: var(--red); background: rgba(240, 71, 71, 0.3); }
+.ibtn .nav-badge { position: absolute; top: -6px; right: -6px; }
+.maintabs {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  padding: 0 12px;
+  background: linear-gradient(180deg, #1c0f12, #140b0e);
+  border-bottom: 1px solid rgba(216, 35, 42, 0.3);
+}
+.maintab {
+  display: inline-flex;
+  width: auto;
+  height: 34px;
+  min-height: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text2);
+  font: 500 15px var(--font-d);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.maintab .btn-icon-svg { width: 16px; height: 16px; }
+.maintab:hover { color: var(--text); background: rgba(216, 35, 42, 0.14); border-color: rgba(216, 35, 42, 0.35); }
+body:not(.light) .maintab.active {
+  color: #fff;
+  border-color: rgba(255, 140, 146, 0.55);
+  background: linear-gradient(180deg, #e63a41 0%, #bf1a21 48%, #8f1016 52%, #a5141b 100%);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.maintabs-spacer { flex: 1; }
+.maintabs .conn { display: flex; align-items: center; gap: 8px; padding-right: 4px; color: var(--text2); font-size: 12.5px; }
+.hidden-tab { display: none !important; }
+.wallet.hidden, .pill-lv.hidden, .pill-tier.hidden { display: none; }   /* өгөгдөл ирэх хүртэл нуух */
+/* Өрөө таб */
+.room-tab-box { max-width: 560px; margin: 48px auto; padding: 32px; text-align: center; }
+.room-tab-box h2 { margin: 6px 0 0; font-size: 1.5rem; }
+.room-tab-box p { margin: 10px 0 22px; color: var(--text2); line-height: 1.5; }
+.room-tab-actions { display: flex; justify-content: center; gap: 10px; }
+@media (max-width: 900px) {
+  .topbanner { height: 92px; padding: 0 14px; }
+  .topbanner .brand-text > span { display: none; }
+  .maintab { padding: 0 12px; letter-spacing: 0.06em; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   Premium (2026-08-22): шахмал өрөөний list, Банк, гишүүнчлэл, эффектүүд
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── GameRanger маягийн шахмал list ── */
+.room-list-panel { padding: 0; }
+.room-list-grid { min-width: 0; }
+.room-list-head,
+.room-list-row {
+  grid-template-columns: 150px 118px minmax(200px, 1fr) 40px 66px 30px 30px 86px;
+  min-width: 0;
+}
+.room-list-head {
+  min-height: 28px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+.room-list-head > div { padding: 5px 8px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
+.room-list-head > div:nth-child(6), .room-list-head > div:nth-child(7) { justify-content: center; padding-inline: 2px; }
+.room-list-head .rl-lock-ico { width: 12px; height: 12px; }
+.room-list-row {
+  min-height: 24px;
+  animation-duration: 0.12s;
+}
+.room-list-row .room-cell {
+  padding: 2px 8px;
+  font-size: 0.8rem;
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.room-list-row:nth-child(even):not(.selected) { background: rgba(255, 255, 255, 0.018); }
+.rl-gt {
+  display: inline-grid;
+  width: 20px;
+  height: 16px;
+  place-items: center;
+  flex: 0 0 20px;
+  border-radius: 3px;
+  color: #fff;
+  font: 700 9px/1 var(--font-d);
+  letter-spacing: 0.02em;
+}
+.rl-game span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.rl-host { color: var(--text); }
+.rl-host .clickable-name { color: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rl-name { overflow: hidden; white-space: nowrap; }
+.rl-name b { font-weight: 600; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.rl-desc { color: var(--text2); flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.rl-mode { flex: 0 0 auto; padding: 0 5px; border-radius: 3px; background: rgba(216, 35, 42, 0.18); color: #ff8a8f; font-size: 0.66rem; letter-spacing: 0.04em; }
+.rl-net, .rl-players { color: var(--text2); font-variant-numeric: tabular-nums; }
+.rl-players { justify-content: flex-end; }
+.rl-state, .rl-lock { justify-content: center; padding-inline: 2px; }
+.rl-state .room-state-dot { width: 9px; height: 9px; }
+.rl-lock-ico { width: 13px; height: 13px; color: var(--text2); }
+.rl-action { justify-content: flex-end; }
+.rl-action .btn { padding: 2px 9px; font-size: 0.72rem; min-height: 0; line-height: 1.3; }
+.room-list-row .my-room-tag { font-size: 0.62rem; padding: 1px 5px; }
+.room-list-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  border-top: 1px solid rgba(216, 35, 42, 0.2);
+  color: var(--text2);
+  font-size: 0.72rem;
+}
+.room-grid-empty { padding: 28px 16px; text-align: center; color: var(--text2); font-size: 0.9rem; }
+
+/* ── Diamond / XP тайлбар ── */
+.bank-note { color: var(--text2); font-size: 0.75rem; margin-top: 8px; line-height: 1.4; }
+
+/* ── Гишүүнчлэл ── */
+.profile-membership-card { grid-column: 1 / -1; }
+.membership-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.membership-head .hint { margin: 0; }
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: 700 0.7rem var(--font-b);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.tier-badge.tier-bronze { background: rgba(185, 119, 61, 0.16); color: #e0a16d; border: 1px solid rgba(185, 119, 61, 0.45); }
+.tier-badge.tier-silver { background: rgba(185, 190, 200, 0.14); color: #d8dce3; border: 1px solid rgba(185, 190, 200, 0.4); }
+.tier-badge.tier-gold   { background: rgba(217, 169, 58, 0.16); color: #f1c563; border: 1px solid rgba(217, 169, 58, 0.45); }
+.tier-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tier-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(216, 35, 42, 0.22);
+  background: rgba(20, 10, 12, 0.7);
+}
+.tier-card[data-tier="silver"] { border-color: rgba(185, 190, 200, 0.35); }
+.tier-card[data-tier="gold"]   { border-color: rgba(217, 169, 58, 0.5); background: linear-gradient(180deg, rgba(217, 169, 58, 0.08), rgba(20, 10, 12, 0.7)); }
+.tier-card.current { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tier-card.current::after {
+  content: 'Таны түвшин';
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent2);
+  color: #fff;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.tier-card .tier-head { display: flex; justify-content: space-between; align-items: center; }
+.tier-card .tier-price { font: 600 1.1rem var(--font-d); letter-spacing: 0.02em; }
+.tier-card .tier-price small { font: 0.72rem var(--font-b); color: var(--text2); }
+.tier-card ul { margin: 0; padding-left: 16px; color: var(--text2); font-size: 0.78rem; display: flex; flex-direction: column; gap: 4px; }
+.tier-card ul li::marker { color: var(--gold); }
+.tier-card .btn { margin-top: auto; }
+.membership-pay-row { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; color: var(--text2); font-size: 0.8rem; }
+.membership-pay-row .input { width: auto; margin: 0; }
+
+/* Нэрийн эффект сонголт (Discord-ын "Choose Effect" шиг) */
+.fx-picker { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.fx-btn {
+  height: 52px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(20, 10, 12, 0.7);
+  color: var(--text);
+  font: 600 0.9rem var(--font-b);
+  cursor: pointer;
+}
+.fx-btn:hover:not(:disabled) { border-color: rgba(255, 140, 146, 0.6); }
+.fx-btn.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(216, 35, 42, 0.25); }
+.fx-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.fx-lock-note { color: var(--text2); font-size: 0.75rem; margin-top: 8px; }
+
+/* Нэрийн эффектүүд — өрөө, DM, нийтийн чат, профайл хаана ч */
+.name-fx-gradient {
+  background: linear-gradient(90deg, #ff8a8f, #f0323a 50%, #ffb347);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  font-weight: 700;
+}
+.name-fx-neon {
+  color: #fff !important;
+  text-shadow: 0 0 4px #fff, 0 0 10px #f0323a, 0 0 20px #f0323a;
+  animation: fx-neon 2.2s ease-in-out infinite alternate;
+}
+@keyframes fx-neon {
+  from { text-shadow: 0 0 3px #fff, 0 0 8px #f0323a, 0 0 14px #d8232a; }
+  to   { text-shadow: 0 0 6px #fff, 0 0 16px #ff5a60, 0 0 30px #f0323a; }
+}
+.name-fx-rainbow {
+  background: linear-gradient(90deg, #ff4d4d, #ffb347, #ffe84d, #4dff88, #4dc9ff, #b84dff, #ff4d4d);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent !important;
+  font-weight: 700;
+  animation: fx-rainbow 4s linear infinite;
+}
+@keyframes fx-rainbow { to { background-position: 300% 0; } }
+.name-fx-toon {
+  color: #fff !important;
+  -webkit-text-stroke: 0.5px #7a0f14;
+  text-shadow: 2px 2px 0 #7a0f14;
+  font-weight: 800;
+}
+
+/* Хөдөлгөөнт neon/алтан аватарын хүрээ (Silver / Gold) */
+@property --fx-angle { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.avatar-frame { position: relative; }
+.avatar-frame::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 3px;
+  background: conic-gradient(from var(--fx-angle), #f0323a, #ffb347, #ff5a60, #f0323a, #ff8a8f, #f0323a);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: fx-spin 3s linear infinite;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px rgba(240, 50, 58, 0.65));
+}
+.avatar-frame.gold::before {
+  background: conic-gradient(from var(--fx-angle), #d9a93a, #fff1b8, #d9a93a, #b9773d, #ffe08a, #d9a93a);
+  filter: drop-shadow(0 0 7px rgba(217, 169, 58, 0.75));
+}
+@keyframes fx-spin { to { --fx-angle: 360deg; } }
+.userchip-avatar.avatar-frame { outline: none; overflow: visible; }
+.userchip-avatar.avatar-frame img { border-radius: 8px; }
+.profile-avatar-wrap.avatar-frame::before { inset: -5px; border-radius: 50%; }
+
+/* Өрөөний дэвсгэр (GOLD) */
+#room-bg-hint { color: var(--text2); font-size: 0.74rem; margin: -2px 0 8px; }
+
+/* QPay төлбөрийн modal */
+.pay-box { max-width: 380px; text-align: center; }
+.pay-box h2 { font-size: 1.2rem; margin-bottom: 4px; }
+.pay-amount { font: 600 1.6rem var(--font-d); color: var(--gold); letter-spacing: 0.03em; margin-bottom: 10px; }
+.pay-qr { width: 220px; height: 220px; margin: 0 auto 10px; border-radius: 10px; background: #fff; object-fit: contain; display: block; }
+.pay-link { display: block; color: var(--text2); font-size: 0.72rem; word-break: break-all; margin-bottom: 8px; min-height: 1em; }
+.pay-status { color: var(--text2); font-size: 0.82rem; margin-bottom: 14px; }
+.pay-actions { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.pay-qpay-note { color: var(--text2); font-size: 0.68rem; margin-top: 10px; }
+
+@media (max-width: 1100px) {
+  .tier-grid { grid-template-columns: 1fr; }
+  .fx-picker { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+
+/* ── Diamond 💎 / XP ── */
+.diamond-card .diamond-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.diamond-amount { font: 600 1.7rem var(--font-d); letter-spacing: 0.03em; color: #8fd3ff; font-variant-numeric: tabular-nums; text-shadow: 0 0 12px rgba(120, 200, 255, 0.35); }
+.diamond-progress { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.diamond-progress .row { display: flex; justify-content: space-between; gap: 10px; color: var(--text2); font-size: 0.78rem; }
+.diamond-progress .bar { height: 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(216, 35, 42, 0.25); overflow: hidden; }
+.diamond-progress .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4dc9ff, #8fd3ff); transition: width 0.3s; }
+.diamond-progress .bar.xp i { background: linear-gradient(90deg, var(--maroon), var(--accent)); }
+.userchip-sub .pill-lv { background: rgba(216, 35, 42, 0.16); color: #ff8a8f; }
+
+/* ── Бот хост панел (өрөөний цонх) ── */
+.bot-host-panel { margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid rgba(216, 35, 42, 0.3); background: rgba(20, 10, 12, 0.72); display: flex; flex-direction: column; gap: 8px; }
+.bot-host-head { display: flex; align-items: center; justify-content: space-between; }
+.bot-host-title { font: 600 0.92rem var(--font-d); letter-spacing: 0.06em; text-transform: uppercase; }
+.bot-host-state { font-size: 0.64rem; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text2); }
+.bot-host-state[data-state="lobby"], .bot-host-state[data-state="started"] { color: #3fcf7a; border-color: rgba(63, 207, 122, 0.5); }
+.bot-host-state[data-state="failed"], .bot-host-state[data-state="cancelled"] { color: #ff8a8f; border-color: rgba(240, 71, 71, 0.5); }
+.bot-host-state[data-state="queued"], .bot-host-state[data-state="hosting"] { color: #f1c563; border-color: rgba(217, 169, 58, 0.5); }
+.bot-host-panel .hint { margin: 0; font-size: 0.76rem; line-height: 1.4; }
+.bot-host-panel .input { margin: 0; }
+.bot-host-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.bot-host-result { margin-top: 4px; overflow-x: auto; }
+.bot-result-head { font: 600 0.86rem var(--font-d); letter-spacing: 0.04em; margin-bottom: 6px; color: var(--gold); }
+.bot-result-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; }
+.bot-result-table th { text-align: left; color: var(--text2); font-weight: 600; padding: 3px 4px; border-bottom: 1px solid rgba(216, 35, 42, 0.25); letter-spacing: 0.04em; }
+.bot-result-table td { padding: 3px 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); white-space: nowrap; }
+.bot-result-table tr.win td:first-child { color: #3fcf7a; font-weight: 600; }

@@ -15,6 +15,8 @@ const discordServerRoutes = require('./routes/discord_servers');
 const streamerRoutes      = require('./routes/streamers');
 const adminRoutes         = require('./routes/admin');
 const warkeyRoutes        = require('./routes/warkey');
+const membershipRoutes    = require('./routes/membership');
+const botRoutes           = require('./routes/bot');
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
@@ -33,7 +35,8 @@ app.set('trust proxy', 1);
 
 // Middleware
 app.use(cors({ origin: process.env.CLIENT_URL || '*' }));
-app.use(express.json({ limit: '5mb' }));
+// rawBody — QPay webhook-ийн HMAC гарын үсэг шалгахад хэрэгтэй
+app.use(express.json({ limit: '5mb', verify: (req, _res, buf) => { req.rawBody = buf; } }));
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
 
 // Rate limiting — auth endpoint brute force хамгаалалт
@@ -49,6 +52,7 @@ app.use('/auth/register', authLimiter); // base64 зураг байршуула�
 
 // REST Routes
 app.use('/auth', authRoutes);
+app.use('/rooms', botRoutes.roomRouter);   // бот хост (/rooms/:id/bot-host) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', roomRoutes);
 app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
@@ -56,6 +60,10 @@ app.use('/discord-servers', discordServerRoutes);
 app.use('/streamers', streamerRoutes);
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
+app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэрийн эффект
+app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP
+app.post('/qpay/webhook', membershipRoutes.qpayWebhook); // QPay dashboard → payment.paid
+app.use('/bot', botRoutes.botRouter);           // hostbot/bridge.js (x-bot-key)
 
 // Танилцуулга landing page (WarKey + Platform, татах товч, админ самбар руу орох).
 app.get('/', (req, res) => {
@@ -158,6 +166,8 @@ setIO(io);
 roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 // Social router-т io дамжуулах (friend request мэдэгдэлд хэрэг)
 socialRoutes.setIO(io);
+// Бот хостын event-үүд (room:bot_*)
+botRoutes.setIO(io);
 // Admin router-т лоббийн онлайн жагсаалт авагч дамжуулах (onlineUsersList hoisted)
 adminRoutes.setPresence(onlineUsersList);
 

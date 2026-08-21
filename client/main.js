@@ -60,7 +60,7 @@ function createWindow() {
     },
     frame: true,
     autoHideMenuBar: true,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0c0b0f',
   });
 
   mainWindow.loadFile('src/renderer/index.html');
@@ -413,10 +413,19 @@ ipcMain.handle('rooms:mine', async () => {
   try { return await apiService.getMyRoom(); } catch { return null; }
 });
 
-ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, password, description, game_mode }) => {
+// Ерөнхий нэвтэрсэн API хүсэлт (Банк, гишүүнчлэл гэх мэт шинэ endpoint-ууд)
+ipcMain.handle('api:request', async (_event, { method, path: urlPath, body } = {}) => {
+  const allowed = ['get', 'post', 'put', 'patch', 'delete'];
+  if (!allowed.includes(String(method || '').toLowerCase()) || typeof urlPath !== 'string' || !urlPath.startsWith('/')) {
+    throw new Error('Буруу хүсэлт');
+  }
+  try { return await apiService.request(method, urlPath, body); } catch (err) { throw apiError(err); }
+});
+
+ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, password, description, game_mode, background_url }) => {
   let room;
   try {
-    room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode });
+    room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode, background_url });
   } catch (err) { throw apiError(err); }
   // ZeroTier — server-аас автоматаар үүссэн network ID ашиглана
   try {
@@ -672,6 +681,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
       status:  roomData.status || '',
       ztNetId: roomData.zerotierNetworkId || '',
       maxPlayers: String(roomData.maxPlayers || roomData.max_players || ''),
+      backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
     },
   });
   // Тоглолт явагдаж байхад санамсаргүй хаахаас сэргийлнэ — цонх хаагдвал
@@ -917,6 +927,8 @@ ipcMain.handle('relay:stop', () => {
   gameRelayService.stopAll();
   return true;
 });
+ipcMain.handle('relay:startBotBridge', (_, opts) => gameRelayService.startBotBridge(opts || {}));
+ipcMain.handle('relay:stopBotBridge', () => { gameRelayService.stopBotBridge(); return true; });
 ipcMain.handle('relay:addHostPlayer', (_, ip) => {
   gameRelayService.addHostPlayerIp(ip);
   return true;
@@ -934,6 +946,7 @@ ipcMain.handle('game:launch', (_, gameType) => {
   if (!fs.existsSync(game.path)) {
     throw new Error(`"${game.name}" файл олдсонгүй: ${game.path}`);
   }
+  try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
 

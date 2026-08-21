@@ -93,6 +93,7 @@ function roomToPublic(room) {
     game_type: room.game_type,
     description: room.description || '',
     game_mode: room.game_mode || '',
+    background_url: room.background_url || '',
     status: room.status,
     has_password: room.has_password,
     zerotier_network_id: room.zerotier_network_id || null,
@@ -114,7 +115,7 @@ router.get('/', optAuth, async (req, res) => {
     try {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
-          r.max_players, r.game_type, r.description, r.game_mode,
+          r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username)
@@ -144,7 +145,7 @@ router.get('/mine', optAuth, async (req, res) => {
     try {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
-          r.max_players, r.game_type, r.description, r.game_mode,
+          r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp2.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username)
@@ -170,9 +171,19 @@ router.get('/mine', optAuth, async (req, res) => {
 });
 
 router.post('/', strictAuth, async (req, res) => {
-  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '' } = req.body;
+  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '' } = req.body;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
   if (!game_type) return res.status(400).json({ error: 'Game type is required' });
+
+  // Өрөөний дэвсгэр зураг — зөвхөн GOLD, зөвхөн https зураг (≤500 тэмдэгт)
+  let bgUrl = String(background_url || '').trim().slice(0, 500);
+  if (bgUrl) {
+    if (!/^https:\/\/\S+$/i.test(bgUrl)) return res.status(400).json({ error: 'Дэвсгэр зураг https:// хаягтай байх ёстой' });
+    const { tierOf, perksOf } = require('./membership');
+    if (!perksOf(await tierOf(req.user.id)).roomBackground) {
+      return res.status(403).json({ error: 'Өрөөний дэвсгэр зураг зөвхөн GOLD гишүүнд нээлттэй', code: 'TIER_REQUIRED' });
+    }
+  }
 
   const hasPassword = !!(password?.length);
   const passwordHash = hasPassword ? await bcrypt.hash(password, 8) : null;
@@ -194,10 +205,10 @@ router.post('/', strictAuth, async (req, res) => {
       }
 
       const result = await db.query(
-        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
          RETURNING *`,
-        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '']
+        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl]
       );
 
       const room = result.rows[0];
@@ -238,6 +249,7 @@ router.post('/', strictAuth, async (req, res) => {
     zerotier_network_id: process.env.ZEROTIER_DEFAULT_NETWORK || null,
     description: descTrimmed,
     game_mode: game_mode || '',
+    background_url: bgUrl,
     players: new Map([[userId, hostName]]),
   };
   memRooms.set(room.id, room);

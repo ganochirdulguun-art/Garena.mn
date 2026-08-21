@@ -18,6 +18,25 @@ async function dbOk() {
   }
 }
 
+// Гишүүнчлэлийн найзын хязгаар: Bronze 50 / Silver 100 / Gold 200
+async function friendLimitError(userId) {
+  try {
+    const { tierOf, perksOf } = require('./membership');
+    const tier = await tierOf(userId);
+    const limit = perksOf(tier).friends;
+    const c = await db.query(
+      `SELECT COUNT(*)::int AS n FROM friendships WHERE (requester_id = $1 OR receiver_id = $1) AND status = 'accepted'`,
+      [userId]
+    );
+    if ((c.rows[0]?.n || 0) >= limit) {
+      return { error: `Найзын хязгаар дүүрсэн (${limit}). Silver / Gold гишүүнчлэлээр нэмэгдүүлнэ.`, code: 'FRIEND_LIMIT', limit, tier };
+    }
+  } catch (e) {
+    console.error('[friend-limit]', e.message);
+  }
+  return null;
+}
+
 function requireOperationalDb(res) {
   return res.status(503).json({ error: 'Service temporarily unavailable' });
 }
@@ -174,6 +193,9 @@ router.post('/friend/request', authMW, async (req, res) => {
         return res.status(409).json({ error: 'Request already exists' });
       }
 
+      const limitErr = await friendLimitError(myId);
+      if (limitErr) return res.status(403).json(limitErr);
+
       const userRow = await db.query('SELECT username, avatar_url FROM users WHERE id = $1', [myId]);
       await db.query(
         `INSERT INTO friendships (requester_id, receiver_id, status) VALUES ($1, $2, 'pending')`,
@@ -218,6 +240,11 @@ router.post('/friend/accept', authMW, async (req, res) => {
 
   if (await dbOk()) {
     try {
+      const myLimit = await friendLimitError(myId);
+      if (myLimit) return res.status(403).json(myLimit);
+      const theirLimit = await friendLimitError(fromUserId);
+      if (theirLimit) return res.status(403).json({ ...theirLimit, error: `Нөгөө талын найзын хязгаар дүүрсэн (${theirLimit.limit}).` });
+
       const result = await db.query(
         `UPDATE friendships
          SET status = 'accepted'
