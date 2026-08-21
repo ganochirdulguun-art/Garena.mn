@@ -1,4 +1,4 @@
-# Mongolian Warcraft Gaming Platform
+# Garena.mn
 
 A Warcraft III / DotA community platform for Mongolia: a desktop app to host and
 join games together over the internet, plus a Node backend that powers accounts,
@@ -12,7 +12,7 @@ The repo is a monorepo with two apps and a companion project:
 | **`server/`** | Express + Socket.IO backend (PostgreSQL) — auth, rooms, stats, social, admin dashboard, WarKey tracking |
 | **[`LexusWarKey/`](LexusWarKey/)** | Standalone WC3 hotkey remapper (its own repo) that signs in with the same Discord accounts and reports to this backend |
 
-Live server: **https://mongolian-warcraft-gaming-platform-production.up.railway.app**
+Live server: **https://garenamn-production.up.railway.app**
 
 ## Highlights
 
@@ -56,7 +56,7 @@ Live server: **https://mongolian-warcraft-gaming-platform-production.up.railway.
 
 Don't clone the repo — download the app:
 
-1. Open the [landing page](https://mongolian-warcraft-gaming-platform-production.up.railway.app/)
+1. Open the [landing page](https://garenamn-production.up.railway.app/)
    or the GitHub **Releases** page.
 2. Download the latest Windows installer and launch it.
 3. Sign in with Discord and pick your Warcraft executable the first time.

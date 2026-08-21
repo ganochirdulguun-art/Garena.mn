@@ -1,4 +1,4 @@
-const SERVER = 'https://mongolian-warcraft-gaming-platform-production.up.railway.app';
+const SERVER = 'https://garenamn-production.up.railway.app';
 
 // ── Socket.io ─────────────────────────────────────────────
 let socket = null;

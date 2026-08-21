@@ -339,7 +339,7 @@ router.get('/discord/callback', async (req, res) => {
 </head><body><div style="font-size:48px">✅</div><h2>Нэвтрэлт амжилттай!</h2><p>Компьютер дээрх апп руугаа буцна уу — хэдхэн секундэд автоматаар нэвтэрнэ.</p></body></html>`);
     }
 
-    return res.redirect(`wc3platform://auth?token=${jwtToken}`);
+    return res.redirect(`garenamn://auth?token=${jwtToken}`);
   } catch (err) {
     console.error('Discord auth error:', err.response?.data || err.message);
     return res.status(500).send('Authentication failed');

@@ -1,8 +1,8 @@
 {
-  "name": "mongolian-warcraft-gaming-platform-client",
-  "version": "1.7.2",
-  "description": "Mongolian Warcraft Gaming Platform Desktop App",
-  "author": "Tuguldur0107",
+  "name": "garena-mn-client",
+  "version": "1.7.3",
+  "description": "Garena.mn Desktop App",
+  "author": "ganochirdulguun-art",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -10,8 +10,8 @@
     "build": "electron-builder --win"
   },
   "build": {
-    "appId": "com.tuguldur.wc3platform",
-    "productName": "Mongolian Warcraft Gaming Platform",
+    "appId": "mn.garena.platform",
+    "productName": "Garena.mn",
     "icon": "src/renderer/icon.ico",
     "directories": {
       "output": "dist"
@@ -38,7 +38,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Mongolian Warcraft Platform",
+      "shortcutName": "Garena.mn",
       "include": "nsis-extra.nsh"
     },
     "files": [
@@ -55,8 +55,9 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "Tuguldur0107",
-      "repo": "mongolian-warcraft-gaming-platform"
+      "owner": "ganochirdulguun-art",
+      "repo": "Garena.mn",
+      "releaseType": "release"
     }
   },
   "dependencies": {

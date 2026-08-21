@@ -70,7 +70,7 @@ app.get('/', (req, res) => {
 
 // Health check (өмнө нь / байсан) — deploy/monitoring-д хэрэглэнэ.
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Mongolian Warcraft Gaming Platform Server ажиллаж байна' });
+  res.json({ status: 'ok', message: 'Garena.mn Server ажиллаж байна' });
 });
 
 // ── Глобал ZeroTier сүлжээ автомат үүсгэх ────────────────

@@ -1,7 +1,7 @@
 const axios = require('axios');
 const authService = require('./auth');
 
-const SERVER_URL = process.env.SERVER_URL || 'https://mongolian-warcraft-gaming-platform-production.up.railway.app';
+const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.railway.app';
 
 function getClient() {
   const token = authService.getToken();

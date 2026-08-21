@@ -12,7 +12,7 @@ const zerotierService = require('./src/services/zerotier');
 const apiService = require('./src/services/api');
 const gameRelayService = require('./src/services/gameRelay');
 
-const SERVER_URL = process.env.SERVER_URL || 'https://mongolian-warcraft-gaming-platform-production.up.railway.app';
+const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.railway.app';
 
 // ── Auto-updater тохиргоо ─────────────────────────────────
 autoUpdater.autoDownload    = true;   // суллагдмагц дэвсгэрт татна
@@ -51,7 +51,7 @@ function createWindow() {
     height: 700,
     minWidth: 800,
     minHeight: 600,
-    title: 'Mongolian Warcraft Gaming Platform',
+    title: 'Garena.mn',
     icon: path.join(__dirname, 'src/renderer/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -66,14 +66,14 @@ function createWindow() {
   mainWindow.loadFile('src/renderer/index.html');
 }
 
-// Discord OAuth2 deep link: wc3platform://auth?token=...
+// Discord OAuth2 deep link: garenamn://auth?token=...
 // Windows dev mode: execPath + argv[1] шаардлагатай
 if (process.platform === 'win32') {
-  app.setAsDefaultProtocolClient('wc3platform', process.execPath, [
+  app.setAsDefaultProtocolClient('garenamn', process.execPath, [
     path.resolve(process.argv[1] || '.'),
   ]);
 } else {
-  app.setAsDefaultProtocolClient('wc3platform');
+  app.setAsDefaultProtocolClient('garenamn');
 }
 
 // Single instance — хоёр дахь instance нь deep link дамжуулна
@@ -115,7 +115,7 @@ app.whenReady().then(() => {
   createWindow();
 
   // Апп эхлэхдээ argv-д deep link байгаа эсэх шалгах (Windows)
-  const deepLinkUrl = process.argv.find(a => a.startsWith('wc3platform://'));
+  const deepLinkUrl = process.argv.find(a => a.startsWith('garenamn://'));
   if (deepLinkUrl) handleDeepLink(deepLinkUrl);
 
   // Апп бэлэн болсноос 5 секундийн дараа update шалгах
@@ -163,7 +163,7 @@ app.on('window-all-closed', () => {
 
 // Discord callback deep link Windows дээр
 app.on('second-instance', (event, argv) => {
-  const url = argv.find((arg) => arg.startsWith('wc3platform://'));
+  const url = argv.find((arg) => arg.startsWith('garenamn://'));
   if (url) handleDeepLink(url);
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
@@ -322,7 +322,7 @@ ipcMain.handle('auth:linkDiscord', () => {
   });
   authWin.loadURL(`${apiService.SERVER_URL}/auth/discord?link=1&token=${encodeURIComponent(token)}`);
   const handleRedirect = (url) => {
-    if (url.startsWith('wc3platform://')) {
+    if (url.startsWith('garenamn://')) {
       authWin.close();
       handleDeepLink(url);
       return true;
@@ -652,7 +652,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
     height: 660,
     minWidth: 720,
     minHeight: 520,
-    title: `${roomData.name} — Mongolian Warcraft Gaming Platform`,
+    title: `${roomData.name} — Garena.mn`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -736,7 +736,7 @@ ipcMain.handle('friends:openWindow', () => {
   friendsWindow = new BrowserWindow({
     width: 420, height: 600,
     minWidth: 360, minHeight: 450,
-    title: 'Найзууд — Mongolian Warcraft Gaming Platform',
+    title: 'Найзууд — Garena.mn',
     icon: path.join(__dirname, 'src/renderer/icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
