@@ -982,6 +982,82 @@ async function testAdminDiamondGrantIsOwnerOnly() {
   }
 }
 
+// Бот хост: гишүүн "WC3 нээж нэгдэх" → WC3 нэр + IP бүртгэгдэнэ; дүн ирэхэд GHost++-ийн тоглогч (нэр|IP) →
+// платформын хэрэглэгч (ажилд бүртгүүлсэн WC3 нэр → давхцахгүй IP → users.wc3_name → username), нэрийг сурна.
+async function testBotResultMapsWc3NamesAndIps() {
+  const inserted = [];
+  const learned = [];
+  const joins = [];
+  const job = { id: 9, room_id: 7, status: 'started', map_key: 'lod', map_name: 'LoD', game_name: 'GMN#7 test', owner_name: 'Vito_Andolini_Corleo' };
+  const query = async (sql, params = []) => {
+    const s = sql.replace(/\s+/g, ' ').trim();
+    if (s === 'SELECT 1' || s === 'BEGIN' || s === 'COMMIT' || s === 'ROLLBACK') return { rows: [{ '?column?': 1 }], rowCount: 1 };
+    if (s.startsWith('SELECT 1 FROM room_players WHERE room_id = $1 AND user_id = $2')) return { rows: [{}] };
+    if (s.startsWith('SELECT * FROM bot_jobs WHERE room_id = $1 AND status IN')) return { rows: [job] };
+    if (s.startsWith('INSERT INTO bot_job_players')) { joins.push(params); return { rows: [], rowCount: 1 }; }
+    if (s.startsWith('SELECT * FROM bot_jobs WHERE id = $1')) return { rows: [job] };
+    if (s.startsWith('SELECT id, played_at, source FROM game_results')) return { rows: [] };
+    if (s.startsWith('SELECT status FROM rooms WHERE id = $1')) return { rows: [{ status: 'playing' }] };
+    if (s.startsWith('SELECT u.id, u.username, u.discord_id, u.wc3_name')) {
+      return { rows: [
+        { id: 5, username: 'Вито Андолини Корлеон', discord_id: '1', wc3_name: null },
+        { id: 7, username: 'BRAVEE', discord_id: '2', wc3_name: 'bravee_old' },
+        { id: 8, username: 'Third', discord_id: '3', wc3_name: null },
+      ] };
+    }
+    if (s.startsWith('SELECT user_id, wc3_name, ip FROM bot_job_players')) {
+      // Вито нэрээ илгээсэн; BRAVEE зөвхөн IP-тэй (хуучин клиент / нэр ирээгүй)
+      return { rows: joins.map((p) => ({ user_id: p[1], wc3_name: p[2], ip: p[3] })).concat([{ user_id: 7, wc3_name: null, ip: '2.2.2.2' }]) };
+    }
+    if (s.startsWith('INSERT INTO game_results')) return { rows: [{ id: 42 }] };
+    if (s.startsWith('UPDATE users SET xp')) return { rows: [{ xp: 40, block_games: 1, block_wins: 1, diamonds: 0 }] };
+    if (s.startsWith('INSERT INTO game_players')) { inserted.push(params); return { rows: [], rowCount: 1 }; }
+    if (s.startsWith('UPDATE users SET wc3_name = $1 WHERE id = $2 AND')) { learned.push([params[1], params[0]]); return { rows: [], rowCount: 1 }; }
+    return { rows: [], rowCount: 0 };
+  };
+  const mockDb = { query, connect: async () => ({ query, release() {} }) };
+  const server = await startServer({ BOT_API_KEY: 'bot-secret' }, { mockDb });
+  try {
+    const vito = makeAuthToken({ id: 5, username: 'Вито Андолини Корлеон' });
+    let res = await fetch(`${server.baseUrl}/rooms/7/bot-host/join`, {
+      method: 'POST', headers: { Authorization: `Bearer ${vito}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ wc3_name: 'Vito_Andolini_Corleo' }),
+    });
+    assert.equal(res.status, 200);
+    assert.equal(joins.length, 1);
+    assert.equal(joins[0][0], 9);
+    assert.equal(joins[0][1], 5);
+    assert.equal(joins[0][2], 'Vito_Andolini_Corleo');
+    assert.ok(joins[0][3], 'ip must be recorded');
+
+    // bot key-гүй → 401
+    res = await fetch(`${server.baseUrl}/bot/jobs/9/result`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ winner_team: 1, players: [] }),
+    });
+    assert.equal(res.status, 401);
+
+    res = await fetch(`${server.baseUrl}/bot/jobs/9/result`, {
+      method: 'POST', headers: { 'x-bot-key': 'bot-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        winner_team: 1, duration_minutes: 35,
+        players: [
+          { name: 'Vito_Andolini_Corleo', ip: '1.1.1.1', team: 1, kills: 5, deaths: 2, assists: 3 },
+          { name: 'BRAVEE', ip: '2.2.2.2', team: 2, kills: 1, deaths: 4, assists: 0 },
+          { name: 'Stranger', ip: '9.9.9.9', team: 2 },
+        ],
+      }),
+    });
+    assert.equal(res.status, 201);
+    const body = await res.json();
+    assert.equal(body.game_result_id, 42);
+    // [game_result_id, user_id, team, is_winner, …, wc3_name]: Вито = WC3 нэрээр, BRAVEE = IP-ээр, Stranger = тааруулагдахгүй
+    assert.deepEqual(inserted.map((p) => [p[1], p[3], p[12]]), [[5, true, 'Vito_Andolini_Corleo'], [7, false, 'BRAVEE']]);
+    assert.deepEqual(learned, [[5, 'Vito_Andolini_Corleo'], [7, 'BRAVEE']]);
+  } finally {
+    await server.stop();
+  }
+}
+
 (async () => {
   await runTest('server smoke flow supports register/login/me and guarded auth endpoints', testSmokeFlow);
   await runTest('Discord-linked usernames are read-only in-app', testDiscordLinkedUsernameIsReadOnly);
@@ -1002,6 +1078,7 @@ async function testAdminDiamondGrantIsOwnerOnly() {
   await runTest('diamonds/transfer moves balance atomically and writes a double ledger', testDiamondTransfer);
   await runTest('platform owner has unlimited diamonds (transfer + membership without deduction)', testOwnerUnlimitedDiamonds);
   await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
+  await runTest('bot result maps GHost++ players to users by WC3 name, then IP; learns wc3_name', testBotResultMapsWc3NamesAndIps);
 
   if (process.exitCode) process.exit(process.exitCode);
 })();

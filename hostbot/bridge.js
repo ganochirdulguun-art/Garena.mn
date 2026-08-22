@@ -127,7 +127,8 @@ function pollLogFile(state) {
 function handleLogText(state, text) {
   if (!state.started && /started loading with \d+ players/i.test(text)) {
     state.started = true;
-    const players = [...text.matchAll(/\[GAME: [^\]]+\] player \[([^\]]+)\] joined the game/gi)].map((m) => ({ name: m[1] }));
+    // GHost++ лог: "player [name|1.2.3.4] joined the game" — нэр ба нийтийн IP
+    const players = [...text.matchAll(/\[GAME: [^\]]+\] player \[([^\]|]+)(?:\|([^\]]*))?\] joined the game/gi)].map((m) => ({ name: m[1], ip: m[2] || '' }));
     api('POST', `/bot/jobs/${state.job.id}/started`, { players }).catch((e) => log('started POST алдаа', e.message));
     log(`[job ${state.job.id}] тоглолт эхэллээ`);
   }
@@ -192,7 +193,7 @@ function readResult(state) {
       const team = teamOfDotaId(dotaId) || (Number(p.team) + 1);
       const leftAt = Number(p.left || 0);
       return {
-        name: p.name, team, kills: Number(d.kills || 0), deaths: Number(d.deaths || 0), assists: Number(d.assists || 0),
+        name: p.name, ip: String(p.ip || ''), team, kills: Number(d.kills || 0), deaths: Number(d.deaths || 0), assists: Number(d.assists || 0),
         hero: d.hero || null, left_at_sec: leftAt,
         is_leaver: leftAt > 0 && leftAt < durationSec - 60 && !/lost|won|finished|has left the game voluntarily/i.test(String(p.leftreason || '')) && leftAt < 10 * 60 ? true : false,
         leftreason: p.leftreason || '',

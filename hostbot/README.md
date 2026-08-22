@@ -39,12 +39,22 @@ Map нэмэх: `server/src/config/maps.json`-д мөр + `hostbot/mapcfgs/<key>
 
 Timeout: queued/lobby 30 минут → `cancelled`.
 
+## GHost++ build-ийн патч (заавал)
+`ghost/game_base.cpp` `EventPlayerJoined`: нэрийн урт `> 15` → `> 31` (WC3 1.26 LAN нэр 15-аас урт байж болдог, жишээ нь
+20 тэмдэгт; хуучин хязгаараар GHost++ `invalid name of length` гээд REJECTJOIN_FULL буцаадаг). `tools/vps/vps-build-ghost.sh`
+энэ sed-ийг хийдэг. Шалгах: 20 тэмдэгттэй нэрээр REQJOIN явуулахад reason 27 (wrong key) ирвэл OK, 9 (full) бол патчгүй.
+
 ## Туршилтын жагсаалт (эхний удаа)
 1. `node bridge.js` → лог `UDP 6112 сонсож байна`, платформ дээр `GET /rooms/bot-host/status` → `bots:[mn-bot-1]`.
 2. Өрөөнд "Бот хост хийх" → bridge лог `GHost++ асаалаа` → 5–10 сек дотор `lobby мэдэгдлээ`. GHost++ `[MAP] ... crc` алдаа өгвөл `/opt/war3`-д MPQ файлууд байгаа эсэх, map файлын нэр.
 3. Клиент "WC3 нээж нэгдэх" → WC3 → LAN → тоглоом харагдана (нэр `GMN#<өрөө> ...`) → Join. Харагдахгүй бол клиентийн лог `[BotBridge]` (порт 6112 reuseAddr, firewall).
 4. Host lobby чатад `!start` (эсвэл 10 хүн дүүрэхэд автоматаар). Бот `started loading` → платформ `playing`.
-5. Тоглолт дуусах → bridge `дүн илгээгдлээ` → профайл дээр хожил/K/D/A, XP нэмэгдсэн эсэх, 10 тоглолтын блок.
+   GHost++ зөвхөн `autohost_owner`-тэй **яг ижил WC3 нэртэй** тоглогчийн `!start`-ыг хүлээн авдаг → клиент (1.8.4+) хостын
+   WC3 LAN нэрийг (registry `userlocal`) `owner_name`-ээр илгээдэг. Таарахгүй бол lobby-д `!owner` (эзэн нь lobby-д байхгүй үед
+   хэн ч авч болно), дараа нь `!start`.
+5. Тоглолт дуусах → bridge `дүн илгээгдлээ` (тоглогч бүр `name` + `ip`) → сервер `results.js` тоглогчийг
+   ажилд бүртгүүлсэн WC3 нэр (`bot_job_players`, клиент REQJOIN-оос барьж `POST /rooms/:id/bot-host/join`) → давхцахгүй
+   нийтийн IP → `users.wc3_name` → username дарааллаар тааруулна → профайл дээр хожил/K/D/A, XP, 10 тоглолтын блок.
 6. GHost++ `dotagames.winner = 0` байвал (map stats явуулаагүй) bridge `leftreason`-оор тааварлана; тэгж ч чадахгүй бол `failed: ялагч тодорхойгүй` → админ гараар.
 
 ## Анхаарах

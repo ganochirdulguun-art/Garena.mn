@@ -46,6 +46,11 @@ function pickMap(mapKey, gameType) {
 function sanitizeGameName(s) {
   return String(s || 'Garena.mn').replace(/[^\w\s\-\.#!А-Яа-яӨөҮүЁё]/g, '').trim().slice(0, 31) || 'Garena.mn';
 }
+// WC3-ийн LAN нэр (registry userlocal эсвэл REQJOIN пакетаас): хяналтын тэмдэгтгүй, ≤31
+function sanitizeWc3Name(s) {
+  const v = String(s || '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 31);
+  return v || null;
+}
 async function jobToPublic(job) {
   if (!job) return null;
   return {
@@ -102,15 +107,47 @@ roomRouter.post('/:id/bot-host', authMW, async (req, res) => {
       'SELECT u.id, u.username FROM room_players rp JOIN users u ON u.id = rp.user_id WHERE rp.room_id = $1', [roomId]
     );
     const gameName = sanitizeGameName(`GMN#${roomId} ${room.name}`);
+    // GHost++ зөвхөн autohost_owner-тэй ИЖИЛ WC3 нэртэй тоглогчийн !start-ыг хүлээн авдаг → хостын WC3 нэрийг
+    // клиент (registry userlocal) илгээнэ; байхгүй бол өмнө нь сурсан users.wc3_name, тэр ч үгүй бол платформын нэр.
+    let ownerName = sanitizeWc3Name(req.body?.owner_name);
+    if (ownerName) {
+      await db.query('UPDATE users SET wc3_name = $1 WHERE id = $2', [ownerName, req.user.id]).catch(() => {});
+    } else {
+      const w = await db.query('SELECT wc3_name FROM users WHERE id = $1', [req.user.id]).catch(() => ({ rows: [] }));
+      ownerName = sanitizeWc3Name(w.rows[0]?.wc3_name) || req.user.username;
+    }
     const ins = await db.query(
       `INSERT INTO bot_jobs (room_id, requested_by, map_key, map_name, game_name, owner_name, expected_players, status)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'queued') RETURNING *`,
-      [roomId, req.user.id, map.key, map.name, gameName, req.user.username, JSON.stringify(members.rows.map((m) => ({ user_id: m.id, name: m.username })))]
+      [roomId, req.user.id, map.key, map.name, gameName, ownerName, JSON.stringify(members.rows.map((m) => ({ user_id: m.id, name: m.username })))]
     );
     const pub = await jobToPublic(ins.rows[0]);
     emitRoom(roomId, 'room:bot_job', pub);
     return res.status(201).json(pub);
   } catch (e) { console.error('[bot-host]', e); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// Гишүүн: "WC3 нээж нэгдэх" дарахад / WC3 ботын lobby-д орох REQJOIN явуулахад — { wc3_name? }
+// WC3 нэр + нийтийн IP-г ажилд бүртгэнэ → дүн ирэхэд GHost++-ийн тоглогч (нэр|IP) ↔ платформын хэрэглэгч тааруулна.
+roomRouter.post('/:id/bot-host/join', authMW, async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  try {
+    const roomId = req.params.id;
+    const member = await db.query('SELECT 1 FROM room_players WHERE room_id = $1 AND user_id = $2', [roomId, req.user.id]);
+    if (!member.rows[0]) return res.status(403).json({ error: 'Та энэ өрөөний гишүүн биш' });
+    const job = await activeJobForRoom(roomId);
+    if (!job) return res.status(404).json({ error: 'Идэвхтэй бот хост алга' });
+    const wc3Name = sanitizeWc3Name(req.body?.wc3_name);
+    const ip = String(req.ip || '').replace(/^::ffff:/, '').slice(0, 64) || null;
+    await db.query(
+      `INSERT INTO bot_job_players (job_id, user_id, wc3_name, ip) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (job_id, user_id) DO UPDATE SET wc3_name = COALESCE(EXCLUDED.wc3_name, bot_job_players.wc3_name), ip = COALESCE(EXCLUDED.ip, bot_job_players.ip), updated_at = NOW()`,
+      [job.id, req.user.id, wc3Name, ip]
+    );
+    if (wc3Name) await db.query('UPDATE users SET wc3_name = $1 WHERE id = $2', [wc3Name, req.user.id]).catch(() => {});
+    emitRoom(job.room_id, 'room:bot_join', { job_id: job.id, user_id: req.user.id, username: req.user.username, wc3_name: wc3Name });
+    return res.json({ ok: true, job_id: job.id, wc3_name: wc3Name });
+  } catch (e) { console.error('[bot-host/join]', e); return res.status(500).json({ error: 'Server error' }); }
 });
 
 // Host: цуцлах
@@ -189,7 +226,7 @@ botRouter.post('/jobs/:id/lobby', async (req, res) => {
   } catch (e) { console.error(e); return res.status(500).json({ error: 'Server error' }); }
 });
 
-// Тоглолт эхэллээ: { players: [{name, slot?, team?}] }
+// Тоглолт эхэллээ: { players: [{name, ip?, slot?, team?}] }
 botRouter.post('/jobs/:id/started', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
   try {
@@ -203,7 +240,7 @@ botRouter.post('/jobs/:id/started', async (req, res) => {
   } catch (e) { console.error(e); return res.status(500).json({ error: 'Server error' }); }
 });
 
-// Дүн: { winner_team (1 Sentinel | 2 Scourge), duration_minutes, players: [{name, team, kills, deaths, assists, hero, left_at_sec, is_leaver}] }
+// Дүн: { winner_team (1 Sentinel | 2 Scourge), duration_minutes, players: [{name, ip?, team, kills, deaths, assists, hero, left_at_sec, is_leaver}] }
 botRouter.post('/jobs/:id/result', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
   const { winner_team, duration_minutes, players } = req.body || {};

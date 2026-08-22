@@ -114,6 +114,20 @@ async function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_bot_jobs_status ON bot_jobs(status, created_at);
     CREATE INDEX IF NOT EXISTS idx_bot_jobs_room ON bot_jobs(room_id, created_at DESC);
+
+    -- WC3-ийн LAN нэр (registry userlocal / REQJOIN) — платформын нэрээс өөр байдаг тул дүн тааруулахад хэрэглэнэ (2026-08-23)
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS wc3_name VARCHAR(64);
+
+    -- Ботын тоглоомд "WC3 нээж нэгдэх" дарсан гишүүд: WC3 нэр + нийтийн IP → GHost++-ийн тоглогчийн жагсаалттай тааруулна
+    CREATE TABLE IF NOT EXISTS bot_job_players (
+      job_id      INTEGER REFERENCES bot_jobs(id) ON DELETE CASCADE,
+      user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      wc3_name    VARCHAR(64),
+      ip          VARCHAR(64),
+      created_at  TIMESTAMP DEFAULT NOW(),
+      updated_at  TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (job_id, user_id)
+    );
   `);
 }
 

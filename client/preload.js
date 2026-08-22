@@ -74,6 +74,8 @@ contextBridge.exposeInMainWorld('api', {
   startBotBridge:  (opts)      => ipcRenderer.invoke('relay:startBotBridge', opts),
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
   updateBotBridge: (opts)      => ipcRenderer.invoke('relay:updateBotBridge', opts),
+  getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),
+  onBotWc3Join:    (cb)        => ipcRenderer.on('bot:wc3-join', (_, d) => cb(d)),
 
   // Тоглоом эхлүүлэх
   launchGame: (gameType) => ipcRenderer.invoke('game:launch', gameType),

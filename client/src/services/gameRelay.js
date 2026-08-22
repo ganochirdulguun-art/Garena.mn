@@ -223,6 +223,21 @@ function stopFinder() {
 // 6112-ыг bind хийж чадахгүй, LAN жагсаалт хоосон харагдана.
 // ═══════════════════════════════════════════════════════════
 let _bot = null;
+let _onBotJoin = null;   // (wc3Name) => void — WC3 ботын lobby-д орохдоо илгээсэн W3GS_REQJOIN-ийн нэр
+function setBotJoinListener(fn) { _onBotJoin = typeof fn === 'function' ? fn : null; }
+
+// W3GS_REQJOIN (0x1E): F7 1E len(2) hostcounter(4) entrykey(4) ?(1) listenport(2) peerkey(4) name\0 …
+// WC3-ийн бодит LAN нэр энд байдаг → GHost++-ийн тоглогчийн нэртэй яг ижил (дүн тааруулах, owner/!start).
+function parseReqJoinName(buf) {
+  if (!buf || buf.length < 21 || buf[0] !== W3_HEADER || buf[1] !== 0x1E) return null;
+  const end = buf.indexOf(0, 19);
+  if (end <= 19) return null;
+  const raw = buf.subarray(19, end);
+  let name = raw.toString('utf8');
+  if (name.includes('\uFFFD')) name = raw.toString('latin1');
+  name = name.replace(/[\x00-\x1f\x7f]/g, '').trim();
+  return name || null;
+}
 
 function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   stopBotBridge();
@@ -238,6 +253,15 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
     state.conns.add(client);
     const done = () => { state.conns.delete(client); try { client.destroy(); } catch {} try { up.destroy(); } catch {} };
     client.setNoDelay(true); up.setNoDelay(true);
+    let first = true;
+    client.on('data', (d) => {
+      if (!first) return;
+      first = false;
+      const name = parseReqJoinName(d);
+      if (!name) return;
+      console.log(`[BotBridge] WC3 REQJOIN нэр: ${name}`);
+      try { _onBotJoin?.(name); } catch {}
+    });
     client.pipe(up); up.pipe(client);
     client.on('error', done); up.on('error', done); client.on('close', done); up.on('close', done);
     console.log(`[BotBridge] WC3 → ${state.hostIp}:${state.hostPort}`);
@@ -297,6 +321,8 @@ module.exports = {
   startBotBridge,
   stopBotBridge,
   updateBotBridge,
+  setBotJoinListener,
+  parseReqJoinName,
   startHost, stopHost, addHostPlayerIp,
   startFinder, stopFinder,
   stopAll, isRunning,

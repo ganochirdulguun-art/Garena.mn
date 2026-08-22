@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, protocol, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
+const { spawn, execFileSync } = require('child_process');
 const QRCode = require('qrcode');
 const { autoUpdater } = require('electron-updater');
 
@@ -936,6 +936,28 @@ ipcMain.handle('relay:stop', () => {
 ipcMain.handle('relay:startBotBridge', (_, opts) => gameRelayService.startBotBridge(opts || {}));
 ipcMain.handle('relay:stopBotBridge', () => { gameRelayService.stopBotBridge(); return true; });
 ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotBridge(opts || {}));
+
+// WC3-ийн LAN нэр — registry HKCU\Software\Blizzard Entertainment\Warcraft III\String\userlocal.
+// GHost++ зөвхөн autohost_owner-тэй ижил нэртэй тоглогчийн !start-ыг зөвшөөрдөг, дүн ч энэ нэрээр ирдэг тул
+// платформын нэр биш WC3 нэрийг серверт мэдэгдэнэ. (PowerShell: кирилл нэрийг UTF-8-аар зөв уншина.)
+let _wc3NameCache = { at: 0, name: null };
+function readWc3LocalName() {
+  if (process.platform !== 'win32') return null;
+  if (Date.now() - _wc3NameCache.at < 15000) return _wc3NameCache.name;
+  let name = null;
+  try {
+    const out = execFileSync('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-Command',
+      "[Console]::OutputEncoding=[Text.Encoding]::UTF8; (Get-ItemProperty -Path 'HKCU:\\Software\\Blizzard Entertainment\\Warcraft III\\String' -ErrorAction SilentlyContinue).userlocal",
+    ], { encoding: 'utf8', timeout: 8000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
+    name = String(out || '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 31) || null;
+  } catch {}
+  _wc3NameCache = { at: Date.now(), name };
+  return name;
+}
+ipcMain.handle('wc3:name', () => readWc3LocalName());
+// WC3 ботын lobby руу REQJOIN явуулахад бодит нэрийг бүх цонх руу (өрөөний цонх тусдаа)
+gameRelayService.setBotJoinListener((name) => broadcastToWindows('bot:wc3-join', { name }));
 ipcMain.handle('relay:addHostPlayer', (_, ip) => {
   gameRelayService.addHostPlayerIp(ip);
   return true;

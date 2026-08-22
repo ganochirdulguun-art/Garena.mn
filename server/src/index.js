@@ -131,7 +131,7 @@ ensureGlobalZtNetwork();
 // Глобал тохиргоо (auth шаардахгүй)
 app.get('/config', async (req, res) => {
   const networkId = _globalZtNetwork || await ensureGlobalZtNetwork();
-  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode() });
+  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version });
 });
 
 let dbForMigration;

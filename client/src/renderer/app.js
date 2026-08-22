@@ -5144,7 +5144,7 @@ init();
   const STATE_TEXT = {
     queued: 'Бот хүлээж байна… (дараалалд)',
     hosting: 'Бот тоглоомыг нээж байна…',
-    lobby: 'Lobby нээлттэй — "WC3 нээж нэгдэх" дараад LAN-аас тоглоомд орно. Host lobby чатад !start бичиж эхлүүлнэ.',
+    lobby: 'Lobby нээлттэй — "WC3 нээж нэгдэх" дараад LAN-аас тоглоомд орно. Host lobby чатад !start бичиж эхлүүлнэ (!start ажиллахгүй бол эхлээд !owner, дараа нь !start).',
     started: 'Тоглолт явагдаж байна — дуусахад дүн автоматаар бүртгэгдэнэ.',
     finished: 'Тоглолт дууслаа — дүн бүртгэгдсэн.',
     failed: 'Бот хостолж чадсангүй.',
@@ -5179,6 +5179,22 @@ init();
     } catch { panel.classList.add('hidden'); }
   }
 
+  // WC3 нэрийг серверт мэдэгдэнэ (registry userlocal эсвэл REQJOIN-оос) → дүн ирэхэд энэ хэрэглэгчтэй тааруулна
+  const getWc3Name = async () => { try { return (await window.api.getWc3Name?.()) || null; } catch { return null; } };
+  let lastReported = null;
+  async function reportJoin(name) {
+    if (!currentRoom?.id || !job || !['lobby', 'started'].includes(job.status)) return;
+    const key = `${job.id}:${name || ''}`;
+    if (lastReported === key) return;
+    lastReported = key;
+    try { await api('post', `/rooms/${currentRoom.id}/bot-host/join`, { wc3_name: name || undefined }); } catch {}
+  }
+  window.api.onBotWc3Join?.(({ name } = {}) => {
+    if (!name) return;
+    appendSysMsg(`🎮 WC3 «${name}» ботын lobby-д холбогдлоо`);
+    reportJoin(name);
+  });
+
   async function startBridgeAndJoin() {
     if (!job?.gameinfo_b64 || !job.host_ip) { showToast('Ботын тоглоомын мэдээлэл хараахан ирээгүй', 'warning'); return; }
     const btn = el('btn-bot-join');
@@ -5189,6 +5205,7 @@ init();
         bridgeOn = true;
         appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" LAN жагсаалтад харагдана (${job.host_ip}:${job.host_port})`);
       }
+      reportJoin(await getWc3Name());
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
       appendSysMsg('✓ WC3 нээгдлээ → Local Area Network → "' + job.game_name + '" → Join (жагсаалтад 2–5 секундэд гарна; харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ)');
@@ -5200,8 +5217,9 @@ init();
     const btn = el('btn-bot-host');
     btn.disabled = true;
     try {
-      job = await api('post', `/rooms/${currentRoom.id}/bot-host`, { map_key: el('bot-host-map').value });
-      appendSysMsg('🤖 Бот хост хүсэгдлээ — бот тоглоомыг нээмэгц мэдэгдэнэ.');
+      const wc3Name = await getWc3Name();
+      job = await api('post', `/rooms/${currentRoom.id}/bot-host`, { map_key: el('bot-host-map').value, owner_name: wc3Name || undefined });
+      appendSysMsg(`🤖 Бот хост хүсэгдлээ — бот тоглоомыг нээмэгц мэдэгдэнэ.${job?.owner_name ? ` Lobby-ийн эзэн (!start эрхтэй WC3 нэр): «${job.owner_name}»` : ''}`);
       render();
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
@@ -5230,6 +5248,7 @@ init();
       else if (bridgeOn && j.gameinfo_b64) window.api.updateBotBridge?.({ gameInfoB64: j.gameinfo_b64 }).catch(() => {});
     });
     s.on('room:bot_started', () => { if (job) job.status = 'started'; render(); appendSysMsg('▶ Ботын тоглолт эхэллээ.'); });
+    s.on('room:bot_join', (d) => { if (d?.username && String(d.user_id) !== String(currentUser?.id)) appendSysMsg(`🎮 ${d.username}${d.wc3_name ? ` (WC3: ${d.wc3_name})` : ''} ботын тоглоомд нэгдэж байна`); });
     s.on('room:bot_result', (r) => {
       if (job) job.status = 'finished';
       render();
