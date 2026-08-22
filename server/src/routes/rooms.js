@@ -1,6 +1,5 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
-const axios = require('axios');
 const auth = require('../middleware/auth');
 
 const optAuth = auth.optional;
@@ -9,9 +8,8 @@ const strictAuth = auth;
 let db;
 try { db = require('../config/db'); } catch { db = null; }
 
+const zt = require('../services/zerotier');
 const allowInMemoryFallback = process.env.NODE_ENV !== 'production';
-const ZT_API = 'https://api.zerotier.com/api/v1';
-const ZT_TOKEN = process.env.ZEROTIER_API_TOKEN;
 const router = express.Router();
 
 async function dbOk() {
@@ -29,19 +27,9 @@ function requireOperationalDb(res) {
 }
 
 async function ztCreateNetwork(roomName) {
-  if (!ZT_TOKEN) return null;
+  if (!zt.configured()) return null;
   try {
-    const { data } = await axios.post(`${ZT_API}/network`, {
-      config: {
-        name: `WC3-${roomName}`.slice(0, 64),
-        private: true,
-        enableBroadcast: true,
-        v4AssignMode: { zt: true },
-        ipAssignmentPools: [{ ipRangeStart: '10.147.20.1', ipRangeEnd: '10.147.20.254' }],
-        routes: [{ target: '10.147.20.0/24' }],
-      },
-    }, { headers: { Authorization: `token ${ZT_TOKEN}` } });
-    return data.id;
+    return await zt.createNetwork(`WC3-${roomName}`);
   } catch (e) {
     console.error('[ZeroTier] create network:', e.message);
     return null;
@@ -49,11 +37,9 @@ async function ztCreateNetwork(roomName) {
 }
 
 async function ztDeleteNetwork(networkId) {
-  if (!ZT_TOKEN || !networkId) return;
+  if (!zt.configured() || !networkId) return;
   try {
-    await axios.delete(`${ZT_API}/network/${networkId}`, {
-      headers: { Authorization: `token ${ZT_TOKEN}` },
-    });
+    await zt.deleteNetwork(networkId);
   } catch (e) {
     console.error('[ZeroTier] delete network:', e.message);
   }

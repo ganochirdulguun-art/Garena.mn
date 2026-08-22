@@ -23,6 +23,7 @@ const adminRoutes         = require('./routes/admin');
 const warkeyRoutes        = require('./routes/warkey');
 const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
+const zt                  = require('./services/zerotier');   // ZeroTier: өөрийн controller ЭСВЭЛ Central
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
@@ -93,19 +94,11 @@ let _globalZtNetwork = process.env.ZEROTIER_DEFAULT_NETWORK || null;
 let _globalZtNetworkHardened = false;
 
 async function hardenGlobalZtNetwork(networkId) {
-  if (_globalZtNetworkHardened || !networkId) return;
-  const token = process.env.ZEROTIER_API_TOKEN;
-  if (!token) return;
+  if (_globalZtNetworkHardened || !networkId || !zt.configured()) return;
   try {
-    const axios = require('axios');
-    await axios.post(`https://api.zerotier.com/api/v1/network/${networkId}`, {
-      config: {
-        private: true,
-        enableBroadcast: true,
-      },
-    }, { headers: { Authorization: `token ${token}` } });
+    await zt.hardenNetwork(networkId);
     _globalZtNetworkHardened = true;
-    console.log(`[ZeroTier] Глобал network private болгож баталгаажууллаа: ${networkId}`);
+    console.log(`[ZeroTier] (${zt.mode()}) Глобал network private болгож баталгаажууллаа: ${networkId}`);
   } catch (e) {
     console.error('[ZeroTier] Глобал network private болгоход алдаа:', e.message);
   }
@@ -116,26 +109,16 @@ async function ensureGlobalZtNetwork() {
     await hardenGlobalZtNetwork(_globalZtNetwork);
     return _globalZtNetwork;
   }
-  const token = process.env.ZEROTIER_API_TOKEN;
-  if (!token) return null;
+  if (!zt.configured()) return null;
   try {
-    const axios = require('axios');
-    const { data } = await axios.post('https://api.zerotier.com/api/v1/network', {
-      config: {
-        name: 'WC3-Platform-Global',
-        private: true,
-        enableBroadcast: true,
-        v4AssignMode: { zt: true },
-        ipAssignmentPools: [{ ipRangeStart: '10.147.20.1', ipRangeEnd: '10.147.20.254' }],
-        routes: [{ target: '10.147.20.0/24' }],
-      },
-    }, { headers: { Authorization: `token ${token}` } });
-    _globalZtNetwork = data.id;
-    process.env.ZEROTIER_DEFAULT_NETWORK = data.id; // rooms.js-д ашиглагдана
+    const id = await zt.createNetwork('WC3-Platform-Global');
+    if (!id) throw new Error('network id ирсэнгүй');
+    _globalZtNetwork = id;
+    process.env.ZEROTIER_DEFAULT_NETWORK = id; // rooms.js-д ашиглагдана
     _globalZtNetworkHardened = true;
-    console.log(`[ZeroTier] Глобал network үүслээ: ${data.id}`);
-    console.log(`[ZeroTier] ⚠ Railway-д ZEROTIER_DEFAULT_NETWORK=${data.id} тохируулна уу!`);
-    return data.id;
+    console.log(`[ZeroTier] (${zt.mode()}) Глобал network үүслээ: ${id}`);
+    console.log(`[ZeroTier] ⚠ Railway-д ZEROTIER_DEFAULT_NETWORK=${id} тохируулна уу!`);
+    return id;
   } catch (e) {
     console.error('[ZeroTier] Глобал network үүсгэж чадсангүй:', e.message);
     return null;
@@ -148,7 +131,7 @@ ensureGlobalZtNetwork();
 // Глобал тохиргоо (auth шаардахгүй)
 app.get('/config', async (req, res) => {
   const networkId = _globalZtNetwork || await ensureGlobalZtNetwork();
-  res.json({ zerotierNetworkId: networkId });
+  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode() });
 });
 
 let dbForMigration;
@@ -569,16 +552,10 @@ io.on('connection', (socket) => {
       socket.emit('zt:authorize_result', { ok: false, error: 'network-mismatch' });
       return;
     }
-    const token = process.env.ZEROTIER_API_TOKEN;
-    if (!token) { socket.emit('zt:authorize_result', { ok: false, error: 'no-api-token' }); return; }
+    if (!zt.configured()) { socket.emit('zt:authorize_result', { ok: false, error: 'no-api-token' }); return; }
     try {
-      const axios = require('axios');
-      await axios.post(
-        `https://api.zerotier.com/api/v1/network/${networkId}/member/${nodeId}`,
-        { config: { authorized: true } },
-        { headers: { Authorization: `token ${token}` } }
-      );
-      console.log(`[ZT] Authorized ${nodeId} on ${networkId} (${socket.user.username})`);
+      await zt.authorizeMember(String(networkId).toLowerCase(), String(nodeId).toLowerCase());
+      console.log(`[ZT] (${zt.mode()}) Authorized ${nodeId} on ${networkId} (${socket.user.username})`);
       socket.emit('zt:authorize_result', { ok: true });
     } catch (e) {
       console.error(`[ZT] Authorize failed for ${nodeId}:`, e.message);
