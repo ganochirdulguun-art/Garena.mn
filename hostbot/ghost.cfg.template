@@ -1,5 +1,5 @@
 ### Garena.mn hostbot — GHost++ тохиргооны загвар (bridge.js ажил бүрт бөглөж run/ghost-<id>.cfg болгоно)
-### {{PORT}} {{GAMENAME}} {{OWNER}} {{MAPCFG}} {{DB}} {{LOG}} {{WAR3PATH}} {{STARTPLAYERS}}
+### {{PORT}} {{RECONNECTPORT}} {{GAMENAME}} {{OWNER}} {{MAPCFG}} {{DB}} {{LOG}} {{WAR3PATH}} {{STARTPLAYERS}}
 
 bot_log = {{LOG}}
 bot_language = language.cfg
@@ -8,7 +8,7 @@ bot_tft = 1
 bot_bindaddress =
 bot_hostport = {{PORT}}
 bot_reconnect = 1
-bot_reconnectport = 6300
+bot_reconnectport = {{RECONNECTPORT}}
 bot_reconnectwaittime = 3
 bot_maxgames = 1
 bot_commandtrigger = !

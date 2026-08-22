@@ -5185,7 +5185,7 @@ init();
       }
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
-      appendSysMsg('✓ WC3 нээгдлээ → Local Area Network → "' + job.game_name + '" → Join');
+      appendSysMsg('✓ WC3 нээгдлээ → Local Area Network → "' + job.game_name + '" → Join (жагсаалтад 2–5 секундэд гарна; харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ)');
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
   }
@@ -5217,7 +5217,12 @@ init();
 
   function attach(s) {
     s.on('room:bot_job', (j) => { job = j; render(); });
-    s.on('room:bot_lobby', (j) => { job = j; render(); appendSysMsg(`🤖 Бот "${j.bot_name || ''}" тоглоом нээлээ: "${j.game_name}" — "WC3 нээж нэгдэх" дарна уу.`); playSound?.('join'); });
+    s.on('room:bot_lobby', (j) => {
+      const wasLobby = job && job.status === 'lobby' && String(job.id) === String(j.id);
+      job = j; render();
+      if (!wasLobby) { appendSysMsg(`🤖 Бот "${j.bot_name || ''}" тоглоом нээлээ: "${j.game_name}" — "WC3 нээж нэгдэх" дарна уу.`); playSound?.('join'); }
+      else if (bridgeOn && j.gameinfo_b64) window.api.updateBotBridge?.({ gameInfoB64: j.gameinfo_b64 }).catch(() => {});
+    });
     s.on('room:bot_started', () => { if (job) job.status = 'started'; render(); appendSysMsg('▶ Ботын тоглолт эхэллээ.'); });
     s.on('room:bot_result', (r) => {
       if (job) job.status = 'finished';

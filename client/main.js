@@ -935,6 +935,7 @@ ipcMain.handle('relay:stop', () => {
 });
 ipcMain.handle('relay:startBotBridge', (_, opts) => gameRelayService.startBotBridge(opts || {}));
 ipcMain.handle('relay:stopBotBridge', () => { gameRelayService.stopBotBridge(); return true; });
+ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotBridge(opts || {}));
 ipcMain.handle('relay:addHostPlayer', (_, ip) => {
   gameRelayService.addHostPlayerIp(ip);
   return true;

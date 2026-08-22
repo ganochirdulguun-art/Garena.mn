@@ -68,6 +68,7 @@ function renderTemplate(job, port, files) {
   if (!fs.existsSync(path.join(CFG.GHOST_DIR, 'mapcfgs', mapCfg))) throw new Error(`mapcfgs/${mapCfg} олдсонгүй`);
   return tpl
     .replace(/\{\{PORT\}\}/g, String(port))
+    .replace(/\{\{RECONNECTPORT\}\}/g, String(6300 + (port - CFG.BASE_PORT)))
     .replace(/\{\{GAMENAME\}\}/g, job.game_name)
     .replace(/\{\{OWNER\}\}/g, job.owner_name || '')
     .replace(/\{\{MAPCFG\}\}/g, mapCfg)
@@ -151,8 +152,13 @@ udp.on('message', (msg) => {
     if (state.finished || state.started) continue;
     if (state.port !== port && state.job.game_name !== gameName) continue;
     const b64 = msg.toString('base64');
-    if (state.lastB64 === b64 && state.lobbyPosted) return;
-    state.lastB64 = b64;
+    // GAMEINFO-д секунд тутам өөрчлөгддөг uptime талбар бий → slot/тоглогчийн тоо өөрчлөгдсөн эсэхийг
+    // пакетийн сүүлийн 24 байтаас (slots total/open, uptime, port) uptime-ыг хасч харьцуулна; 60с тутамд л дахин илгээнэ
+    const sig = msg.subarray(0, msg.length - 24).toString('base64') + ':' + msg.subarray(msg.length - 24, msg.length - 8).toString('hex') + ':' + port;
+    const now = Date.now();
+    if (state.lobbyPosted && state.lastSig === sig && now - (state.lastPostAt || 0) < 60000) return;
+    state.lastSig = sig;
+    state.lastPostAt = now;
     state.lobbyPosted = true;
     api('POST', `/bot/jobs/${state.job.id}/lobby`, { host_ip: CFG.PUBLIC_IP, host_port: state.port, gameinfo_b64: b64, game_name: gameName })
       .then(() => log(`[job ${state.job.id}] lobby мэдэгдлээ (${gameName} @ ${CFG.PUBLIC_IP}:${state.port})`))

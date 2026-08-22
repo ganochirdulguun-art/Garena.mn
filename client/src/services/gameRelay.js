@@ -218,8 +218,9 @@ function stopFinder() {
 // ═══════════════════════════════════════════════════════════
 // BOT BRIDGE — RGC/GProxy маяг: серверийн ботын тоглоомыг локал WC3-д LAN тоглоом шиг харуулна
 //   1) TCP proxy 127.0.0.1:<localPort> → бот IP:port (WC3 локал руу холбогдоно)
-//   2) Ботын W3GS_GAMEINFO пакетыг (port-ыг localPort болгож) 127.0.0.1:6112 руу source port 6112-оос 3 сек тутам
-// WC3-г bridge эхэлснээс ХОЙШ нээнэ (port 6112-г бид эхэлж bind хийнэ).
+//   2) Ботын W3GS_GAMEINFO пакетыг (port-ыг localPort болгож) 127.0.0.1:6112 руу 2 сек тутам илгээнэ
+// GProxy++-тэй адил энгийн (bind хийгээгүй) UDP socket ашиглана — 6112-ыг ЭЗЛЭХГҮЙ, тэгэхгүй бол WC3 өөрөө
+// 6112-ыг bind хийж чадахгүй, LAN жагсаалт хоосон харагдана.
 // ═══════════════════════════════════════════════════════════
 let _bot = null;
 
@@ -244,22 +245,30 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   state.server.on('error', (e) => console.error('[BotBridge] tcp:', e.message));
   state.server.listen(lp, '127.0.0.1');
 
-  // 2) GAMEINFO → локал WC3 (port талбар = пакетийн сүүлийн 2 байт, LE)
+  // 2) GAMEINFO → локал WC3 (port талбар = пакетийн сүүлийн 2 байт, LE). Socket-ийг bind хийхгүй (OS порт).
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);
-  state.udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  state.udp = dgram.createSocket('udp4');
   state.udp.on('error', (e) => console.error('[BotBridge] udp:', e.message));
-  state.udp.bind(WC3_PORT, '0.0.0.0', () => {
-    const tick = () => {
-      if (!state.running) return;
-      try { state.udp.send(local, 0, local.length, WC3_PORT, '127.0.0.1'); } catch {}
-      state.timer = setTimeout(tick, 3000);
-    };
-    tick();
-    console.log(`[BotBridge] Эхэллээ — ${hostIp}:${hostPort} ↔ 127.0.0.1:${lp}, GAMEINFO → 127.0.0.1:6112`);
-  });
+  const tick = () => {
+    if (!state.running) return;
+    try { const b = state.packet || local; state.udp.send(b, 0, b.length, WC3_PORT, '127.0.0.1'); } catch {}
+    state.timer = setTimeout(tick, 2000);
+  };
+  tick();
+  console.log(`[BotBridge] Эхэллээ — ${hostIp}:${hostPort} ↔ 127.0.0.1:${lp}, GAMEINFO → 127.0.0.1:6112`);
   _bot = state;
   return { localPort: lp };
+}
+
+// Ботын GAMEINFO шинэчлэгдэхэд (lobby-д хүн орж/гарахад) дахин эхлүүлэлгүй пакетыг солино
+function updateBotBridge({ gameInfoB64 }) {
+  if (!_bot || !gameInfoB64) return false;
+  const pkt = Buffer.from(String(gameInfoB64), 'base64');
+  if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) return false;
+  pkt.writeUInt16LE(_bot.localPort, pkt.length - 2);
+  _bot.packet = pkt;
+  return true;
 }
 
 function stopBotBridge() {
@@ -287,6 +296,7 @@ function isRunning() {
 module.exports = {
   startBotBridge,
   stopBotBridge,
+  updateBotBridge,
   startHost, stopHost, addHostPlayerIp,
   startFinder, stopFinder,
   stopAll, isRunning,

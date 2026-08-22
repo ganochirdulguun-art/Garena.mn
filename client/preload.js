@@ -73,6 +73,7 @@ contextBridge.exposeInMainWorld('api', {
   addRelayPlayer:  (ip)        => ipcRenderer.invoke('relay:addHostPlayer', ip),
   startBotBridge:  (opts)      => ipcRenderer.invoke('relay:startBotBridge', opts),
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
+  updateBotBridge: (opts)      => ipcRenderer.invoke('relay:updateBotBridge', opts),
 
   // Тоглоом эхлүүлэх
   launchGame: (gameType) => ipcRenderer.invoke('game:launch', gameType),
