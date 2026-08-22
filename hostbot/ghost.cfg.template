@@ -5,6 +5,8 @@ bot_log = {{LOG}}
 bot_language = language.cfg
 bot_war3path = {{WAR3PATH}}
 bot_tft = 1
+# WC3 1.26a клиентүүд: GAMEINFO-ийн хувилбар таарахгүй бол LAN жагсаалтад харагдахгүй (GHost++ default 30!)
+lan_war3version = 26
 bot_bindaddress =
 bot_hostport = {{PORT}}
 bot_reconnect = 1
