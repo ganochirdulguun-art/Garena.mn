@@ -13,27 +13,83 @@ const ZT_PATHS = [
 let _ztCmd = null;
 let currentNetworkId = null;
 
+// ZeroTier 1.14+ (Windows): zerotier-cli нь CLI token шаарддаг. Системийн файл (ProgramData) зөвхөн admin-д
+// уншигдана; ZeroTier-ийн GUI анх нээгдэхдээ түүнийг хэрэглэгчийн хавтас руу хуулдаг. Манай апп MSI-г чимээгүй
+// суулгадаг тул GUI нээгдэхгүй → хэрэглэгчийн файл үүсдэггүй → CLI бүтэлгүйтэж "сервис зогссон" мэт харагддаг байсан.
+const SYS_TOKEN = 'C:\\ProgramData\\ZeroTier\\One\\authtoken.secret';
+const USER_TOKEN = path.join(os.homedir(), 'AppData', 'Local', 'ZeroTier', 'authtoken.secret');
+
 function isValidNetworkId(networkId) {
   return /^[0-9a-f]{16}$/i.test(String(networkId || '').trim());
+}
+
+function readCliToken() {
+  for (const f of [USER_TOKEN, SYS_TOKEN]) {
+    try {
+      const t = fs.readFileSync(f, 'utf8').trim();
+      if (t) return t;
+    } catch {}
+  }
+  return null;
 }
 
 function getZtCmd() {
   if (_ztCmd) return _ztCmd;
   for (const p of ZT_PATHS) {
     if (fs.existsSync(p)) {
-      // ZeroTier 1.16+ нь authtoken.secret-д admin шаарддаг
-      // User-level token ашиглах (AppData\Local\ZeroTier)
-      const userToken = path.join(os.homedir(), 'AppData', 'Local', 'ZeroTier', 'authtoken.secret');
-      if (fs.existsSync(userToken)) {
-        const token = fs.readFileSync(userToken, 'utf8').trim();
-        _ztCmd = `"${p}" -q -T${token}`;
-      } else {
-        _ztCmd = `"${p}" -q`;
-      }
-      return _ztCmd;
+      const token = readCliToken();
+      // token олдсон үед л кэшлэнэ — дараа нь файл үүсвэл дахин шалгана
+      if (token) { _ztCmd = `"${p}" -q -T${token}`; return _ztCmd; }
+      return `"${p}" -q`;
     }
   }
   return null;
+}
+
+// Windows service ажиллаж байгаа эсэх — CLI token шаардахгүй (sc query)
+function isServiceRunning() {
+  try {
+    const out = execSync('sc query ZeroTierOneService', { stdio: 'pipe', encoding: 'utf8', timeout: 5000 });
+    return /RUNNING/.test(out);
+  } catch { return false; }
+}
+
+// CLI ашиглах боломжтой юу (token зөв, сервис хариулж байна)
+function cliReady() {
+  const cmd = getZtCmd();
+  if (!cmd) return false;
+  try { execSync(`${cmd} info`, { stdio: 'pipe', timeout: 8000 }); return true; } catch { return false; }
+}
+
+// ZeroTier GUI-ийн анхны нээлттэй ижил: системийн CLI token файлыг хэрэглэгчийн хавтас руу (UAC-аар) хуулна.
+// Сервис ажиллаж байгаа ч CLI бүтэлгүйтэж байвал л дуудна.
+function ensureCliToken() {
+  if (cliReady()) return true;
+  if (!isServiceRunning() || !fs.existsSync(SYS_TOKEN)) return false;
+  try {
+    const q = (s) => String(s).replace(/'/g, "''");
+    const user = `${process.env.USERDOMAIN || os.hostname()}\\${os.userInfo().username}`;
+    const ps = [
+      `New-Item -ItemType Directory -Force -Path '${q(path.dirname(USER_TOKEN))}' | Out-Null`,
+      `Copy-Item -Force '${q(SYS_TOKEN)}' '${q(USER_TOKEN)}'`,
+      `icacls '${q(USER_TOKEN)}' /grant '${q(user)}:R' | Out-Null`,
+    ].join('; ');
+    const scriptDir = path.join(os.tmpdir(), 'wc3-zt-setup');
+    if (!fs.existsSync(scriptDir)) fs.mkdirSync(scriptDir, { recursive: true });
+    const scriptPath = path.join(scriptDir, 'zt-cli-token.ps1');
+    fs.writeFileSync(scriptPath, ps + '\r\n', 'utf8');
+    console.log('[ZeroTier] CLI token-ыг хэрэглэгчийн хавтас руу хуулж байна (UAC)...');
+    execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File','${scriptPath}' -Verb RunAs -Wait -WindowStyle Hidden"`,
+      { stdio: 'pipe', timeout: 60000 }
+    );
+  } catch (e) {
+    console.warn('[ZeroTier] CLI token хуулах алдаа:', e.message);
+  }
+  _ztCmd = null;
+  const ok = cliReady();
+  console.log('[ZeroTier] CLI token:', ok ? 'OK' : 'олдсонгүй');
+  return ok;
 }
 
 function isInstalled() {
@@ -56,6 +112,9 @@ async function connectExistingInstall(networkId) {
   const running = isRunning();
   if (!running) {
     return { ok: false, error: 'service-stopped', installed: true, running: false, ip: null };
+  }
+  if (!cliReady() && !ensureCliToken()) {
+    return { ok: false, error: 'cli-token', installed: true, running: true, ip: null };
   }
 
   try {
@@ -88,14 +147,7 @@ function getNodeId() {
 }
 
 function isRunning() {
-  const cmd = getZtCmd();
-  if (!cmd) return false;
-  try {
-    execSync(`${cmd} info`, { stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
+  return isServiceRunning() || cliReady();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -224,6 +276,9 @@ async function autoSetup(networkId, gamePaths) {
   const running = await ensureRunning();
   if (!running) return { ok: false, error: 'service-failed' };
 
+  // 2b. CLI token (ZeroTier 1.14+): хэрэглэгчийн файл байхгүй бол UAC-аар хуулна
+  if (!cliReady() && !ensureCliToken()) return { ok: false, error: 'cli-token' };
+
   // 3. Network-д нэгдэх
   try {
     await joinNetwork(networkId);
@@ -263,13 +318,13 @@ async function joinNetwork(networkId) {
     console.warn('[ZeroTier] Суулгаагүй байна');
     return false;
   }
-  if (!isRunning()) {
-    console.warn('[ZeroTier] Сервис ажиллаагүй байна');
-    return false;
+  if (!cliReady() && !ensureCliToken()) {
+    console.warn('[ZeroTier] CLI token байхгүй — join хийж чадахгүй');
+    throw new Error('cli-token');
   }
 
   return new Promise((resolve, reject) => {
-    exec(`${cmd} join ${networkId}`, (err) => {
+    exec(`${getZtCmd()} join ${networkId}`, (err) => {
       if (err) {
         console.error('[ZeroTier] join алдаа:', err.message);
         return reject(err);
@@ -307,9 +362,11 @@ function getMyIp(networkId) {
 function getStatus(networkId) {
   const installed = isInstalled();
   const running   = installed && isRunning();
+  const cli       = running && cliReady();
   const nid       = networkId || currentNetworkId;
-  const ip        = running && nid ? getMyIp(nid) : null;
-  return { installed, running, connected: !!ip, networkId: nid || null, ip };
+  const ip        = cli && nid ? getMyIp(nid) : null;
+  const error     = !installed ? 'not-installed' : !running ? 'service-stopped' : !cli ? 'cli-token' : null;
+  return { installed, running, cli, connected: !!ip, networkId: nid || null, ip, error };
 }
 
 // Firewall rule аль хэдийн байгаа эсэх шалгах (admin шаардлагагүй)
@@ -472,6 +529,6 @@ function disconnect() {
 
 module.exports = {
   joinNetwork, disconnect,
-  isInstalled, isRunning, getMyIp, getNodeId, getStatus,
+  isInstalled, isRunning, isServiceRunning, cliReady, ensureCliToken, getMyIp, getNodeId, getStatus,
   ensureInstalled, ensureRunning, autoSetup, elevatedNetworkSetup, connectExistingInstall,
 };

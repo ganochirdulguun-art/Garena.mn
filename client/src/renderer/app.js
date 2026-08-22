@@ -721,12 +721,13 @@ async function init() {
       console.log('[ZT] ZeroTier setup complete. IP:', result.ip || 'pending');
     } else {
       const msgs = {
-        'not-installed': 'ZeroTier is not installed. Open Settings and use the official installer link.',
-        'service-stopped': 'ZeroTier is installed but its service is not running. Start ZeroTier or restart Windows.',
-        'join-failed': 'ZeroTier network join failed.',
-        'no-network-id': 'Server ZeroTier network is not configured.',
+        'not-installed': 'ZeroTier суулгаагүй байна. Тохиргоо → Сүлжээ → "ZeroTier татах" дарна уу.',
+        'service-stopped': 'ZeroTier суусан ч сервис нь ажиллахгүй байна. ZeroTier One-ийг нээх эсвэл Windows-оо дахин асаана уу.',
+        'cli-token': 'ZeroTier-ийн эрх хэрэгтэй: Тохиргоо → Сүлжээ → "Холболт шалгах" дараад UAC цонхонд "Yes" дарна уу.',
+        'join-failed': 'ZeroTier сүлжээнд нэгдэж чадсангүй.',
+        'no-network-id': 'Серверийн ZeroTier сүлжээ тохируулагдаагүй байна.',
       };
-      showToast(msgs[result.error] || `ZeroTier error: ${result.error}`, result.error === 'not-installed' ? 'warning' : 'error', 10000);
+      showToast(msgs[result.error] || `ZeroTier алдаа: ${result.error}`, result.error === 'not-installed' ? 'warning' : 'error', 10000);
     }
   });
 
@@ -3349,6 +3350,7 @@ async function loadSettings() {
     if (stEl) {
       if (!st.installed) stEl.textContent = '(суулгаагүй)';
       else if (!st.running) stEl.textContent = '(сервис зогссон)';
+      else if (st.cli === false) stEl.textContent = '(эрх хэрэгтэй — "Холболт шалгах" дарна уу)';
       else if (!st.connected) stEl.textContent = '(холбогдоогүй)';
       else stEl.textContent = '(холбогдсон)';
     }
@@ -3561,15 +3563,19 @@ document.getElementById('btn-zt-refresh')?.addEventListener('click', async () =>
         lines.push(`IP: ${result.ip}`);
         msgEl.style.color = 'var(--green)';
       } else if (result.error === 'not-installed') {
-        lines.push('ZeroTier not installed');
-        lines.push('Use the official installer button below');
+        lines.push('ZeroTier суулгаагүй байна');
+        lines.push('Доорх "ZeroTier татах" товчийг ашиглана уу');
         msgEl.style.color = 'var(--yellow, orange)';
-      } else if (result.error === 'service-stopped') {
-        lines.push('ZeroTier service is not running');
-        lines.push('Open ZeroTier or restart Windows');
+      } else if (result.error === 'service-stopped' || result.error === 'service-failed') {
+        lines.push('ZeroTier сервис ажиллахгүй байна');
+        lines.push('ZeroTier One-ийг нээх эсвэл Windows-оо дахин асаана уу');
+        msgEl.style.color = 'var(--yellow, orange)';
+      } else if (result.error === 'cli-token') {
+        lines.push('ZeroTier-ийн эрх олгогдоогүй (UAC цонхонд "Yes" дарна уу)');
+        lines.push('Эсвэл ZeroTier One програмыг нэг удаа нээгээд дахин "Холболт шалгах"');
         msgEl.style.color = 'var(--yellow, orange)';
       } else {
-        lines.push('IP not available yet');
+        lines.push('IP хараахан олгогдоогүй — хэдэн секундын дараа дахин шалгана уу');
         msgEl.style.color = 'var(--red)';
       }
       msgEl.innerHTML = lines.join('<br>');
