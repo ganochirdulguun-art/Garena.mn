@@ -75,6 +75,12 @@ contextBridge.exposeInMainWorld('api', {
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
   updateBotBridge: (opts)      => ipcRenderer.invoke('relay:updateBotBridge', opts),
   getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),
+
+  // 1.8.5: Найзууд цонх ↔ үндсэн цонх (удирдлагын товчнууд), реклам
+  mainAction:      (a)         => ipcRenderer.invoke('ui:mainAction', a),
+  onUiAction:      (cb)        => ipcRenderer.on('ui:action', (_, d) => cb(d)),
+  notifyMainShown: ()          => ipcRenderer.invoke('ui:mainShown'),
+  getAd:           ()          => ipcRenderer.invoke('config:ad'),
   onBotWc3Join:    (cb)        => ipcRenderer.on('bot:wc3-join', (_, d) => cb(d)),
 
   // Тоглоом эхлүүлэх

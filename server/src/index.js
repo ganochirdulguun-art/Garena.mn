@@ -131,7 +131,11 @@ ensureGlobalZtNetwork();
 // Глобал тохиргоо (auth шаардахгүй)
 app.get('/config', async (req, res) => {
   const networkId = _globalZtNetwork || await ensureGlobalZtNetwork();
-  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version });
+  // Клиентийн толгойн реклам: env AD_IMAGE_URL / AD_LINK_URL / AD_TEXT (хоосон бол клиент placeholder харуулна)
+  const ad = (process.env.AD_IMAGE_URL || process.env.AD_TEXT)
+    ? { image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }
+    : null;
+  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version, ad });
 });
 
 let dbForMigration;
@@ -542,7 +546,8 @@ io.on('connection', (socket) => {
       return;
     }
     if (!roomId) { socket.emit('zt:authorize_result', { ok: false, error: 'room-required' }); return; }
-    if (String(socket.data.roomId) !== String(roomId)) { socket.emit('zt:authorize_result', { ok: false, error: 'room-mismatch' }); return; }
+    // socket.data.roomId-г room:join async тавьдаг тул клиент шууд дараа нь zt:authorize явуулахад
+    // "room-mismatch" гардаг байсан (race) → зөвхөн DB-ийн гишүүнчлэлээр шалгана
     if (!await ensureRoomMembership(socket, roomId)) {
       socket.emit('zt:authorize_result', { ok: false, error: 'room-access-denied' });
       return;

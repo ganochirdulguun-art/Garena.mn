@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, shell, protocol, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, protocol, dialog, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { spawn, execFileSync } = require('child_process');
@@ -64,6 +64,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile('src/renderer/index.html');
+  // Найзууд цонх үндсэн цонхны хажууд наалдаж явна; үндсэн цонх хаагдахад хамт хаагдана
+  mainWindow.on('moved', dockFriendsWindow);
+  mainWindow.on('resized', dockFriendsWindow);
+  mainWindow.on('closed', () => { closeFriendsWindow(); mainWindow = null; });
 }
 
 // Discord OAuth2 deep link: garenamn://auth?token=...
@@ -373,6 +377,7 @@ ipcMain.handle('update:check', async () => {
 });
 
 ipcMain.handle('auth:logout', async () => {
+  closeFriendsWindow();
   // User-ийн өрөөг сервер дээр хаах/гарах
   try {
     const myRoom = await apiService.getMyRoom();
@@ -740,11 +745,25 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
 });
 
 // ── Найзуудын тусдаа цонх ─────────────────────────────────
+// ── Найзууд цонх (1.8.5: үндсэн цонхтой ХАМТ нээгдэж, баруун хажууд нь наалддаг хоёр дахь үндсэн цонх) ──
+// Профайл чип + чат/тохиргоо/гарах товчнууд энд байдаг тул дангаар нь хаагдахгүй (closable: false);
+// үндсэн цонх хаагдах / гарах үед main.js хаана.
 let friendsWindow = null;
-ipcMain.handle('friends:openWindow', () => {
-  if (friendsWindow && !friendsWindow.isDestroyed()) { friendsWindow.focus(); return; }
+const FRIENDS_W = 400;
+function dockFriendsWindow() {
+  if (!mainWindow || mainWindow.isDestroyed() || !friendsWindow || friendsWindow.isDestroyed()) return;
+  try {
+    const b = mainWindow.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    let x = b.x + b.width;                              // баруун хажууд
+    if (x + FRIENDS_W > area.x + area.width) x = Math.max(area.x, b.x - FRIENDS_W);   // багтахгүй бол зүүн талд
+    friendsWindow.setBounds({ x, y: b.y, width: FRIENDS_W, height: b.height });
+  } catch {}
+}
+function openFriendsWindow() {
+  if (friendsWindow && !friendsWindow.isDestroyed()) { dockFriendsWindow(); return friendsWindow; }
   friendsWindow = new BrowserWindow({
-    width: 420, height: 600,
+    width: FRIENDS_W, height: 700,
     minWidth: 360, minHeight: 450,
     title: 'Найзууд — Garena.mn',
     icon: path.join(__dirname, 'src/renderer/icon.ico'),
@@ -754,10 +773,31 @@ ipcMain.handle('friends:openWindow', () => {
       nodeIntegration: false,
     },
     autoHideMenuBar: true,
+    closable: false,
     backgroundColor: '#0d0d1a',
   });
   friendsWindow.loadFile('src/renderer/index.html', { query: { mode: 'friends' } });
   friendsWindow.on('closed', () => { friendsWindow = null; });
+  friendsWindow.once('ready-to-show', dockFriendsWindow);
+  dockFriendsWindow();
+  return friendsWindow;
+}
+function closeFriendsWindow() {
+  if (friendsWindow && !friendsWindow.isDestroyed()) { try { friendsWindow.destroy(); } catch {} }
+  friendsWindow = null;
+}
+ipcMain.handle('friends:openWindow', () => { openFriendsWindow()?.focus(); });
+ipcMain.handle('ui:mainShown', () => { openFriendsWindow(); mainWindow?.focus(); });
+// Найзууд цонхны товчнууд → үндсэн цонх (таб солих, тохиргоо, гарах)
+ipcMain.handle('ui:mainAction', (_, a) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  mainWindow.webContents.send('ui:action', a || {});
+  if (a?.action !== 'logout') { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); }
+  return true;
+});
+// Реклам: сервер /config → ad { image, link, text } (env AD_IMAGE_URL / AD_LINK_URL / AD_TEXT)
+ipcMain.handle('config:ad', async () => {
+  try { const { data } = await axios.get(`${SERVER_URL}/config`, { timeout: 8000 }); return data?.ad || null; } catch { return null; }
 });
 
 ipcMain.handle('dm:isWindowOpen', (_, userId) => {
@@ -978,15 +1018,40 @@ ipcMain.handle('game:launch', (_, gameType) => {
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
+  const launchedAt = Date.now();
 
-  // WC3 хаагдахад renderer-т мэдэгдэнэ (өрөөний цонх currentRoom-той тул бүх цонх руу)
+  // WC3 хаагдахад renderer-т мэдэгдэнэ (өрөөний цонх currentRoom-той тул бүх цонх руу).
+  // "Frozen Throne.exe"/"Warcraft III.exe" нь launcher — war3.exe-г асаагаад өөрөө шууд гардаг тул
+  // түргэн гарвал war3.exe ажиллаж байгаа эсэхийг tasklist-ээр хянаж, жинхэнэ хаагдахад л мэдэгдэнэ.
   proc.on('exit', () => {
     _gameProc = null;
-    broadcastToWindows('game:exited');
+    if (Date.now() - launchedAt > 20000 || process.platform !== 'win32') { broadcastToWindows('game:exited'); return; }
+    watchWar3Exit();
   });
 
   return true;
 });
+
+let _war3Watch = null;
+function isWar3Running() {
+  try {
+    const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    return /war3\.exe/i.test(out);
+  } catch { return false; }
+}
+function watchWar3Exit() {
+  if (_war3Watch) return;
+  const startedAt = Date.now();
+  let seen = false;
+  _war3Watch = setInterval(() => {
+    const running = isWar3Running();
+    if (running) { seen = true; return; }
+    // 15 сек дотор war3.exe огт гарч ирээгүй бол launcher өөрөө хаагдсан гэж үзнэ
+    if (!seen && Date.now() - startedAt < 15000) return;
+    clearInterval(_war3Watch); _war3Watch = null;
+    broadcastToWindows('game:exited');
+  }, 3000);
+}
 
 // WC3-г force kill хийх (host хаахад тоглогчдыг гаргах)
 ipcMain.handle('game:kill', () => {

@@ -601,6 +601,9 @@ async function init() {
     await connectSocket();
     document.getElementById('friends-fullpage').classList.add('active');
     initFriendsWindowMode();
+    // Профайл чип (аватар/нэр/LV/tier/💎) — Найзууд цонхны улаан толгойд
+    setUserUI(user);
+    window.__premium?.refreshMe?.();
     return;
   }
 
@@ -778,9 +781,11 @@ function userDisplayName(user) {
 }
 
 function setUserUI(user) {
-  document.getElementById('user-name').textContent = userDisplayName(user) || user.username;
+  // Профайл чип одоо Найзууд цонхонд байна (1.8.5) — үндсэн цонхонд элемент байхгүй байж болно
+  const nameEl = document.getElementById('user-name');
+  if (nameEl) nameEl.textContent = userDisplayName(user) || user.username;
   const av = document.getElementById('user-avatar');
-  if (user.avatar_url) { av.src = user.avatar_url; av.style.display = 'block'; }
+  if (av && user.avatar_url) { av.src = user.avatar_url; av.style.display = 'block'; }
 }
 
 // ── Имэйл нэвтрэх ────────────────────────────────────────
@@ -943,13 +948,18 @@ async function loadQR() {
 document.getElementById('btn-refresh-qr').onclick = loadQR;
 
 // ── Header товчнууд ───────────────────────────────────────
-document.getElementById('btn-logout').onclick = async () => {
+async function doLogout() {
   await window.api.logout();
   if (socket) socket.disconnect();
   currentUser = null;
   showPage('page-login');
   loadQR();
-};
+}
+// "Гарах" товч Найзууд цонхонд байна (1.8.5) → үндсэн цонх гаргана, Найзууд цонх main.js-ээс хаагдана
+document.getElementById('btn-logout')?.addEventListener('click', () => {
+  if (isFriendsMode()) { window.api.mainAction?.({ action: 'logout' }); return; }
+  doLogout();
+});
 
 document.querySelectorAll('.nav-btn').forEach(btn => {
   btn.onclick = () => showTab(btn.dataset.tab);
@@ -3320,8 +3330,7 @@ document.getElementById('btn-upload-avatar').onclick = async () => {
       document.getElementById('profile-avatar').style.display = 'block';
       // Header дахь avatar шинэчлэх
       const headerAv = document.getElementById('user-avatar');
-      headerAv.src = result.avatar_url;
-      headerAv.style.display = 'block';
+      if (headerAv) { headerAv.src = result.avatar_url; headerAv.style.display = 'block'; }
       if (currentUser) currentUser.avatar_url = result.avatar_url;
     }
   } catch (err) {
@@ -3439,19 +3448,19 @@ async function syncTierBotData(triggerBtn = null) {
     btn.disabled = true;
     btn.innerHTML = 'Татаж байна...';
   });
-  setTierBotStatus('TierBot дата татаж байна...');
+  setTierBotStatus('TierSystem дата татаж байна...');
 
   try {
     if (sourceUrl) localStorage.setItem(TIERBOT_URL_KEY, sourceUrl);
     const result = await window.api.syncTierBot({ source_url: sourceUrl || undefined });
     const message = `Импорт: ${result.imported || 0}, шинэ: ${result.created || 0}, шинэчилсэн: ${result.updated || 0}, алгассан: ${result.skipped || 0}`;
     setTierBotStatus(message, 'success');
-    showToast(`TierBot sync амжилттай. ${message}`, 'success');
+    showToast(`TierSystem sync амжилттай. ${message}`, 'success');
     await loadRanking(1, 'rating');
   } catch (err) {
     const message = err?.message || String(err);
     setTierBotStatus(message, 'error');
-    showToast(`TierBot sync алдаа: ${message}`, 'error', 5000);
+    showToast(`TierSystem sync алдаа: ${message}`, 'error', 5000);
   } finally {
     buttons.forEach((btn) => {
       btn.disabled = false;
@@ -4741,19 +4750,47 @@ init();
 
 // ── Мокап №2-ын үндсэн цонх: баннер + 4 таб (2026-08-22) ──
 (function mainShell() {
-  // data-goto-tab товчнууд (brand, userchip, "Өрөөнүүд рүү очих")
+  const toMain = (action, value) => window.api.mainAction?.({ action, value });
+  // data-goto-tab товчнууд (brand, userchip, "Өрөөнүүд рүү очих") — Найзууд цонхноос үндсэн цонх руу дамжуулна
   document.querySelectorAll('[data-goto-tab]').forEach(el => {
-    el.addEventListener('click', () => showTab(el.dataset.gotoTab));
+    el.addEventListener('click', () => (isFriendsMode() ? toMain('tab', el.dataset.gotoTab) : showTab(el.dataset.gotoTab)));
   });
   // "Тоглоом" таб → Тохиргооны "Тоглоом" хэсэг; араа → "Апп" хэсэг
   const jumpSection = (sec) => document.querySelector(`.settings-menu-item[data-settings-section="${sec}"]`)?.click();
   document.querySelectorAll('[data-settings-jump]').forEach(el => {
     el.addEventListener('click', () => {
+      if (isFriendsMode()) { toMain('settings', el.dataset.settingsJump); return; }
       if (!el.classList.contains('nav-btn')) showTab('settings');
       jumpSection(el.dataset.settingsJump);
     });
   });
-  // Найзуудын тусдаа цонх
+  // Найзууд цонхны удирдлагын товчнууд (чат / тохиргоо) → үндсэн цонх
+  document.querySelectorAll('[data-main-action]').forEach(el => {
+    el.addEventListener('click', () => toMain(el.dataset.mainAction, el.dataset.value));
+  });
+  // Үндсэн цонх: Найзууд цонхноос ирсэн үйлдлүүд
+  if (!isFriendsMode() && !isRoomMode() && !isDMMode()) {
+    window.api.onUiAction?.(({ action, value } = {}) => {
+      if (action === 'tab') showTab(value || 'lobby');
+      else if (action === 'settings') { showTab('settings'); jumpSection(value || 'app'); }
+      else if (action === 'logout') doLogout();
+    });
+    // Үндсэн хуудас гарах бүрт Найзууд цонхыг хамт нээнэ (үндсэн цонхны хажууд наалдана)
+    const _showPageMain = showPage;
+    showPage = function (id) { _showPageMain(id); if (id === 'page-main') window.api.notifyMainShown?.(); };
+    // Реклам (сервер /config → ad)
+    (async () => {
+      try {
+        const ad = await window.api.getAd?.();
+        const slot = document.getElementById('ad-slot');
+        if (!slot || !ad || !(ad.image || ad.text)) return;
+        slot.classList.add('has-ad');
+        slot.innerHTML = `<a class="ad-link" href="#" title="${escHtml(ad.text || '')}">${ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text)}</span>`}</a>`;
+        slot.querySelector('.ad-link').addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
+      } catch {}
+    })();
+  }
+  // Найзуудын тусдаа цонх (хуучин товч — байхгүй байж болно)
   document.getElementById('btn-open-friends-main')?.addEventListener('click', () => window.api.openFriendsWindow?.());
   // Холболтын текст
   const connLabel = document.querySelector('.maintabs .conn-label');

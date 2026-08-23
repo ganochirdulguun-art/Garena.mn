@@ -241,6 +241,7 @@ function parseReqJoinName(buf) {
 
 function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   stopBotBridge();
+  stopHost(); stopFinder();   // ZeroTier relay UDP 6112-ыг эзэлж болзошгүй — ботын замд хэрэггүй
   if (!hostIp || !hostPort || !gameInfoB64) throw new Error('Ботын мэдээлэл дутуу');
   const pkt = Buffer.from(String(gameInfoB64), 'base64');
   if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) throw new Error('GAMEINFO пакет буруу');

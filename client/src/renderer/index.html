@@ -268,36 +268,10 @@
           <span>Монгол gameranger платформ</span>
         </span>
       </button>
-      <div class="banner-right">
-        <button type="button" class="userchip" data-goto-tab="profile" title="Профайл">
-          <span class="userchip-avatar">
-            <svg class="btn-icon-svg"><use href="#ico-nav-profile"/></svg>
-            <img id="user-avatar" src="" alt="" class="hidden" />
-          </span>
-          <span class="userchip-text">
-            <span id="user-name"></span>
-            <span class="userchip-sub">
-              <span id="user-level" class="pill-lv hidden"></span>
-              <span id="user-tier" class="pill-tier hidden"></span>
-            </span>
-          </span>
-          <span id="user-wallet" class="wallet hidden" title="Diamond — 10 тоглолтоос 5-д хожвол +30"><b id="user-wallet-amount">💎 0</b><span>Diamond</span></span>
-        </button>
-        <div class="banner-actions">
-          <button type="button" id="btn-open-friends-main" class="ibtn" title="Найзууд (тусдаа цонх)">
-            <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2 20a7 7 0 0 1 14 0M16 4a3.5 3.5 0 0 1 0 7M22 20a7 7 0 0 0-5-6.7"/></svg>
-          </button>
-          <button type="button" class="nav-btn ibtn" data-tab="chat" title="Нийтийн чат / DM">
-            <svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg>
-            <span id="chat-badge" class="nav-badge hidden">0</span>
-          </button>
-          <button type="button" id="btn-open-settings" class="ibtn" data-settings-jump="app" title="Тохиргоо">
-            <svg class="btn-icon-svg"><use href="#ico-nav-settings"/></svg>
-          </button>
-          <button type="button" id="btn-logout" class="ibtn ibtn-danger" title="Гарах">
-            <svg class="btn-icon-svg"><use href="#ico-logout"/></svg>
-          </button>
-        </div>
+      <!-- Баруун тал = рекламны орон зай (сервер /config → ad: {image, link, text}; хоосон бол placeholder) -->
+      <div id="ad-slot" class="ad-slot" title="Рекламны орон зай">
+        <span class="ad-label">Реклам</span>
+        <span class="ad-text">Энд таны реклам байрлана</span>
       </div>
     </header>
     <nav class="maintabs" aria-label="Үндсэн цэс">
@@ -523,18 +497,18 @@
       <div class="tab-header section-header ranking-header">
         <div class="section-title-group">
           <h2>Rank</h2>
-          <span class="section-subtitle">TierBot rating, хожил, win rate, нийт тоглолтоор тоглогчдыг жагсаана</span>
+          <span class="section-subtitle">TierSystem rating, хожил, win rate, нийт тоглолтоор тоглогчдыг жагсаана</span>
         </div>
         <div class="ranking-controls">
           <select id="ranking-sort" class="input input-sm" title="Эрэмблэх">
-            <option value="rating">TierBot rating</option>
+            <option value="rating">TierSystem rating</option>
             <option value="wins">Хожлоор</option>
             <option value="winrate">Win%-ээр</option>
             <option value="total_games">Нийт тоглолтоор</option>
           </select>
-          <button type="button" id="btn-rank-tierbot-sync" class="btn btn-secondary btn-with-icon" title="TierBot дата татах">
+          <button type="button" id="btn-rank-tierbot-sync" class="btn btn-secondary btn-with-icon" title="TierSystem дата татах">
             <svg class="btn-icon-svg"><use href="#ico-refresh"/></svg>
-            TierBot sync
+            TierSystem sync
           </button>
         </div>
       </div>
@@ -717,7 +691,7 @@
           </button>
           <button type="button" class="settings-menu-item" role="tab" aria-selected="false" aria-controls="settings-panel-tierbot" data-settings-section="tierbot">
             <span class="settings-menu-icon icon-tierbot"><svg class="btn-icon-svg"><use href="#ico-nav-rank"/></svg></span>
-            <span class="settings-menu-text"><strong>TierBot</strong><small>Rank import</small></span>
+            <span class="settings-menu-text"><strong>TierSystem</strong><small>Rank import</small></span>
           </button>
           <button type="button" class="settings-menu-item" role="tab" aria-selected="false" aria-controls="settings-panel-notifications" data-settings-section="notifications">
             <span class="settings-menu-icon icon-notifications"><svg class="btn-icon-svg"><use href="#ico-settings-bell"/></svg></span>
@@ -806,8 +780,8 @@
 
           <section id="settings-panel-tierbot" class="settings-panel settings-panel-single" role="tabpanel" data-settings-panel="tierbot" aria-hidden="true">
             <div class="card settings-card">
-              <h3>TierBot rank import</h3>
-              <p class="hint">TierBot-ийн JSON export/API URL-г оруулж Rank өгөгдлийг платформын хэрэглэгчидтэй нэр, Discord ID эсвэл TierBot ID-аар тааруулж оруулна.</p>
+              <h3>TierSystem rank import</h3>
+              <p class="hint">TierSystem-ийн JSON export/API URL-г оруулж Rank өгөгдлийг платформын хэрэглэгчидтэй нэр, Discord ID эсвэл TierSystem ID-аар тааруулж оруулна.</p>
               <input id="tierbot-source-url" type="url" class="input" placeholder="https://.../tierbot/ranking.json" />
               <div class="settings-actions">
                 <button type="button" id="btn-tierbot-save-url" class="btn btn-secondary">URL хадгалах</button>
@@ -1082,11 +1056,40 @@
   <!-- Найзуудын тусдаа цонх горим (full page) -->
   <div id="friends-fullpage" class="page friends-fullpage">
     <div class="friends-window-container">
+      <!-- Улаан толгой = профайл чип (аватар, нэр, LV, tier, 💎) — дарвал үндсэн цонхны Профайл таб -->
       <div class="friends-window-header">
-        <span>👥</span>
-        <h3>Найзууд</h3>
+        <button type="button" class="userchip" data-goto-tab="profile" title="Профайл">
+          <span class="userchip-avatar">
+            <svg class="btn-icon-svg"><use href="#ico-nav-profile"/></svg>
+            <img id="user-avatar" src="" alt="" class="hidden" />
+          </span>
+          <span class="userchip-text">
+            <span id="user-name"></span>
+            <span class="userchip-sub">
+              <span id="user-level" class="pill-lv hidden"></span>
+              <span id="user-tier" class="pill-tier hidden"></span>
+            </span>
+          </span>
+          <span id="user-wallet" class="wallet hidden" title="Diamond — 10 тоглолтоос 5-д хожвол +30"><b id="user-wallet-amount">💎 0</b><span>Diamond</span></span>
+        </button>
       </div>
       <div class="friends-window-body">
+        <!-- Удирдлагын товчнууд (чат / тохиргоо / гарах) — үндсэн цонх руу IPC-ээр дамжуулна -->
+        <div class="fw-toolbar">
+          <span class="fw-toolbar-title">👥 Найзууд</span>
+          <div class="banner-actions">
+            <button type="button" class="ibtn" data-main-action="tab" data-value="chat" title="Нийтийн чат / DM">
+              <svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg>
+              <span id="chat-badge" class="nav-badge hidden">0</span>
+            </button>
+            <button type="button" id="btn-open-settings" class="ibtn" data-main-action="settings" data-value="app" title="Тохиргоо">
+              <svg class="btn-icon-svg"><use href="#ico-nav-settings"/></svg>
+            </button>
+            <button type="button" id="btn-logout" class="ibtn ibtn-danger" title="Гарах">
+              <svg class="btn-icon-svg"><use href="#ico-logout"/></svg>
+            </button>
+          </div>
+        </div>
         <div id="fw-pending-section">
           <div class="dm-section-label">📨 Хүсэлтүүд</div>
           <ul id="fw-pending-list" class="dm-users-list"></ul>
