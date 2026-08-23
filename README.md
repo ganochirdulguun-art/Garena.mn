@@ -135,3 +135,8 @@ SERVER_URL=http://127.0.0.1:3000
 
 ## Бот хостын ops (сервер, 2026-08-24)
 - `OPS_DISCORD_WEBHOOK` — Discord сувгийн webhook URL. Бот offline/online болох, ажил failed/cancelled болох бүрт мэдэгдэнэ (B4). Админ самбар → 🤖 Бот хост хэсэгт ботууд, ажлууд (Цуцлах / Дахин хост), үйл явдлын лог (C2); "Discord тест" товчоор шалгана.
+
+## TierSystem ↔ Garena.mn автомат sync (D3, 2026-08-24)
+- TierSystem Railway: `RANKING_API_KEY=<санамсаргүй 32+ тэмдэгт>` → `GET /api/export/ranking` (X-API-Key).
+- Garena.mn Railway: `TIERBOT_STATS_URL=https://tiersystem-production.up.railway.app/api/export/ranking`, `TIERBOT_API_KEY=<ижил утга>`, `TIERBOT_SYNC_MINUTES=10` (0 = унтраах).
+- Зөвхөн Discord ID-аар таарсан хэрэглэгчдийн tier/MMR/wins/losses шинэчилнэ; админ: `GET /stats/tierbot/auto`, `POST /stats/tierbot/auto/run`.

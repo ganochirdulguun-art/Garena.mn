@@ -23,7 +23,8 @@ const adminRoutes         = require('./routes/admin');
 const warkeyRoutes        = require('./routes/warkey');
 const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
-const zt                  = require('./services/zerotier');   // ZeroTier: өөрийн controller ЭСВЭЛ Central
+const zt                  = require('./services/zerotier');
+const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)   // ZeroTier: өөрийн controller ЭСВЭЛ Central
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
@@ -180,6 +181,7 @@ roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 socialRoutes.setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
+tierSync.start();
 // Diamond 💎 шилжүүлэг / олголтын мэдэгдэл (diamonds:received, membership:updated)
 membershipRoutes.setIO(io);
 // Admin router-т лоббийн онлайн жагсаалт авагч дамжуулах (onlineUsersList hoisted)

@@ -123,7 +123,9 @@ function tierBotHeaders() {
   return headers;
 }
 
-async function upsertTierBotPlayer(player) {
+// opts.updateOnly (автомат sync): шинэ хэрэглэгч үүсгэхгүй, платформын username-ийг ДАРЖ бичихгүй —
+// зөвхөн Discord ID/tierbot_id-аар таарсан хэрэглэгчийн tier/rating/wins/losses шинэчилнэ.
+async function upsertTierBotPlayer(player, opts = {}) {
   let existing = null;
   if (player.discord_id) {
     const byDiscord = await db.query('SELECT id FROM users WHERE discord_id = $1', [player.discord_id]);
@@ -133,12 +135,22 @@ async function upsertTierBotPlayer(player) {
     const byTierBot = await db.query('SELECT id FROM users WHERE tierbot_id = $1', [player.tierbot_id]);
     existing = byTierBot.rows[0] || null;
   }
-  if (!existing) {
+  if (!existing && !opts.updateOnly) {
     const byName = await db.query(
       'SELECT id FROM users WHERE LOWER(username) = LOWER($1) ORDER BY id ASC LIMIT 1',
       [player.username]
     );
     existing = byName.rows[0] || null;
+  }
+  if (opts.updateOnly) {
+    if (!existing) return 'skipped';
+    await db.query(
+      `UPDATE users
+       SET wins = $1, losses = $2, tierbot_id = COALESCE($3, tierbot_id), tierbot_rating = $4, tierbot_tier = $5, tierbot_rank = $6, tierbot_synced_at = NOW()
+       WHERE id = $7`,
+      [player.wins, player.losses, player.tierbot_id, player.rating, player.tier, player.rank, existing.id]
+    );
+    return 'updated';
   }
 
   const params = [
@@ -310,6 +322,16 @@ router.get('/ranking', async (req, res) => {
 
 // TierBot rank export/API-аас тоглогчдын rank өгөгдөл татаж users хүснэгтэд оруулна.
 // Admin эрхтэй хэрэглэгч л ажиллуулна.
+// Автомат sync-ийн төлөв + гараар шууд ажиллуулах (админ самбар)
+router.get('/tierbot/auto', admin, (req, res) => {
+  const { state } = require('../services/tierSync');
+  res.json({ configured: !!process.env.TIERBOT_STATS_URL, url: process.env.TIERBOT_STATS_URL || null, minutes: Number(process.env.TIERBOT_SYNC_MINUTES ?? 10), ...state });
+});
+router.post('/tierbot/auto/run', admin, async (req, res) => {
+  const { runOnce } = require('../services/tierSync');
+  res.json(await runOnce('manual'));
+});
+
 router.post('/tierbot/sync', admin, async (req, res) => {
   if (!await dbAvailable()) {
     return res.status(503).json({ error: 'Service temporarily unavailable' });
@@ -483,3 +505,4 @@ function memberIdToNumber(id) {
 }
 
 module.exports = router;
+module.exports.tierBotHelpers = { ensureTierBotColumns, extractTierBotRows, normalizeTierBotPlayer, upsertTierBotPlayer, tierBotSourceUrl, tierBotHeaders };
