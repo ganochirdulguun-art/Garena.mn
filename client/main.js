@@ -1039,6 +1039,21 @@ function isWar3Running() {
     return /war3\.exe/i.test(out);
   } catch { return false; }
 }
+// WC3 UDP 6112-г эзэлсэн эсэх — ботын bridge 6112-т bind хийхээсээ ӨМНӨ WC3 эзэлсэн байх ёстой,
+// эс бөгөөс WC3 өөрөө 6112-т bind хийж чадахгүй LAN алдаа гаргадаг (v1.8.8-ийн гаж нөлөө).
+function isUdp6112InUse() {
+  try {
+    const out = execFileSync('netstat', ['-ano', '-p', 'UDP'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
+    return /:6112\b/.test(out);
+  } catch {
+    try {
+      const out2 = execFileSync('netstat', ['-an'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
+      return /UDP[^\n]*:6112\b/i.test(out2);
+    } catch { return false; }
+  }
+}
+ipcMain.handle('wc3:lanReady', () => isUdp6112InUse());
+ipcMain.handle('wc3:running', () => isWar3Running());
 function watchWar3Exit() {
   if (_war3Watch) return;
   const startedAt = Date.now();

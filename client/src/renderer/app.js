@@ -161,7 +161,7 @@ function initBackgroundLightning() {
   schedule();
 }
 
-initBackgroundLightning();
+// initBackgroundLightning(); // 1.8.9: аянга цахилгааны эффект хассан (маскот watermark-аар сольсон)
 
 // ── Цонх горимууд ────────────────────────────────────────
 function isRoomMode() {
@@ -5241,15 +5241,23 @@ init();
     const btn = el('btn-bot-join');
     btn.disabled = true;
     try {
-      if (!bridgeOn) {
-        await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
-        bridgeOn = true;
-        appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" LAN жагсаалтад харагдана (${job.host_ip}:${job.host_port})`);
-      }
+      // 1) WC3-ыг ЭХЛЭЭД асаана — WC3 өөрөө UDP 6112-ыг эзлэх ёстой (LAN алдаа гаргахгүй)
       reportJoin(await getWc3Name());
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
-      appendSysMsg('✓ WC3 нээгдлээ → Local Area Network → "' + job.game_name + '" → Join (жагсаалтад 2–5 секундэд гарна; харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ)');
+      appendSysMsg('✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
+      // 2) WC3 6112-ыг эзэлтэл хүлээгээд, ДАРАА нь bridge холбоно (эх порт 6112, зэрэгцэн)
+      if (!bridgeOn) {
+        let ready = false;
+        for (let i = 0; i < 30; i++) {
+          if (await window.api.isWc3LanReady?.()) { ready = true; break; }
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        if (ready) await new Promise((r) => setTimeout(r, 800));
+        await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
+        bridgeOn = true;
+        appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" бэлэн → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
+      }
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
   }

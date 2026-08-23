@@ -75,6 +75,8 @@ contextBridge.exposeInMainWorld('api', {
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
   updateBotBridge: (opts)      => ipcRenderer.invoke('relay:updateBotBridge', opts),
   getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),
+  isWc3LanReady:   ()          => ipcRenderer.invoke('wc3:lanReady'),
+  isWc3Running:    ()          => ipcRenderer.invoke('wc3:running'),
 
   // 1.8.5: Найзууд цонх ↔ үндсэн цонх (удирдлагын товчнууд), реклам
   mainAction:      (a)         => ipcRenderer.invoke('ui:mainAction', a),
