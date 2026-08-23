@@ -3983,16 +3983,13 @@ body:not(.light) .maintab.active {
 
 /* 1.8.9: аянга эффект хассан; улаан маскотыг бүдэг watermark болгож дэвсгэрт нэмсэн */
 .bg-lightning { display: none !important; }
-.bg-mascot {
-  position: fixed;
-  right: 0;
-  bottom: 0;
-  width: 46vw;
-  max-width: 640px;
-  height: 88vh;
-  z-index: 0;
+.header-mascot {
+  height: 82px;
+  width: auto;
+  align-self: center;
+  margin: 0 6px 0 14px;
   pointer-events: none;
-  background: url('mascot.png') right bottom / contain no-repeat;
-  opacity: 0.06;
-  filter: saturate(1.1);
+  opacity: 0.95;
+  filter: drop-shadow(0 3px 10px rgba(216, 35, 42, 0.45));
+  flex: 0 0 auto;
 }
