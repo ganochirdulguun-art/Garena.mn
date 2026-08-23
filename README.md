@@ -132,3 +132,6 @@ SERVER_URL=http://127.0.0.1:3000
   instance clients connect to, so "who's online" reflects real socket presence.
 - The desktop client is published to GitHub Releases (electron‑builder) and
   auto‑updates via `electron-updater`.
+
+## Бот хостын ops (сервер, 2026-08-24)
+- `OPS_DISCORD_WEBHOOK` — Discord сувгийн webhook URL. Бот offline/online болох, ажил failed/cancelled болох бүрт мэдэгдэнэ (B4). Админ самбар → 🤖 Бот хост хэсэгт ботууд, ажлууд (Цуцлах / Дахин хост), үйл явдлын лог (C2); "Discord тест" товчоор шалгана.

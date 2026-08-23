@@ -1093,6 +1093,33 @@ async function testRateLimits() {
   }
 }
 
+// C2: бот хостын админ API нь админ эрх шаардана; админд тойм буцаана
+async function testBotAdminOverview() {
+  const mockDb = { query: async (sql) => {
+    if (sql.includes('admin_whitelist')) return { rows: [] };
+    if (sql.includes('SELECT 1')) return { rows: [{ '?column?': 1 }] };
+    if (sql.includes('FROM bot_jobs j')) return { rows: [{ id: 1, room_id: 7, status: 'failed', game_name: 'GMN#7 x', created_at: new Date().toISOString(), room_name: 'x', requested_by_name: 'Host' }] };
+    return { rows: [], rowCount: 0 };
+  } };
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999', BOT_API_KEY: 'k' }, { mockDb });
+  try {
+    let res = await fetch(`${server.baseUrl}/admin/api/bot/overview`);
+    assert.equal(res.status, 401);
+    const user = makeAuthToken({ id: 5, username: 'Member', discord_id: '111' });
+    res = await fetch(`${server.baseUrl}/admin/api/bot/overview`, { headers: { Authorization: `Bearer ${user}` } });
+    assert.equal(res.status, 403);
+    const admin = makeAuthToken({ id: 1, username: 'Owner', discord_id: '999' });
+    res = await fetch(`${server.baseUrl}/admin/api/bot/overview`, { headers: { Authorization: `Bearer ${admin}` } });
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.enabled, true);
+    assert.equal(body.jobs.length, 1);
+    assert.ok(Array.isArray(body.events));
+  } finally {
+    await server.stop();
+  }
+}
+
 (async () => {
   await runTest('server smoke flow supports register/login/me and guarded auth endpoints', testSmokeFlow);
   await runTest('Discord-linked usernames are read-only in-app', testDiscordLinkedUsernameIsReadOnly);
@@ -1115,6 +1142,7 @@ async function testRateLimits() {
   await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
   await runTest('bot result maps GHost++ players to users by WC3 name, then IP; learns wc3_name', testBotResultMapsWc3NamesAndIps);
   await runTest('rate limits: forgot-password per IP, perUser limiter per account', testRateLimits);
+  await runTest('bot admin overview is admin-only and lists jobs/events', testBotAdminOverview);
 
   if (process.exitCode) process.exit(process.exitCode);
 })();

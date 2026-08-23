@@ -8,6 +8,8 @@ const path = require('path');
 const authMW = require('../middleware/auth');
 const { perUser } = require('../middleware/ratelimit');
 const { recordGameResult } = require('../services/results');
+const botops = require('../services/botops');
+const adminMW = require('../middleware/admin');
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
@@ -172,6 +174,7 @@ botRouter.use(botAuth);
 
 botRouter.post('/heartbeat', (req, res) => {
   const name = String(req.body?.bot || req.query.bot || 'bot').slice(0, 64);
+  if (!bots.has(name)) botops.record('info', 'bot_seen', `Бот "${name}" холбогдлоо (v${String(req.body?.version || '?')})`, { bot: name });
   bots.set(name, { last_seen: Date.now(), games: Number(req.body?.games || 0), max_games: Number(req.body?.max_games || 1), version: String(req.body?.version || '') });
   res.json({ ok: true, server_time: new Date().toISOString() });
 });
@@ -196,6 +199,7 @@ botRouter.get('/jobs/next', async (req, res) => {
     const job = r.rows[0];
     if (!job) return res.json(null);
     const map = MAPS.find((m) => m.key === job.map_key) || null;
+    botops.record('info', 'job_taken', `Ажил #${job.id} (${job.game_name}) → бот "${name}"`, { bot: name, job_id: job.id });
     emitRoom(job.room_id, 'room:bot_job', await jobToPublic(job));
     return res.json({ ...job, map });
   } catch (e) { console.error('[bot/jobs/next]', e); return res.status(500).json({ error: 'Server error' }); }
@@ -232,6 +236,7 @@ botRouter.post('/jobs/:id/started', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
   try {
     await db.query(`UPDATE bot_jobs SET status = 'started', started_at = NOW(), updated_at = NOW() WHERE id = $1`, [job.id]);
+    botops.record('info', 'job_started', `Ажил #${job.id} (${job.game_name}) эхэллээ — ${(req.body?.players || []).length} тоглогч`, { job_id: job.id });
     if (job.room_id) {
       await db.query(`UPDATE rooms SET status = 'playing' WHERE id = $1`, [job.room_id]);
       if (_io) { _io.to(String(job.room_id)).emit('room:started'); _io.emit('rooms:updated'); }
@@ -253,6 +258,7 @@ botRouter.post('/jobs/:id/result', async (req, res) => {
       players, source: 'bot', botJobId: job.id, mapName: job.map_name, gameName: job.game_name,
     });
     await db.query(`UPDATE bot_jobs SET status = 'finished', finished_at = NOW(), updated_at = NOW(), game_result_id = $1 WHERE id = $2`, [out.result?.id || null, job.id]);
+    botops.record('info', 'job_finished', `Ажил #${job.id} (${job.game_name}) дууслаа — team ${Number(winner_team)} ялав, ${Number(duration_minutes || 0)} мин, ${(out.players || []).filter((p) => p.user_id).length}/${players.length} тоглогч таарав`, { job_id: job.id });
     if (_io && job.room_id) {
       _io.to(String(job.room_id)).emit('room:bot_result', {
         job_id: job.id, winner_team: Number(winner_team), duration_minutes: Number(duration_minutes || 0),
@@ -275,6 +281,9 @@ botRouter.post('/jobs/:id/failed', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
   try {
     await db.query(`UPDATE bot_jobs SET status = 'failed', error = $1, finished_at = NOW(), updated_at = NOW() WHERE id = $2`, [String(req.body?.error || 'unknown').slice(0, 500), job.id]);
+    const err = String(req.body?.error || 'unknown');
+    // lobby timeout (хэн ч нэгдээгүй) = энгийн; бусад алдаа = Discord мэдэгдэл
+    botops.alert(/lobby (дууссан|timeout)/i.test(err) ? 'info' : 'warn', 'job_failed', `Ажил #${job.id} (${job.game_name}, өрөө ${job.room_id}) FAILED: ${err.slice(0, 300)}`, { job_id: job.id, bot: job.bot_name });
     if (job.room_id) {
       await db.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status = 'playing'`, [job.room_id]);
     }
@@ -283,4 +292,72 @@ botRouter.post('/jobs/:id/failed', async (req, res) => {
   } catch (e) { console.error(e); return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { roomRouter, botRouter, setIO, botsEnabled, MAPS };
+// ════════════════ Админ тал (C2): /admin/api/bot/* ════════════════
+const adminRouter = express.Router();
+adminRouter.use(adminMW);
+
+// Тойм: ботууд (онлайн/офлайн), сүүлийн ажлууд, үйл явдлын лог
+adminRouter.get('/overview', async (req, res) => {
+  const now = Date.now();
+  const botList = [...bots.entries()].map(([name, b]) => ({
+    name, online: now - b.last_seen < BOT_STALE_SEC * 1000, last_seen: new Date(b.last_seen).toISOString(),
+    seconds_ago: Math.round((now - b.last_seen) / 1000), games: b.games, max_games: b.max_games, version: b.version,
+  }));
+  let jobs = [];
+  if (await dbOk()) {
+    try {
+      const r = await db.query(
+        `SELECT j.*, r.name AS room_name, u.username AS requested_by_name
+           FROM bot_jobs j LEFT JOIN rooms r ON r.id = j.room_id LEFT JOIN users u ON u.id = j.requested_by
+          ORDER BY j.id DESC LIMIT $1`, [Math.min(200, Number(req.query.limit) || 50)]);
+      jobs = r.rows.map((j) => ({ ...j, gameinfo_b64: undefined, expected_players: undefined }));
+    } catch (e) { console.error('[admin/bot/overview]', e); }
+  }
+  res.json({ enabled: botsEnabled(), alerts_configured: botops.configured(), bots: botList, jobs, events: botops.recentEvents(100), stale_sec: BOT_STALE_SEC });
+});
+
+// Ажил цуцлах (queued/hosting/lobby) — бот дараагийн poll-оор GHost++-ээ зогсооно
+adminRouter.post('/jobs/:id/cancel', async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  const r = await db.query('SELECT * FROM bot_jobs WHERE id = $1', [req.params.id]);
+  const job = r.rows[0];
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  if (!['queued', 'hosting', 'lobby'].includes(job.status)) return res.status(409).json({ error: `Төлөв ${job.status} — цуцлах боломжгүй` });
+  await db.query(`UPDATE bot_jobs SET status = 'cancelled', error = $2, updated_at = NOW() WHERE id = $1`, [job.id, `админ ${req.user?.username || ''} цуцалсан`]);
+  botops.record('warn', 'job_cancelled', `Ажил #${job.id} (${job.game_name}) админ цуцаллаа (${req.user?.username || ''})`, { job_id: job.id });
+  emitRoom(job.room_id, 'room:bot_job', await jobToPublic({ ...job, status: 'cancelled' }));
+  return res.json({ ok: true });
+});
+
+// Дахин хост: хуучин ажлын өрөө/map/owner-оор шинэ queued ажил (өрөө хаагдаагүй, тоглоогүй бол)
+adminRouter.post('/jobs/:id/retry', async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  const r = await db.query('SELECT * FROM bot_jobs WHERE id = $1', [req.params.id]);
+  const job = r.rows[0];
+  if (!job) return res.status(404).json({ error: 'job not found' });
+  if (!job.room_id) return res.status(409).json({ error: 'Өрөө устсан' });
+  const rr = await db.query('SELECT id, status FROM rooms WHERE id = $1', [job.room_id]);
+  if (!rr.rows[0] || rr.rows[0].status === 'done') return res.status(409).json({ error: 'Өрөө хаагдсан' });
+  if (rr.rows[0].status === 'playing') return res.status(409).json({ error: 'Өрөө тоглож байна' });
+  if (await activeJobForRoom(job.room_id)) return res.status(409).json({ error: 'Энэ өрөөнд идэвхтэй ажил байна' });
+  if (!onlineBots().length) return res.status(503).json({ error: 'Онлайн бот алга' });
+  const ins = await db.query(
+    `INSERT INTO bot_jobs (room_id, requested_by, map_key, map_name, game_name, owner_name, expected_players, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'queued') RETURNING *`,
+    [job.room_id, job.requested_by, job.map_key, job.map_name, job.game_name, job.owner_name, job.expected_players ? JSON.stringify(job.expected_players) : null]);
+  const pub = await jobToPublic(ins.rows[0]);
+  botops.record('info', 'job_retry', `Ажил #${job.id} → шинэ ажил #${ins.rows[0].id} (админ ${req.user?.username || ''})`, { job_id: ins.rows[0].id });
+  emitRoom(job.room_id, 'room:bot_job', pub);
+  return res.status(201).json(pub);
+});
+
+// Discord мэдэгдлийн тест
+adminRouter.post('/alerts/test', async (req, res) => {
+  if (!botops.configured()) return res.status(400).json({ error: 'OPS_DISCORD_WEBHOOK тохируулаагүй' });
+  const ok = await botops.notify(`🔔 Garena.mn ops тест — ${req.user?.username || 'админ'} илгээв`);
+  return res.json({ ok });
+});
+
+botops.start(() => bots);
+
+module.exports = { roomRouter, botRouter, adminRouter, setIO, botsEnabled, MAPS };

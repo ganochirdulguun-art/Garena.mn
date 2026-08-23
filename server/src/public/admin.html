@@ -244,6 +244,34 @@
       </div>
 
       <div class="section">
+        <h2>🤖 Бот хост</h2>
+        <div id="botMsg" class="muted" style="margin:0 0 10px;display:none"></div>
+        <div class="toolbar">
+          <span class="muted" id="botAlertsState">Мэдэгдэл: …</span>
+          <button class="btn" style="padding:7px 12px;font-size:13px" onclick="botAlertTest()">🔔 Discord тест</button>
+          <button class="btn" style="padding:7px 12px;font-size:13px" onclick="loadBotOps()">↻ Сэргээх</button>
+        </div>
+        <div class="panel" style="margin-bottom:12px">
+          <table>
+            <thead><tr><th>Бот</th><th>Төлөв</th><th>Сүүлийн heartbeat</th><th>Тоглолт</th><th>Хувилбар</th></tr></thead>
+            <tbody id="botsBody"><tr><td colspan="5" class="empty">Ачааллаж байна…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel" style="margin-bottom:12px">
+          <table>
+            <thead><tr><th>#</th><th>Өрөө</th><th>Тоглоом</th><th>Host</th><th>Төлөв</th><th>Бот</th><th>Үүссэн</th><th>Алдаа</th><th></th></tr></thead>
+            <tbody id="botJobsBody"><tr><td colspan="9" class="empty">Ачааллаж байна…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Цаг</th><th>Түвшин</th><th>Үйл явдал</th></tr></thead>
+            <tbody id="botEventsBody"><tr><td colspan="3" class="empty">Ачааллаж байна…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
         <h2>🛡️ Админ эрх</h2>
         <div class="toolbar">
           <input type="search" id="newAdminId" placeholder="Discord ID (жишээ: 123456789012345678)" style="max-width:280px">
@@ -666,6 +694,56 @@
     el.style.display = text ? '' : 'none';
   }
 
+  // ── 🤖 Бот хост (C2/B4) ──
+  const JOB_LABEL = { queued: 'Дараалалд', hosting: 'Нээж байна', lobby: 'Lobby', started: 'Тоглож байна', finished: 'Дууссан', failed: 'Алдаа', cancelled: 'Цуцлагдсан' };
+  function botNote(text, isError) {
+    const n = $('botMsg'); n.textContent = text; n.style.display = text ? '' : 'none'; n.style.color = isError ? '#ff8a8f' : '';
+    if (text) setTimeout(() => { n.style.display = 'none'; }, 6000);
+  }
+  function fmtAgo(sec) { return sec < 60 ? `${sec} сек` : sec < 3600 ? `${Math.round(sec / 60)} мин` : `${Math.round(sec / 3600)} цаг`; }
+  async function loadBotOps() {
+    try {
+      const res = await api('/admin/api/bot/overview?limit=60');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      $('botAlertsState').textContent = d.enabled ? (d.alerts_configured ? 'Мэдэгдэл: Discord webhook идэвхтэй' : 'Мэдэгдэл: OPS_DISCORD_WEBHOOK тохируулаагүй (зөвхөн энэ лог)') : 'Бот хост идэвхжээгүй (BOT_API_KEY алга)';
+      $('botsBody').innerHTML = d.bots.length ? d.bots.map((b) => `<tr>
+          <td><b>${esc(b.name)}</b></td>
+          <td><span class="badge ${b.online ? 'online' : 'offline'}">${b.online ? 'Онлайн' : 'Офлайн'}</span></td>
+          <td>${fmtAgo(b.seconds_ago)} өмнө</td><td>${b.games}/${b.max_games}</td><td>${esc(b.version || '')}</td></tr>`).join('')
+        : '<tr><td colspan="5" class="empty">Бот холбогдоогүй байна</td></tr>';
+      $('botJobsBody').innerHTML = d.jobs.length ? d.jobs.map((j) => {
+        const canCancel = ['queued', 'hosting', 'lobby'].includes(j.status);
+        const canRetry = ['failed', 'cancelled', 'finished'].includes(j.status) && j.room_id;
+        return `<tr>
+          <td>${j.id}</td><td>${esc(j.room_name || ('#' + (j.room_id || '—')))}</td><td>${esc(j.game_name)}<br><span class="muted">${esc(j.map_name || j.map_key)}</span></td>
+          <td>${esc(j.requested_by_name || '')}<br><span class="muted">WC3: ${esc(j.owner_name || '')}</span></td>
+          <td><span class="badge ${j.status === 'started' || j.status === 'lobby' ? 'online' : (j.status === 'failed' ? 'offline' : 'in_room')}">${esc(JOB_LABEL[j.status] || j.status)}</span></td>
+          <td>${esc(j.bot_name || '')}${j.host_ip ? `<br><span class="muted">${esc(j.host_ip)}:${j.host_port}</span>` : ''}</td>
+          <td>${esc(new Date(j.created_at).toLocaleString('mn-MN'))}</td>
+          <td class="muted" style="max-width:220px">${esc(j.error || '')}</td>
+          <td style="white-space:nowrap">${canCancel ? `<button class="btn danger" style="padding:4px 8px;font-size:12px" onclick="botJobAction(${j.id},'cancel')">Цуцлах</button>` : ''}
+              ${canRetry ? `<button class="btn" style="padding:4px 8px;font-size:12px" onclick="botJobAction(${j.id},'retry')">Дахин хост</button>` : ''}</td></tr>`;
+      }).join('') : '<tr><td colspan="9" class="empty">Ажил алга</td></tr>';
+      $('botEventsBody').innerHTML = d.events.length ? d.events.map((e) => `<tr>
+          <td style="white-space:nowrap">${esc(new Date(e.at).toLocaleString('mn-MN'))}</td>
+          <td><span class="badge ${e.level === 'error' ? 'offline' : (e.level === 'warn' ? 'in_room' : 'online')}">${esc(e.level)}</span></td>
+          <td>${esc(e.text)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty">Үйл явдал алга</td></tr>';
+    } catch (e) { botNote('Бот хостын мэдээлэл татахад алдаа: ' + e.message, true); }
+  }
+  async function botJobAction(id, action) {
+    if (action === 'cancel' && !confirm(`Ажил #${id}-ийг цуцлах уу?`)) return;
+    const res = await apiSend('POST', `/admin/api/bot/jobs/${id}/${action}`);
+    const d = await res.json().catch(() => ({}));
+    botNote(res.ok ? (action === 'cancel' ? `Ажил #${id} цуцлагдлаа` : `Шинэ ажил #${d.id} үүслээ`) : (d.error || 'Алдаа'), !res.ok);
+    loadBotOps();
+  }
+  async function botAlertTest() {
+    const res = await apiSend('POST', '/admin/api/bot/alerts/test');
+    const d = await res.json().catch(() => ({}));
+    botNote(res.ok && d.ok ? 'Discord руу тест мэдэгдэл илгээгдлээ' : (d.error || 'Илгээж чадсангүй'), !(res.ok && d.ok));
+  }
+
   async function loadAdmins() {
     const res = await api('/admin/api/admins');
     if (!res.ok) return handleAuth(res);
@@ -735,7 +813,8 @@
     show('app');
     loadSummary(); loadOnline(); loadUsers(); loadAdmins();
     loadWarkeySummary(); loadWarkeyUsers(); loadBannedUsers();
-    loadDiamondSummary(); loadLedger();
+    loadDiamondSummary(); loadLedger(); loadBotOps();
+    setInterval(loadBotOps, 15000);
     // Cards + online жагсаалтыг 5 сек тутам сэргээнэ; хүснэгтүүдийг тогтвортой
     // байлгахын тулд давтан татахгүй (хуудаслалт/гүйлгээ эвдэхгүй).
     clearInterval(refreshTimer);

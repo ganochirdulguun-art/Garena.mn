@@ -82,6 +82,7 @@ app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
 app.use('/discord-servers', discordServerRoutes);
 app.use('/streamers', streamerRoutes);
+app.use('/admin/api/bot', botRoutes.adminRouter);     // админ: бот хостын хяналт (C2) + мэдэгдлийн лог (B4)
 app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
