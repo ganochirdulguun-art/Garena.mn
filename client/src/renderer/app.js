@@ -5245,18 +5245,25 @@ init();
       reportJoin(await getWc3Name());
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
-      appendSysMsg('✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
-      // 2) WC3 6112-ыг эзэлтэл хүлээгээд, ДАРАА нь bridge холбоно (эх порт 6112, зэрэгцэн)
+      const isZt = /^10\.147\./.test(String(job.host_ip || ''));
+      appendSysMsg(isZt ? '✓ WC3 нээгдэж байна… ZeroTier-ээр ботын тоглоом LAN-д гарна.' : '✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
+      // WC3 бүрэн асаж 6112-ыг эзэлтэл хүлээнэ
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        if (await window.api.isWc3LanReady?.()) { ready = true; break; }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (ready) await new Promise((r) => setTimeout(r, 800));
       if (!bridgeOn) {
-        let ready = false;
-        for (let i = 0; i < 30; i++) {
-          if (await window.api.isWc3LanReady?.()) { ready = true; break; }
-          await new Promise((r) => setTimeout(r, 1000));
+        if (isZt) {
+          // ZeroTier хост: 6112-ыг WC3-д БҮРЭН үлдээнэ (bind хийхгүй), зөвхөн SEARCHGAME илгээж
+          // GHost++-ийг GAMEINFO-гоор хариулуулна (Tuguldur-ын ажилладаг зам).
+          await window.api.startGameFinder?.(job.host_ip);
+        } else {
+          await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
         }
-        if (ready) await new Promise((r) => setTimeout(r, 800));
-        await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
         bridgeOn = true;
-        appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" бэлэн → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
+        appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
       }
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
@@ -5303,7 +5310,7 @@ init();
       render();
       showResult(r);
       appendSysMsg(`🏁 Дүн бүртгэгдлээ: ${r.winner_team === 1 ? 'Sentinel' : 'Scourge'} ялав (${r.duration_minutes} мин).`);
-      if (bridgeOn) { window.api.stopBotBridge?.().catch(() => {}); bridgeOn = false; }
+      if (bridgeOn) { window.api.stopRelay?.().catch(() => {}); window.api.stopBotBridge?.().catch(() => {}); bridgeOn = false; }
       window.api.refreshUser?.().catch(() => {});
     });
   }

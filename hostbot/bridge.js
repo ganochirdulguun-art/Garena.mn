@@ -23,6 +23,7 @@ const CFG = {
   BOT_KEY: process.env.BOT_KEY || '',
   BOT_NAME: process.env.BOT_NAME || 'garena-bot-1',
   PUBLIC_IP: process.env.PUBLIC_IP || '',
+  ZT_HOST_IP: process.env.ZT_HOST_IP || '',   // ZeroTier IP (10.147.20.x) — тоглогчид үүгээр холбогдоно
   GHOST_DIR: path.resolve(process.env.GHOST_DIR || __dirname),
   GHOST_BIN: process.env.GHOST_BIN || './ghost++',
   WAR3_PATH: process.env.WAR3_PATH || '/opt/war3/',
@@ -161,8 +162,9 @@ udp.on('message', (msg) => {
     state.lastSig = sig;
     state.lastPostAt = now;
     state.lobbyPosted = true;
-    api('POST', `/bot/jobs/${state.job.id}/lobby`, { host_ip: CFG.PUBLIC_IP, host_port: state.port, gameinfo_b64: b64, game_name: gameName })
-      .then(() => log(`[job ${state.job.id}] lobby мэдэгдлээ (${gameName} @ ${CFG.PUBLIC_IP}:${state.port})`))
+    const hostIp = CFG.ZT_HOST_IP || CFG.PUBLIC_IP;
+    api('POST', `/bot/jobs/${state.job.id}/lobby`, { host_ip: hostIp, host_port: state.port, gameinfo_b64: b64, game_name: gameName })
+      .then(() => log(`[job ${state.job.id}] lobby мэдэгдлээ (${gameName} @ ${hostIp}:${state.port})`))
       .catch((e) => { state.lobbyPosted = false; log('lobby POST алдаа', e.message); });
     return;
   }

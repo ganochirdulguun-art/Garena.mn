@@ -3983,13 +3983,18 @@ body:not(.light) .maintab.active {
 
 /* 1.8.9: аянга эффект хассан; улаан маскотыг бүдэг watermark болгож дэвсгэрт нэмсэн */
 .bg-lightning { display: none !important; }
-.header-mascot {
-  height: 82px;
-  width: auto;
-  align-self: center;
-  margin: 0 6px 0 14px;
+/* Улаан маскот — дэвсгэрийн чимэглэл (бүх хуудсанд: login, үндсэн цэс) */
+.bg-mascot {
+  position: fixed;
+  right: 2vw;
+  bottom: 0;
+  width: 34vw;
+  max-width: 460px;
+  height: 82vh;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0.95;
-  filter: drop-shadow(0 3px 10px rgba(216, 35, 42, 0.45));
-  flex: 0 0 auto;
+  background: url('mascot.png') right bottom / contain no-repeat;
+  opacity: 0.42;
+  filter: drop-shadow(0 6px 24px rgba(216, 35, 42, 0.3));
 }
+.page > * { position: relative; z-index: 1; }
