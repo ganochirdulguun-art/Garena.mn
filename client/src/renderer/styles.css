@@ -3978,3 +3978,5 @@ body:not(.light) .maintab.active {
 .adv-host .hint { margin: 0 0 8px; font-size: 0.74rem; line-height: 1.4; }
 .adv-host .btn { width: 100%; }
 .room-action-row > .btn { flex: 1 1 auto; }
+/* QPay лого (гэрээ §5.5.4 — төлбөрийн хуудсанд QPay лого) */
+.pay-qpay-logo { display: block; width: 96px; height: auto; margin: 2px auto 8px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.35)); }

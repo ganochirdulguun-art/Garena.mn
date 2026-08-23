@@ -455,6 +455,69 @@ function ownerOnly(req, res, next) {
   next();
 }
 
+// ── 📊 Тайлан (C3): сарын QPay орлого, гишүүнчлэл, 💎 гүйлгээ; CSV архив (QPay гэрээ §5.5.9 — 12 сар) ──
+adminRouter.get('/reports/summary', adminMW, async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  const months = Math.min(24, Math.max(1, Number(req.query.months) || 6));
+  try {
+    const orders = await db.query(
+      `SELECT to_char(date_trunc('month', COALESCE(paid_at, created_at)), 'YYYY-MM') AS month,
+              COUNT(*) FILTER (WHERE status = 'PAID' AND currency = 'MNT') AS qpay_orders,
+              COALESCE(SUM(amount) FILTER (WHERE status = 'PAID' AND currency = 'MNT'), 0) AS qpay_mnt,
+              COUNT(*) FILTER (WHERE status = 'PAID' AND kind = 'membership' AND tier = 'silver') AS silver,
+              COUNT(*) FILTER (WHERE status = 'PAID' AND kind = 'membership' AND tier = 'gold') AS gold,
+              COALESCE(SUM(diamonds) FILTER (WHERE status = 'PAID' AND kind = 'diamonds'), 0) AS diamonds_sold,
+              COUNT(*) FILTER (WHERE status <> 'PAID') AS unpaid
+         FROM payment_orders
+        WHERE COALESCE(paid_at, created_at) >= date_trunc('month', NOW()) - ($1 || ' months')::interval
+        GROUP BY 1 ORDER BY 1 DESC`, [String(months - 1)]);
+    const dia = await db.query(
+      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'block_bonus'), 0) AS bonus,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'purchase'), 0) AS purchased,
+              COALESCE(-SUM(amount) FILTER (WHERE type = 'membership'), 0) AS spent_membership,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'transfer_in'), 0) AS transferred,
+              COALESCE(SUM(amount) FILTER (WHERE type = 'admin_grant'), 0) AS granted
+         FROM diamond_transactions
+        WHERE created_at >= date_trunc('month', NOW()) - ($1 || ' months')::interval
+        GROUP BY 1 ORDER BY 1 DESC`, [String(months - 1)]);
+    const active = await db.query(
+      `SELECT membership, COUNT(*) AS n FROM users WHERE membership IN ('silver','gold') AND (membership_until IS NULL OR membership_until > NOW()) GROUP BY membership`);
+    const totals = await db.query(
+      `SELECT COALESCE(SUM(amount) FILTER (WHERE status = 'PAID' AND currency = 'MNT'), 0) AS qpay_mnt_all,
+              COUNT(*) FILTER (WHERE status = 'PAID') AS paid_all,
+              (SELECT COALESCE(SUM(diamonds), 0) FROM users) AS diamonds_in_circulation
+         FROM payment_orders`);
+    const byMonth = new Map();
+    for (const r of orders.rows) byMonth.set(r.month, { month: r.month, qpay_orders: +r.qpay_orders, qpay_mnt: +r.qpay_mnt, silver: +r.silver, gold: +r.gold, diamonds_sold: +r.diamonds_sold, unpaid: +r.unpaid });
+    for (const r of dia.rows) byMonth.set(r.month, { ...(byMonth.get(r.month) || { month: r.month, qpay_orders: 0, qpay_mnt: 0, silver: 0, gold: 0, diamonds_sold: 0, unpaid: 0 }), dia_bonus: +r.bonus, dia_purchased: +r.purchased, dia_spent_membership: +r.spent_membership, dia_transferred: +r.transferred, dia_granted: +r.granted });
+    const rows = [...byMonth.values()].sort((a, b) => (a.month < b.month ? 1 : -1));
+    const activeMap = Object.fromEntries(active.rows.map((r) => [r.membership, +r.n]));
+    res.json({ months, rows, active: { silver: activeMap.silver || 0, gold: activeMap.gold || 0 }, totals: { qpay_mnt_all: +totals.rows[0].qpay_mnt_all, paid_all: +totals.rows[0].paid_all, diamonds_in_circulation: +totals.rows[0].diamonds_in_circulation } });
+  } catch (e) { console.error('[reports/summary]', e); res.status(500).json({ error: 'Server error' }); }
+});
+
+// CSV архив: захиалгууд (QPay нэхэмжлэх + 💎 төлбөр) — ?from=YYYY-MM-DD&to=YYYY-MM-DD (default сүүлийн 12 сар)
+adminRouter.get('/reports/orders.csv', adminMW, async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  const from = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.from || '')) ? req.query.from : null;
+  const to = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.to || '')) ? req.query.to : null;
+  try {
+    const r = await db.query(
+      `SELECT o.id, o.created_at, o.paid_at, o.status, o.kind, o.tier, o.months, o.amount, o.currency, o.diamonds, o.invoice_id,
+              u.id AS user_id, u.username, u.discord_id
+         FROM payment_orders o LEFT JOIN users u ON u.id = o.user_id
+        WHERE o.created_at >= COALESCE($1::date, NOW() - INTERVAL '12 months') AND o.created_at < COALESCE($2::date + INTERVAL '1 day', NOW() + INTERVAL '1 day')
+        ORDER BY o.id`, [from, to]);
+    const esc = (v) => { const t = v == null ? '' : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const head = ['id', 'created_at', 'paid_at', 'status', 'kind', 'tier', 'months', 'amount', 'currency', 'diamonds', 'invoice_id', 'user_id', 'username', 'discord_id'];
+    const lines = [head.join(',')].concat(r.rows.map((row) => head.map((k) => esc(row[k] instanceof Date ? row[k].toISOString() : row[k])).join(',')));
+    res.set('Content-Type', 'text/csv; charset=utf-8');
+    res.set('Content-Disposition', `attachment; filename="garena-orders-${from || 'last12m'}-${to || 'now'}.csv"`);
+    res.send('\ufeff' + lines.join('\n'));
+  } catch (e) { console.error('[reports/orders.csv]', e); res.status(500).json({ error: 'Server error' }); }
+});
+
 adminRouter.get('/diamonds/summary', adminMW, async (req, res) => {
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
   try {

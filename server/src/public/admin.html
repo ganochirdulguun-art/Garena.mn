@@ -244,6 +244,21 @@
       </div>
 
       <div class="section">
+        <h2>📊 Орлого ба 💎 тайлан</h2>
+        <div class="toolbar">
+          <span class="muted" id="reportTotals">…</span>
+          <select id="reportMonths" onchange="loadReports()" style="max-width:140px"><option value="3">3 сар</option><option value="6" selected>6 сар</option><option value="12">12 сар</option><option value="24">24 сар</option></select>
+          <button class="btn" style="padding:7px 12px;font-size:13px" onclick="downloadOrdersCsv()">⬇ Захиалгын архив CSV (12 сар)</button>
+        </div>
+        <div class="panel">
+          <table>
+            <thead><tr><th>Сар</th><th>QPay орлого</th><th>Төлөгдсөн</th><th>Silver</th><th>Gold</th><th>💎 зарагдсан</th><th>💎 бонус</th><th>💎 гишүүнчлэлд</th><th>💎 шилжүүлэг</th><th>💎 админ</th><th>Төлөгдөөгүй</th></tr></thead>
+            <tbody id="reportBody"><tr><td colspan="11" class="empty">Ачааллаж байна…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="section">
         <h2>🤖 Бот хост</h2>
         <div id="botMsg" class="muted" style="margin:0 0 10px;display:none"></div>
         <div class="toolbar">
@@ -694,6 +709,30 @@
     el.style.display = text ? '' : 'none';
   }
 
+  // ── 📊 Тайлан (C3) ──
+  async function loadReports() {
+    try {
+      const months = $('reportMonths').value;
+      const res = await api(`/admin/api/reports/summary?months=${months}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      $('reportTotals').textContent = `Нийт QPay: ${fmtN(d.totals.qpay_mnt_all)}₮ · төлөгдсөн захиалга ${fmtN(d.totals.paid_all)} · идэвхтэй Silver ${d.active.silver} / Gold ${d.active.gold} · эргэлтэд ${fmtN(d.totals.diamonds_in_circulation)} 💎`;
+      $('reportBody').innerHTML = d.rows.length ? d.rows.map((r) => `<tr>
+          <td><b>${esc(r.month)}</b></td><td><b>${fmtN(r.qpay_mnt)}₮</b></td><td>${r.qpay_orders}</td><td>${r.silver}</td><td>${r.gold}</td>
+          <td>${fmtN(r.diamonds_sold)}</td><td>${fmtN(r.dia_bonus || 0)}</td><td>${fmtN(r.dia_spent_membership || 0)}</td><td>${fmtN(r.dia_transferred || 0)}</td><td>${fmtN(r.dia_granted || 0)}</td><td>${r.unpaid}</td></tr>`).join('')
+        : '<tr><td colspan="11" class="empty">Өгөгдөл алга</td></tr>';
+    } catch (e) { $('reportTotals').textContent = 'Тайлан татахад алдаа: ' + e.message; }
+  }
+  async function downloadOrdersCsv() {
+    const res = await api('/admin/api/reports/orders.csv');
+    if (!res.ok) { alert('CSV татахад алдаа: HTTP ' + res.status); return; }
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (res.headers.get('Content-Disposition') || '').match(/filename="([^"]+)"/)?.[1] || 'garena-orders.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+
   // ── 🤖 Бот хост (C2/B4) ──
   const JOB_LABEL = { queued: 'Дараалалд', hosting: 'Нээж байна', lobby: 'Lobby', started: 'Тоглож байна', finished: 'Дууссан', failed: 'Алдаа', cancelled: 'Цуцлагдсан' };
   function botNote(text, isError) {
@@ -813,7 +852,7 @@
     show('app');
     loadSummary(); loadOnline(); loadUsers(); loadAdmins();
     loadWarkeySummary(); loadWarkeyUsers(); loadBannedUsers();
-    loadDiamondSummary(); loadLedger(); loadBotOps();
+    loadDiamondSummary(); loadLedger(); loadBotOps(); loadReports();
     setInterval(loadBotOps, 15000);
     // Cards + online жагсаалтыг 5 сек тутам сэргээнэ; хүснэгтүүдийг тогтвортой
     // байлгахын тулд давтан татахгүй (хуудаслалт/гүйлгээ эвдэхгүй).
