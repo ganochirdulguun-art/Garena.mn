@@ -270,18 +270,38 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   state.server.on('error', (e) => console.error('[BotBridge] tcp:', e.message));
   state.server.listen(lp, '127.0.0.1');
 
-  // 2) GAMEINFO → локал WC3 (port талбар = пакетийн сүүлийн 2 байт, LE). Socket-ийг bind хийхгүй (OS порт).
+  // 2) GAMEINFO → локал WC3. ЧУХАЛ: WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN жагсаалтад
+  //    хүлээн авдаг (startHost-той ижил — ажилладаг нь батлагдсан). Тиймээс socket-ийг 6112-т
+  //    reuseAddr-ээр bind хийж (WC3 мөн reuseAddr-ээр зэрэг эзэлнэ), broadcast (255.255.255.255) +
+  //    loopback руу илгээнэ. Bind амжилтгүй бол (ховор) unbound socket руу шилжинэ.
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);
-  state.udp = dgram.createSocket('udp4');
-  state.udp.on('error', (e) => console.error('[BotBridge] udp:', e.message));
-  const tick = () => {
-    if (!state.running) return;
-    try { const b = state.packet || local; state.udp.send(b, 0, b.length, WC3_PORT, '127.0.0.1'); } catch {}
-    state.timer = setTimeout(tick, 2000);
+  const beginSend = (sock, from6112) => {
+    state.udp = sock;
+    try { sock.setBroadcast(true); } catch {}
+    const tick = () => {
+      if (!state.running) return;
+      const b = state.packet || local;
+      for (const dst of ['255.255.255.255', '127.0.0.1']) {
+        try { sock.send(b, 0, b.length, WC3_PORT, dst); } catch {}
+      }
+      state.timer = setTimeout(tick, 2000);
+    };
+    tick();
+    console.log(`[BotBridge] Эхэллээ — ${hostIp}:${hostPort} ↔ 127.0.0.1:${lp}, GAMEINFO эх порт ${from6112 ? '6112 (bound)' : 'OS'} → 255.255.255.255 + 127.0.0.1:6112`);
   };
-  tick();
-  console.log(`[BotBridge] Эхэллээ — ${hostIp}:${hostPort} ↔ 127.0.0.1:${lp}, GAMEINFO → 127.0.0.1:6112`);
+  const bound = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  let boundStarted = false;
+  bound.on('error', (e) => {
+    if (boundStarted) { console.error('[BotBridge] udp:', e.message); return; }
+    // 6112-т bind хийж чадсангүй → unbound socket-оор (эх порт OS-ийнх) fallback
+    console.warn('[BotBridge] 6112 bind амжилтгүй, unbound fallback:', e.message);
+    try { bound.close(); } catch {}
+    const ub = dgram.createSocket('udp4');
+    ub.on('error', (er) => console.error('[BotBridge] udp:', er.message));
+    ub.bind(() => beginSend(ub, false));
+  });
+  bound.bind(WC3_PORT, '0.0.0.0', () => { boundStarted = true; beginSend(bound, true); });
   _bot = state;
   return { localPort: lp };
 }
