@@ -824,7 +824,7 @@
               <p class="hint mt-4" style="font-size:0.72rem">12 алхам — Өмнөх / Дараах товчоор удирдана</p>
               <ul class="hint mt-4" style="font-size:0.74rem; line-height:1.5; padding-left:18px">
                 <li><strong>Diamond 💎</strong> — 10 тоглолт тутамд 5-аас олон хожвол +30 💎. Silver = 800 💎 (эсвэл 20,000₮), Gold = 1500 💎 (эсвэл 40,000₮), 30 хоног. Профайл хэсгээс харна; найздаа шилжүүлж, QPay-аар багц авч болно.</li>
-                <li><strong>Бот хост</strong> — өрөөний host "Тоглоом" картаас map сонгоод "Бот хост хийх" дарна; бусад нь "WC3 нээж нэгдэх" → LAN жагсаалтаас орно. Host lobby-д <code>!start</code> бичнэ (ажиллахгүй бол эхлээд <code>!owner</code>, дараа нь <code>!start</code>); дүн, K/D/A, XP, 💎 автоматаар бүртгэгдэнэ. WC3-ийн LAN нэр тань автоматаар бүртгэгдэнэ.</li>
+                <li><strong>Тоглолт (бот хост — үндсэн зам)</strong> — өрөөний host "Тоглоом" картаас map сонгоод "Тоглолт эхлүүлэх" дарна; бусад нь "WC3 нээж нэгдэх" → LAN жагсаалтаас орно. ZeroTier хэрэггүй. Өөрөө хостлох (ZeroTier) нь "Нэмэлт" хэсэгт. Host lobby-д <code>!start</code> бичнэ (ажиллахгүй бол эхлээд <code>!owner</code>, дараа нь <code>!start</code>); дүн, K/D/A, XP, 💎 автоматаар бүртгэгдэнэ. WC3-ийн LAN нэр тань автоматаар бүртгэгдэнэ.</li>
               </ul>
             </div>
           </section>
@@ -977,22 +977,34 @@
             </div>
           </div>
           <p class="hint" id="room-info-text"></p>
+          <!-- ҮНДСЭН ЗАМ (1.8.6): бот хост — RGC/GameRanger шиг, ZeroTier хэрэггүй -->
           <div id="bot-host-panel" class="bot-host-panel hidden">
-            <div class="bot-host-head"><span class="bot-host-title">🤖 Бот хост</span><span id="bot-host-state" class="bot-host-state" data-state="idle">БЭЛЭН</span></div>
+            <div class="bot-host-head"><span class="bot-host-title">▶ Тоглолт</span><span id="bot-host-state" class="bot-host-state" data-state="idle">БЭЛЭН</span></div>
             <select id="bot-host-map" class="input input-sm" title="Map"></select>
             <p id="bot-host-text" class="hint"></p>
             <div class="bot-host-actions">
-              <button type="button" id="btn-bot-host" class="btn btn-primary btn-sm">Бот хост хийх</button>
+              <button type="button" id="btn-bot-host" class="btn btn-primary btn-block btn-with-icon" title="Бот тоглоомыг хостолно — тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ">
+                <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
+                <span>Тоглолт эхлүүлэх</span>
+              </button>
               <button type="button" id="btn-bot-cancel" class="btn btn-sm hidden">Цуцлах</button>
-              <button type="button" id="btn-bot-join" class="btn btn-primary btn-sm hidden">WC3 нээж нэгдэх</button>
+              <button type="button" id="btn-bot-join" class="btn btn-primary btn-block btn-with-icon hidden">
+                <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
+                <span>WC3 нээж нэгдэх</span>
+              </button>
             </div>
             <div id="bot-host-result" class="bot-host-result hidden"></div>
           </div>
-          <div class="room-action-row">
-            <button type="button" id="btn-launch-wc3" class="btn btn-primary btn-block btn-with-icon" title="Тоглолт эхлүүлэх">
+          <!-- НЭМЭЛТ: тоглогч өөрөө хостлох (ZeroTier виртуал LAN) — бот байхгүй үед эсвэл өөрийн map-аар -->
+          <details id="adv-host" class="adv-host">
+            <summary>Нэмэлт: өөрөө хостлох (ZeroTier)</summary>
+            <p class="hint">Host өөрийн WC3-оор тоглоом нээж, бусад нь ZeroTier виртуал LAN-аар орно. Бүх тоглогчид ZeroTier суулгасан байх ёстой (Тохиргоо → Сүлжээ). Ботгүй үед эсвэл өөрийн map-аар тоглоход ашиглана.</p>
+            <button type="button" id="btn-launch-wc3" class="btn btn-secondary btn-block btn-with-icon" title="Өөрөө хостлох (ZeroTier)">
               <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
               <span>Эхлүүлэх</span>
             </button>
+          </details>
+          <div class="room-action-row">
             <button type="button" id="btn-close-room" class="btn btn-danger btn-block btn-with-icon" title="Өрөөг хаах">
               <svg class="btn-icon-svg"><use href="#ico-close"/></svg>
               <span>Хаах</span>

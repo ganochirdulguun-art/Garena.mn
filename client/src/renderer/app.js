@@ -5193,7 +5193,7 @@ init();
     const st = job?.status || null;
     el('bot-host-state').textContent = st ? st.toUpperCase() : 'БЭЛЭН';
     el('bot-host-state').dataset.state = st || 'idle';
-    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Тоглоомыг бот хостолно: ZeroTier хэрэггүй, ялагч/K/D/A автоматаар, XP + Diamond.' : 'Host "Бот хост хийх" дарвал энд харагдана.');
+    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Бот тоглоомыг хостолно — ZeroTier хэрэггүй; тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ, ялагч/K/D/A, XP, 💎 автоматаар.' : 'Host "Тоглолт эхлүүлэх" дарахад энд мэдэгдэнэ — дараа нь "WC3 нээж нэгдэх".');
     const active = st && ['queued', 'hosting', 'lobby', 'started'].includes(st);
     el('btn-bot-host').classList.toggle('hidden', !isHost || active);
     el('bot-host-map').classList.toggle('hidden', !isHost || active);
@@ -5201,13 +5201,17 @@ init();
     el('btn-bot-join').classList.toggle('hidden', !(st === 'lobby' || st === 'started'));
     const online = (status?.bots || []).length;
     if (isHost && !active) el('btn-bot-host').disabled = !online;
-    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — энгийн "Эхлүүлэх"-ийг ашиглана уу.';
+    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — доорх "Нэмэлт: өөрөө хостлох" замыг ашиглана уу.';
+    // Бот байхгүй үед л ZeroTier замыг дэлгэнэ
+    const adv = document.getElementById('adv-host');
+    if (adv && isHost && !active && !adv.dataset.userToggled) adv.open = !online;
   }
 
+  document.getElementById('adv-host')?.addEventListener('toggle', (e) => { e.target.dataset.userToggled = '1'; });
   async function loadStatus() {
     try {
       status = await api('get', '/rooms/bot-host/status');
-      if (!status?.enabled) { panel.classList.add('hidden'); return; }
+      if (!status?.enabled) { panel.classList.add('hidden'); const adv = document.getElementById('adv-host'); if (adv) adv.open = true; return; }
       panel.classList.remove('hidden');
       const sel = el('bot-host-map');
       sel.innerHTML = (status.maps || []).map((m) => `<option value="${m.key}" ${m.default ? 'selected' : ''}>${m.name}</option>`).join('');
@@ -5256,7 +5260,7 @@ init();
     try {
       const wc3Name = await getWc3Name();
       job = await api('post', `/rooms/${currentRoom.id}/bot-host`, { map_key: el('bot-host-map').value, owner_name: wc3Name || undefined });
-      appendSysMsg(`🤖 Бот хост хүсэгдлээ — бот тоглоомыг нээмэгц мэдэгдэнэ.${job?.owner_name ? ` Lobby-ийн эзэн (!start эрхтэй WC3 нэр): «${job.owner_name}»` : ''}`);
+      appendSysMsg(`▶ Тоглолт эхлүүлэх хүсэлт илгээгдлээ — бот тоглоомыг нээмэгц (~30 сек) "WC3 нээж нэгдэх" товч гарна.${job?.owner_name ? ` Lobby-ийн эзэн (!start эрхтэй WC3 нэр): «${job.owner_name}»` : ''}`);
       render();
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }

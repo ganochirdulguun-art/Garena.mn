@@ -3968,3 +3968,13 @@ body:not(.light) .maintab.active {
 }
 .fw-toolbar-title { font: 600 13px var(--font-d); letter-spacing: 0.04em; color: var(--text); }
 .fw-toolbar .ibtn { position: relative; }
+
+/* ── 1.8.6: бот хост = үндсэн зам; ZeroTier хост = "Нэмэлт" details ─────── */
+.bot-host-actions .btn-block { flex: 1 1 100%; }
+.adv-host { margin-top: 10px; border: 1px dashed rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 6px 10px; }
+.adv-host summary { cursor: pointer; font-size: 0.78rem; color: var(--text2); letter-spacing: 0.03em; user-select: none; }
+.adv-host summary:hover { color: var(--text); }
+.adv-host[open] summary { margin-bottom: 6px; }
+.adv-host .hint { margin: 0 0 8px; font-size: 0.74rem; line-height: 1.4; }
+.adv-host .btn { width: 100%; }
+.room-action-row > .btn { flex: 1 1 auto; }
