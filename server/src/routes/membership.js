@@ -5,6 +5,7 @@
 // Env: QPAY_API_BASE, QPAY_API_KEY, QPAY_WEBHOOK_SECRET, SERVER_URL.
 const express = require('express');
 const authMW = require('../middleware/auth');
+const { perUser } = require('../middleware/ratelimit');
 const adminMW = require('../middleware/admin');
 const qpay = require('../services/qpay');
 const { levelProgress, RULES } = require('../services/progression');
@@ -254,7 +255,7 @@ router.get('/public', async (req, res) => {
 });
 
 // Гишүүнчлэл авах: { tier: 'silver'|'gold', months: 1..12, pay_with: 'qpay'|'diamonds' }
-router.post('/order', authMW, async (req, res) => {
+router.post('/order', authMW, perUser('order', 10, 60 * 60 * 1000, 'Захиалга хэт олон — 1 цагийн дараа дахин оролдоно уу.'), async (req, res) => {
   const tier = String(req.body?.tier || '').toLowerCase();
   const months = Math.min(12, Math.max(1, parseInt(req.body?.months, 10) || 1));
   const payWith = req.body?.pay_with === 'diamonds' ? 'diamonds' : 'qpay';
@@ -422,7 +423,7 @@ diamondsRouter.post('/transfer', authMW, async (req, res) => {
 });
 
 // QPay-аар Diamond багц авах: { pack: 'd500' }
-diamondsRouter.post('/buy', authMW, async (req, res) => {
+diamondsRouter.post('/buy', authMW, perUser('order', 10, 60 * 60 * 1000, 'Захиалга хэт олон — 1 цагийн дараа дахин оролдоно уу.'), async (req, res) => {
   const pack = DIAMOND_PACKS.find((p) => p.key === String(req.body?.pack || ''));
   if (!pack) return res.status(400).json({ error: 'Багц сонгоно уу', packs: DIAMOND_PACKS });
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });

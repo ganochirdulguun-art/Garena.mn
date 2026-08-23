@@ -6,6 +6,7 @@ const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const authMW = require('../middleware/auth');
+const { perUser } = require('../middleware/ratelimit');
 const { recordGameResult } = require('../services/results');
 
 let db;
@@ -88,7 +89,7 @@ roomRouter.get('/:id/bot-host', authMW, async (req, res) => {
 });
 
 // Host: "Бот хост" — { map_key? }
-roomRouter.post('/:id/bot-host', authMW, async (req, res) => {
+roomRouter.post('/:id/bot-host', authMW, perUser('bot-host', 10, 10 * 60 * 1000, 'Бот хостын хүсэлт хэт олон — 10 минутын дараа дахин оролдоно уу.'), async (req, res) => {
   const roomId = req.params.id;
   if (!botsEnabled()) return res.status(503).json({ error: 'Бот хост идэвхжээгүй (BOT_API_KEY тохируулаагүй)', code: 'BOT_DISABLED' });
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
@@ -129,7 +130,7 @@ roomRouter.post('/:id/bot-host', authMW, async (req, res) => {
 
 // Гишүүн: "WC3 нээж нэгдэх" дарахад / WC3 ботын lobby-д орох REQJOIN явуулахад — { wc3_name? }
 // WC3 нэр + нийтийн IP-г ажилд бүртгэнэ → дүн ирэхэд GHost++-ийн тоглогч (нэр|IP) ↔ платформын хэрэглэгч тааруулна.
-roomRouter.post('/:id/bot-host/join', authMW, async (req, res) => {
+roomRouter.post('/:id/bot-host/join', authMW, perUser('bot-join', 60, 10 * 60 * 1000), async (req, res) => {
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
   try {
     const roomId = req.params.id;

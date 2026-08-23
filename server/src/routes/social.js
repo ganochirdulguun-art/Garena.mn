@@ -1,5 +1,6 @@
 const express = require('express');
 const authMW = require('../middleware/auth');
+const { perUser } = require('../middleware/ratelimit');
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
@@ -175,7 +176,7 @@ router.get('/pending', authMW, async (req, res) => {
   return res.json([...getMap(memPendingReceived, myId).values()]);
 });
 
-router.post('/friend/request', authMW, async (req, res) => {
+router.post('/friend/request', authMW, perUser('friend-req', 60, 60 * 60 * 1000, 'Найзын хүсэлт хэт олон — 1 цагийн дараа дахин оролдоно уу.'), async (req, res) => {
   const myId = req.user.id;
   const { toUserId } = req.body;
   if (!toUserId) return res.status(400).json({ error: 'toUserId is required' });

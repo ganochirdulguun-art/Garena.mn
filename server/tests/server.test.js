@@ -1058,6 +1058,41 @@ async function testBotResultMapsWc3NamesAndIps() {
   }
 }
 
+// C4: abuse хамгаалалт — forgot-password IP limiter (10/15 мин) + хэрэглэгч бүрийн perUser limiter
+async function testRateLimits() {
+  const rl = require(path.join(serverDir, 'src', 'middleware', 'ratelimit.js'));
+  rl._reset();
+  // perUser: 3 удаа зөвшөөрч 4 дэх нь 429
+  const mw = rl.perUser('t', 3, 60000);
+  const hits = [];
+  for (let i = 0; i < 4; i++) {
+    let status = 200;
+    const res = { set() {}, status(c) { status = c; return this; }, json() { return this; } };
+    mw({ user: { id: 7 }, ip: '1.1.1.1' }, res, () => { status = 'next'; });
+    hits.push(status);
+  }
+  assert.deepEqual(hits, ['next', 'next', 'next', 429]);
+  // өөр хэрэглэгч тусдаа тоологдоно
+  let other = 200;
+  mw({ user: { id: 8 }, ip: '1.1.1.1' }, { set() {}, status(c) { other = c; return this; }, json() { return this; } }, () => { other = 'next'; });
+  assert.equal(other, 'next');
+
+  const mockDb = { query: async (sql) => (sql.includes('SELECT 1') ? { rows: [{ '?column?': 1 }] } : { rows: [], rowCount: 0 }) };
+  const server = await startServer({}, { mockDb });
+  try {
+    let last = 0;
+    for (let i = 0; i < 11; i++) {
+      const res = await fetch(`${server.baseUrl}/auth/forgot-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'nobody@example.com' }),
+      });
+      last = res.status;
+    }
+    assert.equal(last, 429, 'forgot-password must be rate limited after 10 attempts');
+  } finally {
+    await server.stop();
+  }
+}
+
 (async () => {
   await runTest('server smoke flow supports register/login/me and guarded auth endpoints', testSmokeFlow);
   await runTest('Discord-linked usernames are read-only in-app', testDiscordLinkedUsernameIsReadOnly);
@@ -1079,6 +1114,7 @@ async function testBotResultMapsWc3NamesAndIps() {
   await runTest('platform owner has unlimited diamonds (transfer + membership without deduction)', testOwnerUnlimitedDiamonds);
   await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
   await runTest('bot result maps GHost++ players to users by WC3 name, then IP; learns wc3_name', testBotResultMapsWc3NamesAndIps);
+  await runTest('rate limits: forgot-password per IP, perUser limiter per account', testRateLimits);
 
   if (process.exitCode) process.exit(process.exitCode);
 })();

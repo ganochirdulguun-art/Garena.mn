@@ -1,6 +1,7 @@
 const express = require('express');
 const axios = require('axios');
 const auth = require('../middleware/auth');
+const { perUser } = require('../middleware/ratelimit');
 const admin = require('../middleware/admin');
 const { recordGameResult } = require('../services/results');
 
@@ -372,7 +373,7 @@ router.post('/tierbot/sync', admin, async (req, res) => {
 });
 
 // Replay parse хийсний дараа үр дүн хадгалах (өрөөний гишүүн)
-router.post('/result', auth, async (req, res) => {
+router.post('/result', auth, perUser('result', 30, 60 * 60 * 1000), async (req, res) => {
   const { room_id, winner_team, duration_minutes, replay_path, players } = req.body;
 
   if (!await dbAvailable()) {

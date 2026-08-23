@@ -56,6 +56,23 @@ const authLimiter = rateLimit({
 });
 app.use('/auth/login', authLimiter);
 app.use('/auth/register', authLimiter); // base64 зураг байршуулахад хэрэг
+// Нууц үг сэргээх имэйл — spam/өртөг хамгаалалт (15 минутад 10)
+const forgotLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, max: 10,
+  message: { error: 'Хэт олон оролдлого. 15 минутын дараа дахин оролдоно уу.' },
+  standardHeaders: true, legacyHeaders: false,
+});
+app.use('/auth/forgot-password', forgotLimiter);
+app.use('/auth/reset-password', forgotLimiter);
+// Глобал аюулгүйн тор: нэг IP-ээс 5 минутад 3000 хүсэлт (интернэт кафе: ~20 клиент × polling багтана).
+// Статик файл, ботын bridge (/bot, x-bot-key) болон QPay webhook үүнд орохгүй.
+const apiLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, max: 3000,
+  message: { error: 'Хэт олон хүсэлт — түр хүлээгээд дахин оролдоно уу.' },
+  standardHeaders: true, legacyHeaders: false,
+  skip: (req) => req.path.startsWith('/bot/') || req.path === '/qpay/webhook' || req.path.startsWith('/assets/') || req.method === 'OPTIONS',
+});
+app.use(apiLimiter);
 
 // REST Routes
 app.use('/auth', authRoutes);
@@ -454,6 +471,7 @@ io.on('connection', (socket) => {
 
   // Өрөөний урилга
   socket.on('room:invite', ({ toUserId, roomId, roomName }) => {
+    if (checkRateLimit(socket)) return;   // урилгын spam
     io.to(`user:${String(toUserId)}`).emit('room:invited', {
       fromUsername: socket.user.username,
       fromUserId:   String(socket.user.id),
