@@ -42,7 +42,8 @@ bot_gameoverfile = gameover.txt
 bot_localadminmessages = 0
 
 # Garena.mn bridge UDP 6112 дээр GAMEINFO-г барина → broadcast зөвхөн өөрийн машин руу
-udp_broadcasttarget = 10.147.20.255   # ZeroTier subnet broadcast — тоглогчид ZT-ээр GAMEINFO хүлээж авна
+# ZeroTier subnet broadcast (10.147.99.0/24 — 1d71 VPN-тэй мөргөлдөхөөс зайлсхийсэн); тоглогчид ZT-ээр GAMEINFO хүлээж авна
+udp_broadcasttarget = 10.147.99.255
 udp_dontroute = 0
 
 # Autohost: ажил бүрт нэг тоглоом; өрөөний host (owner) lobby-д !start бичиж эхлүүлнэ

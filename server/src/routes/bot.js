@@ -46,8 +46,8 @@ function pickMap(mapKey, gameType) {
   if (mapKey) return MAPS.find((m) => m.key === mapKey) || null;
   return MAPS.find((m) => m.default) || MAPS[0] || null;
 }
-function sanitizeGameName(s) {
-  return String(s || 'Garena.mn').replace(/[^\w\s\-\.#!А-Яа-яӨөҮүЁё]/g, '').trim().slice(0, 31) || 'Garena.mn';
+function sanitizeGameName(s, maxLen = 31) {
+  return String(s || 'Garena.mn').replace(/[^\w\s\-\.#!А-Яа-яӨөҮүЁё]/g, '').trim().slice(0, maxLen).trim() || 'Garena.mn';
 }
 // WC3-ийн LAN нэр (registry userlocal эсвэл REQJOIN пакетаас): хяналтын тэмдэгтгүй, ≤31
 function sanitizeWc3Name(s) {
@@ -109,7 +109,9 @@ roomRouter.post('/:id/bot-host', authMW, perUser('bot-host', 10, 10 * 60 * 1000,
     const members = await db.query(
       'SELECT u.id, u.username FROM room_players rp JOIN users u ON u.id = rp.user_id WHERE rp.room_id = $1', [roomId]
     );
-    const gameName = sanitizeGameName(`GMN#${roomId} ${room.name}`);
+    // GHost++ autohost нэр дээр " #<тоологч>" нэмдэг тул суурь нэрийг 27-д багтаана
+    // (31 хатуу WC3 хязгаар − " #NN"); эс бөгөөс autohost "name too long" гэж зогсоно.
+    const gameName = sanitizeGameName(`GMN#${roomId} ${room.name}`, 27);
     // GHost++ зөвхөн autohost_owner-тэй ИЖИЛ WC3 нэртэй тоглогчийн !start-ыг хүлээн авдаг → хостын WC3 нэрийг
     // клиент (registry userlocal) илгээнэ; байхгүй бол өмнө нь сурсан users.wc3_name, тэр ч үгүй бол платформын нэр.
     let ownerName = sanitizeWc3Name(req.body?.owner_name);

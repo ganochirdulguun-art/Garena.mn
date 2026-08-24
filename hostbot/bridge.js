@@ -80,6 +80,13 @@ function renderTemplate(job, port, files) {
 }
 
 async function startJob(job) {
+  // WC3/GHost++ тоглоомын нэрийн дээд хязгаар = 31 тэмдэгт. autohost нь нэр дээр
+  // " #<тоологч>" (4 хүртэл тэмдэгт) нэмдэг тул суурь нэрийг 27-д таслана, эс бөгөөс
+  // GHost++ "next game name ... is too long" гэж autohost-ыг зогсооно.
+  if (job.game_name && job.game_name.length > 27) {
+    log(`[job ${job.id}] game name "${job.game_name}" хэт урт → 27 тэмдэгтэд таслав`);
+    job.game_name = job.game_name.slice(0, 27).trim();
+  }
   const port = allocPort();
   const runDir = path.join(CFG.GHOST_DIR, 'run');
   fs.mkdirSync(runDir, { recursive: true });
