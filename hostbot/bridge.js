@@ -41,13 +41,31 @@ if (!CFG.BOT_KEY || !CFG.PUBLIC_IP) {
 
 const jobs = new Map(); // jobId -> state
 const log = (...a) => console.log(new Date().toISOString(), ...a);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function api(method, p, body) {
-  const res = await fetch(`${CFG.PLATFORM_URL}${p}`, {
-    method,
-    headers: { 'x-bot-key': CFG.BOT_KEY, 'Content-Type': 'application/json' },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+// Нэг тоглоомын гэнэтийн алдаа БҮХ тоглоомыг унагахаас сэргийлнэ — процессыг амьд байлгана.
+process.on('uncaughtException', (e) => log('⚠️ uncaughtException (үл тоомсорлов):', (e && e.stack) || e));
+process.on('unhandledRejection', (e) => log('⚠️ unhandledRejection (үл тоомсорлов):', (e && e.stack) || e));
+
+// GHost++ child-ыг SIGTERM → 5с дараа SIGKILL-ээр баталгаатай унтраана (зомби/порт гацахаас сэргийлнэ).
+function killProc(proc) {
+  if (!proc) return;
+  try { proc.kill('SIGTERM'); } catch {}
+  setTimeout(() => { try { proc.kill('SIGKILL'); } catch {} }, 5000);
+}
+
+async function api(method, p, body, timeoutMs = 15000) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  let res;
+  try {
+    res = await fetch(`${CFG.PLATFORM_URL}${p}`, {
+      method,
+      headers: { 'x-bot-key': CFG.BOT_KEY, 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ac.signal,
+    });
+  } finally { clearTimeout(timer); }
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
@@ -148,7 +166,7 @@ function handleLogText(state, text) {
   }
 }
 
-// ── UDP: GHost++-ийн GAMEINFO broadcast барих (udp_broadcasttarget = 127.0.0.1) ──
+// ── UDP: GHost++-ийн GAMEINFO broadcast барих (udp_broadcasttarget = 10.147.99.255, ZeroTier) ──
 const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 udp.on('message', (msg) => {
   if (msg.length < 24 || msg[0] !== 0xF7 || msg[1] !== 0x30) return;
@@ -159,7 +177,8 @@ udp.on('message', (msg) => {
   const port = msg.readUInt16LE(msg.length - 2);
   for (const state of jobs.values()) {
     if (state.finished || state.started) continue;
-    if (state.port !== port && state.job.game_name !== gameName) continue;
+    // Порт = найдвартай түлхүүр. Нэрээр таарах нь 2 зэрэг тоглоомын хооронд андуурч болзошгүй тул хассан.
+    if (state.port !== port) continue;
     const b64 = msg.toString('base64');
     // GAMEINFO-д секунд тутам өөрчлөгддөг uptime талбар бий → slot/тоглогчийн тоо өөрчлөгдсөн эсэхийг
     // пакетийн сүүлийн 24 байтаас (slots total/open, uptime, port) uptime-ыг хасч харьцуулна; 60с тутамд л дахин илгээнэ
@@ -176,7 +195,12 @@ udp.on('message', (msg) => {
     return;
   }
 });
-udp.on('error', (e) => log('udp алдаа', e.message));
+udp.on('error', (e) => {
+  log('⚠️ UDP 6112 алдаа:', e.message);
+  // bind амжилтгүй (EADDRINUSE) бол GAMEINFO хэзээ ч ирэхгүй → идэвхтэй тоглоом байхгүй үед
+  // процессыг унтрааж systemd-ээр дахин асаана. Идэвхтэй тоглоомтой бол унагаахгүй.
+  if (jobs.size === 0) { log('идэвхтэй тоглоом алга → restart-д гарч байна'); process.exit(1); }
+});
 udp.bind(6112, '0.0.0.0', () => log('UDP 6112 сонсож байна (GHost++ GAMEINFO)'));
 
 // ── Дүн: sqlite → платформ ───────────────────────────────
@@ -224,26 +248,37 @@ async function finalize(state, why) {
   if (state.finished) return;
   state.finished = true;
   jobs.delete(state.job.id);
-  try { state.proc.kill(); } catch {}
+  killProc(state.proc);
   if (!state.started) {
     return fail(state, state.lobbyPosted ? `lobby дууссан (${why})` : `хостолж чадсангүй (${why}): ${state.stdout.slice(-400)}`);
   }
+  let r;
   try {
-    const r = readResult(state);
-    if (!r || ![1, 2].includes(r.winner_team)) {
-      return fail(state, `ялагч тодорхойгүй (${why})`);
-    }
-    await api('POST', `/bot/jobs/${state.job.id}/result`, r);
-    log(`[job ${state.job.id}] дүн илгээгдлээ — winner team ${r.winner_team}, ${r.duration_minutes} мин, ${r.players.length} тоглогч`);
+    r = readResult(state);
   } catch (e) {
-    log(`[job ${state.job.id}] дүн илгээх алдаа`, e.message);
-    await fail(state, `result: ${e.message}`);
+    log(`[job ${state.job.id}] sqlite унших алдаа`, e.message);
+    return fail(state, `result унших: ${e.message}`);
   }
+  if (!r || ![1, 2].includes(r.winner_team)) {
+    return fail(state, `ялагч тодорхойгүй (${why})`);
+  }
+  // Дууссан тоглоомыг сүлжээний түр саатлаас болж "failed" болгохгүйн тулд 3 удаа дахин оролдоно.
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      await api('POST', `/bot/jobs/${state.job.id}/result`, r);
+      log(`[job ${state.job.id}] дүн илгээгдлээ — winner team ${r.winner_team}, ${r.duration_minutes} мин, ${r.players.length} тоглогч`);
+      return;
+    } catch (e) {
+      log(`[job ${state.job.id}] дүн илгээх оролдлого ${attempt}/3 бүтсэнгүй`, e.message);
+      if (attempt < 3) await sleep(2000 * attempt);
+    }
+  }
+  await fail(state, 'дүн 3 удаа илгээж чадсангүй');
 }
 async function fail(state, error) {
   state.finished = true;
   jobs.delete(state.job.id);
-  try { state.proc?.kill(); } catch {}
+  killProc(state.proc);
   try { await api('POST', `/bot/jobs/${state.job.id}/failed`, { error: String(error).slice(0, 500) }); } catch (e) { log('failed POST алдаа', e.message); }
   log(`[job ${state.job.id}] FAILED: ${error}`);
 }
@@ -253,19 +288,32 @@ async function heartbeat() {
   try { await api('POST', '/bot/heartbeat', { bot: CFG.BOT_NAME, games: jobs.size, max_games: CFG.MAX_GAMES, version: 'bridge-1.0' }); }
   catch (e) { log('heartbeat алдаа', e.message); }
 }
+const MAX_GAME_MS = 4 * 60 * 60 * 1000;  // started тоглоом 4ц-аас удвал slot суллана (гацсан GHost)
 async function poll() {
   for (const st of jobs.values()) {
     pollLogFile(st);
     if (!st.started && Date.now() - st.createdAt > CFG.LOBBY_TIMEOUT_MS) finalize(st, 'lobby timeout');
+    else if (st.started && !st.finished && Date.now() - st.createdAt > MAX_GAME_MS) finalize(st, 'тоглоомын хугацаа хэтэрсэн (>4ц)');
   }
   if (jobs.size >= CFG.MAX_GAMES) return;
   try {
     const job = await api('GET', `/bot/jobs/next?bot=${encodeURIComponent(CFG.BOT_NAME)}`);
-    if (job && job.id) await startJob(job);
+    if (job && job.id) {
+      if (jobs.size >= CFG.MAX_GAMES) return;  // await-ийн дараа дахин шалгах (давхардсан poll хамгаалалт)
+      try {
+        await startJob(job);
+      } catch (e) {
+        // Job аль хэдийн "hosting" болсон тул алдвал заавал /failed илгээж, "hosting"-д гацахаас сэргийлнэ.
+        log(`[job ${job.id}] startJob алдаа`, e.message);
+        try { await api('POST', `/bot/jobs/${job.id}/failed`, { error: `startJob: ${String(e.message).slice(0, 300)}` }); } catch {}
+      }
+    }
   } catch (e) { log('poll алдаа', e.message); }
 }
 heartbeat();
 setInterval(heartbeat, CFG.HEARTBEAT_MS);
 setInterval(poll, CFG.POLL_MS);
 log(`bridge эхэллээ — ${CFG.BOT_NAME} → ${CFG.PLATFORM_URL}, public ${CFG.PUBLIC_IP}, max ${CFG.MAX_GAMES} тоглолт`);
-process.on('SIGINT', () => { for (const st of jobs.values()) { try { st.proc.kill(); } catch {} } process.exit(0); });
+function shutdown() { for (const st of jobs.values()) { try { st.proc.kill('SIGTERM'); } catch {} } setTimeout(() => process.exit(0), 500); }
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);   // systemd stop нь SIGTERM илгээдэг — цэвэрхэн унтраана

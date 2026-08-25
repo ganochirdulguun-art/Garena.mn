@@ -27,6 +27,7 @@ const BOT_KEYS = String(process.env.BOT_API_KEYS || process.env.BOT_API_KEY || '
   .split(',').map((s) => s.trim()).filter(Boolean);
 const BOT_STALE_SEC = 90;                 // heartbeat энэ хугацаанд ирэхгүй бол бот offline
 const LOBBY_TIMEOUT_MIN = 30;             // lobby энэ хугацаанд эхлэхгүй бол ажил cancelled
+const MAX_GAME_MIN = 240;                 // started тоглолт 4ц-аас удвал гацсан гэж үзэж цуцална
 
 const bots = new Map();                   // bot_name -> { last_seen, games, max_games, version }
 
@@ -71,6 +72,33 @@ async function activeJobForRoom(roomId) {
   );
   return r.rows[0] || null;
 }
+
+// Гацсан ажлуудыг цэвэрлэх watchdog — бот poll хийж байгаа эсэхээс ҮЛ ХАМААРАН ажиллана (setInterval доор).
+// Ингэснээр ганц бот offline болоход queued/lobby/started ажил үүрд гацахгүй, өрөө "playing"-д тээглэхгүй.
+async function sweepStaleJobs() {
+  if (!db || !await dbOk()) return;
+  try {
+    const r = await db.query(
+      `UPDATE bot_jobs SET status='cancelled',
+         error = CASE WHEN status='queued' THEN 'timeout (queued)'
+                      WHEN status='started' THEN 'timeout (started >4h)'
+                      ELSE 'timeout (lobby)' END,
+         updated_at=NOW()
+       WHERE (status='queued'               AND created_at < NOW() - INTERVAL '${LOBBY_TIMEOUT_MIN} minutes')
+          OR (status IN ('hosting','lobby')  AND updated_at < NOW() - INTERVAL '${LOBBY_TIMEOUT_MIN} minutes')
+          OR (status='started'               AND started_at < NOW() - INTERVAL '${MAX_GAME_MIN} minutes')
+       RETURNING id, room_id`
+    );
+    for (const row of r.rows) {
+      if (!row.room_id) continue;
+      await db.query(`UPDATE rooms SET status='waiting' WHERE id=$1 AND status='playing'`, [row.room_id]).catch(() => {});
+      emitRoom(row.room_id, 'room:bot_job', { id: row.id, status: 'cancelled', error: 'timeout' });
+    }
+    if (r.rows.length && _io) _io.emit('rooms:updated');
+    if (r.rows.length) console.log(`[bot watchdog] ${r.rows.length} гацсан ажил цуцлав`);
+  } catch (e) { console.error('[bot watchdog]', e.message); }
+}
+setInterval(sweepStaleJobs, 60 * 1000).unref();   // минут тутам — bot poll-оос хамааралгүй (.unref → тест/shutdown-д саад болохгүй)
 
 // ════════════════ Платформ тал ════════════════
 const roomRouter = express.Router();   // mount: /rooms
@@ -121,11 +149,16 @@ roomRouter.post('/:id/bot-host', authMW, perUser('bot-host', 10, 10 * 60 * 1000,
       const w = await db.query('SELECT wc3_name FROM users WHERE id = $1', [req.user.id]).catch(() => ({ rows: [] }));
       ownerName = sanitizeWc3Name(w.rows[0]?.wc3_name) || req.user.username;
     }
+    // Давхар job-оос сэргийлж атомаар оруулна: идэвхтэй job байвал WHERE NOT EXISTS-ээр огт оруулахгүй
+    // (line 104-ийн шалгалт TOCTOU-той тул хоёр зэрэг хүсэлт хоёулаа орж 2 lobby үүсэхээс энэ хамгаална).
     const ins = await db.query(
       `INSERT INTO bot_jobs (room_id, requested_by, map_key, map_name, game_name, owner_name, expected_players, status)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'queued') RETURNING *`,
+       SELECT $1,$2,$3,$4,$5,$6,$7,'queued'
+       WHERE NOT EXISTS (SELECT 1 FROM bot_jobs WHERE room_id = $1 AND status IN ('queued','hosting','lobby','started'))
+       RETURNING *`,
       [roomId, req.user.id, map.key, map.name, gameName, ownerName, JSON.stringify(members.rows.map((m) => ({ user_id: m.id, name: m.username })))]
     );
+    if (!ins.rows[0]) return res.status(409).json({ error: 'Энэ өрөөнд бот хост аль хэдийн хүсэгдсэн байна' });
     const pub = await jobToPublic(ins.rows[0]);
     emitRoom(roomId, 'room:bot_job', pub);
     return res.status(201).json(pub);
@@ -189,9 +222,8 @@ botRouter.get('/jobs/next', async (req, res) => {
   bots.set(name, { ...(bots.get(name) || { games: 0, max_games: 1, version: '' }), last_seen: Date.now() });
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
   try {
-    // queued ажлууд дотроос 30 минутаас хуучныг нь cancel
-    await db.query(`UPDATE bot_jobs SET status='cancelled', error='timeout (queued)', updated_at=NOW() WHERE status='queued' AND created_at < NOW() - INTERVAL '${LOBBY_TIMEOUT_MIN} minutes'`);
-    await db.query(`UPDATE bot_jobs SET status='cancelled', error='timeout (lobby)', updated_at=NOW() WHERE status IN ('hosting','lobby') AND updated_at < NOW() - INTERVAL '${LOBBY_TIMEOUT_MIN} minutes'`);
+    // Гацсан ажлуудыг цэвэрлэнэ (queued/lobby/started timeout) — standalone watchdog-той ижил логик
+    await sweepStaleJobs();
     const r = await db.query(
       `UPDATE bot_jobs SET status = 'hosting', bot_name = $1, updated_at = NOW()
        WHERE id = (SELECT id FROM bot_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED)

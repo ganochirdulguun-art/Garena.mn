@@ -9,7 +9,9 @@ const axios = require('axios');
 const https = require('https');
 
 const CENTRAL_API = 'https://api.zerotier.com/api/v1';
-const POOL = { start: '10.147.20.1', end: '10.147.20.254', route: '10.147.20.0/24' };
+// Subnet-ийг env-ээр удирдана (renumber үед энэ нэг л газраас өөрчлөгдөнө). Одоогийн бодит сүлжээ 10.147.99.0/24.
+const _ztSub = String(process.env.ZT_SUBNET_PREFIX || '10.147.99').replace(/\.$/, '');
+const POOL = { start: `${_ztSub}.1`, end: `${_ztSub}.254`, route: `${_ztSub}.0/24` };
 
 function controllerCfg() {
   const url = String(process.env.ZT_CONTROLLER_URL || '').replace(/\/+$/, '');
@@ -90,12 +92,25 @@ async function hardenNetwork(networkId) {
 async function authorizeMember(networkId, nodeId) {
   const m = mode();
   if (m === 'off') throw new Error('no-api-token');
-  if (m === 'controller') {
-    await ctl().post(`/controller/network/${networkId}/member/${nodeId}`, { authorized: true });
-    return true;
+  // Түр зуурын алдаа (controller/Central timeout, 5xx) дээр 3 хүртэл дахин оролдоно —
+  // нэг сүлжээний blip тоглогчийн ZeroTier join-ыг унагахгүй.
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      if (m === 'controller') {
+        await ctl().post(`/controller/network/${networkId}/member/${nodeId}`, { authorized: true });
+      } else {
+        await central().post(`/network/${networkId}/member/${nodeId}`, { config: { authorized: true } });
+      }
+      return true;
+    } catch (e) {
+      lastErr = e;
+      const status = e && e.response && e.response.status;
+      if (status && status >= 400 && status < 500) throw e;   // 4xx — дахин оролдох утгагүй
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * attempt));
+    }
   }
-  await central().post(`/network/${networkId}/member/${nodeId}`, { config: { authorized: true } });
-  return true;
+  throw lastErr;
 }
 
 async function deleteNetwork(networkId) {
