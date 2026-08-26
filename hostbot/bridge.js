@@ -167,9 +167,15 @@ function handleLogText(state, text) {
 }
 
 // ── UDP: GHost++-ийн GAMEINFO broadcast барих (udp_broadcasttarget = 10.147.99.255, ZeroTier) ──
+// ЧУХАЛ: WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN жагсаалтад хүлээж авдаг. GHost нь ephemeral
+// эх портоос broadcast хийдэг тул WC3 үл тоомсорлодог. Иймд энэ 6112-т bind хийсэн socket-оор ДАХИН
+// broadcast хийж эх портыг 6112 болгоно → тоглоомчдын WC3 LAN-д харагдана.
+const ZT_BC = (CFG.ZT_HOST_IP || '').replace(/\.\d+$/, '.255') || null;
 const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-udp.on('message', (msg) => {
+udp.on('message', (msg, rinfo) => {
   if (msg.length < 24 || msg[0] !== 0xF7 || msg[1] !== 0x30) return;
+  if (rinfo && rinfo.port === 6112) return;   // өөрийн дахин broadcast-ийн echo — алгасна (давталтаас сэргийлнэ)
+  if (ZT_BC) { try { udp.send(msg, 0, msg.length, 6112, ZT_BC); } catch {} }   // эх порт 6112-оос дахин broadcast
   // F7 30 len(2) product(4) version(4) hostcounter(4) entrykey(4) gamename\0 ... port(2)
   const end = msg.indexOf(0, 20);
   if (end < 0) return;
@@ -201,7 +207,7 @@ udp.on('error', (e) => {
   // процессыг унтрааж systemd-ээр дахин асаана. Идэвхтэй тоглоомтой бол унагаахгүй.
   if (jobs.size === 0) { log('идэвхтэй тоглоом алга → restart-д гарч байна'); process.exit(1); }
 });
-udp.bind(6112, '0.0.0.0', () => log('UDP 6112 сонсож байна (GHost++ GAMEINFO)'));
+udp.bind(6112, '0.0.0.0', () => { try { udp.setBroadcast(true); } catch {} log('UDP 6112 сонсож байна (GAMEINFO + эх порт 6112 re-broadcast)'); });
 
 // ── Дүн: sqlite → платформ ───────────────────────────────
 function readResult(state) {
