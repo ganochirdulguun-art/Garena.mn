@@ -300,50 +300,39 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   state.server.on('error', (e) => console.error('[BotBridge] tcp:', e.message));
   state.server.listen(lp, '127.0.0.1');
 
-  // 2) GAMEINFO → локал WC3. WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN жагсаалтад хүлээж авдаг.
-  //    WC3 (0.0.0.0:6112) аль хэдийн эзэлсэн тул bridge-ийг ТОДОРХОЙ IP:6112-т bind хийнэ →
-  //    127.0.0.1 руу илгээсэн пакет WC3 руу очно, эх порт 6112 хэвээр.
+  // 2) GAMEINFO → локал WC3 (GProxy маяг). WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN
+  //    жагсаалтад хүлээж авдаг. Иймд 0.0.0.0:6112-т reuseAddr-ээр bind хийж (WC3-тай ЗЭРЭГЦЭН —
+  //    Windows дээр SO_REUSEADDR-ээр боломжтой) зөвхөн 127.0.0.1:6112 руу илгээнэ → эх IP 127.0.0.1,
+  //    эх порт 6112 → WC3 хүлээж аваад port талбар (=localPort) руу буюу 127.0.0.1:localPort (TCP тунел)
+  //    руу холбогдоно → тунел ботын нийтийн IP руу дамжуулна. ZeroTier огт шаардлагагүй.
   const local = Buffer.from(pkt);
-  local.writeUInt16LE(lp, local.length - 2);
-  const bindIp = _localBindIp();
-  const subnetBc = bindIp ? bindIp.replace(/\.\d+$/, '.255') : null;
-  const targets = ['127.0.0.1'];
-  if (subnetBc) targets.push(subnetBc);
-  targets.push('255.255.255.255');
+  local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн port талбарыг локал proxy порт болгоно
   let sentCount = 0;
   const beginSend = (sock, how) => {
     state.udp = sock;
-    try { sock.setBroadcast(true); } catch {}
     const tick = () => {
       if (!state.running) return;
       const b = state.packet || local;
-      for (const dst of targets) { try { sock.send(b, 0, b.length, WC3_PORT, dst); } catch (e) { if (sentCount < 3) bblog('send алдаа ' + dst + ': ' + e.message); } }
+      try { sock.send(b, 0, b.length, WC3_PORT, '127.0.0.1'); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
       sentCount += 1;
-      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO илгээв x${sentCount} → ${targets.join(', ')} (эх порт ${how})`);
+      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO → 127.0.0.1:6112 x${sentCount} (эх порт ${how})`);
       state.timer = setTimeout(tick, 2000);
     };
     tick();
-    bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP proxy 127.0.0.1:${lp}, эх порт=${how}, зорилтууд=${targets.join(', ')}, WC3 нэр орж ирэхийг хүлээж байна`);
+    bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP тунел 127.0.0.1:${lp}, эх порт=${how}`);
   };
-  const tryBind = (ip, label, onFail) => {
-    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    let ok = false;
-    sock.on('error', (e) => {
-      if (ok) { bblog('udp алдаа: ' + e.message); return; }
-      bblog(`bind ${label} (${ip || '0.0.0.0'}):6112 амжилтгүй: ${e.message}`);
-      try { sock.close(); } catch {}
-      onFail && onFail();
-    });
-    sock.bind(WC3_PORT, ip || '0.0.0.0', () => { ok = true; beginSend(sock, label); });
-  };
-  // 1-рт тодорхой IP:6112 (WC3-той мөргөлдөхгүй) → бүтэхгүй бол 0.0.0.0:6112 → бүтэхгүй бол unbound
-  tryBind(bindIp, bindIp ? `тодорхой ${bindIp}` : '0.0.0.0', () => {
-    tryBind('0.0.0.0', '0.0.0.0', () => {
-      const ub = dgram.createSocket('udp4');
-      ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
-      ub.bind(() => beginSend(ub, 'OS(unbound)'));
-    });
+  // 0.0.0.0:6112-т reuseAddr-ээр bind (WC3-тай зэрэгцэн) → бүтэхгүй бол unbound (эх порт 6112 биш, сүүлчийн арга)
+  const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  let bound = false;
+  sock.on('error', (e) => {
+    if (bound) { bblog('udp алдаа: ' + e.message); return; }
+    bblog(`bind 0.0.0.0:6112 амжилтгүй: ${e.message} → unbound fallback`);
+    try { sock.close(); } catch {}
+    const ub = dgram.createSocket('udp4');
+    ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
+    ub.bind(() => beginSend(ub, 'OS(unbound)'));
   });
+  sock.bind(WC3_PORT, '0.0.0.0', () => { bound = true; beginSend(sock, '6112'); });
   _bot = state;
   return { localPort: lp };
 }

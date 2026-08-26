@@ -194,7 +194,8 @@ udp.on('message', (msg, rinfo) => {
     state.lastSig = sig;
     state.lastPostAt = now;
     state.lobbyPosted = true;
-    const hostIp = CFG.ZT_HOST_IP || CFG.PUBLIC_IP;
+    // RGC маяг: нийтийн IP-ыг эхэнд илгээнэ → клиент GProxy тунел (public IP:port) ашиглана, ZeroTier шаардлагагүй.
+    const hostIp = CFG.PUBLIC_IP || CFG.ZT_HOST_IP;
     api('POST', `/bot/jobs/${state.job.id}/lobby`, { host_ip: hostIp, host_port: state.port, gameinfo_b64: b64, game_name: gameName })
       .then(() => log(`[job ${state.job.id}] lobby мэдэгдлээ (${gameName} @ ${hostIp}:${state.port})`))
       .catch((e) => { state.lobbyPosted = false; log('lobby POST алдаа', e.message); });
