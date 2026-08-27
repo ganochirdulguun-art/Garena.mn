@@ -158,8 +158,17 @@ app.get('/config', async (req, res) => {
     ? [{ image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
     : [
         { image: `${adBase}/assets/gs-ad-1.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
-        { image: `${adBase}/assets/gs-ad-2.png`, link: gsLink, text: 'GarenaSystem — Tier · MMR · Тэмцээн · QPay төлбөр' },
       ];
+  // Нэмэлт (жинхэнэ) рекламууд: env AD_EXTRA_JSON = [{image,link,text}, ...] JSON массив.
+  // Зар сурталчлагч өөрийн баннер (1120×144) + линкийг өгсөн үед энд нэмнэ — код өөрчлөхгүй.
+  try {
+    const extra = JSON.parse(process.env.AD_EXTRA_JSON || '[]');
+    if (Array.isArray(extra)) {
+      for (const a of extra) {
+        if (a && (a.image || a.text)) ads.push({ image: a.image || null, link: a.link || null, text: a.text || null });
+      }
+    }
+  } catch {}
   res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version, ad: ads[0], ads });
 });
 
