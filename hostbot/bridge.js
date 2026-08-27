@@ -194,8 +194,9 @@ udp.on('message', (msg, rinfo) => {
     state.lastSig = sig;
     state.lastPostAt = now;
     state.lobbyPosted = true;
-    // RGC маяг: нийтийн IP-ыг эхэнд илгээнэ → клиент GProxy тунел (public IP:port) ашиглана, ZeroTier шаардлагагүй.
-    const hostIp = CFG.PUBLIC_IP || CFG.ZT_HOST_IP;
+    // ZeroTier зам: клиент 6112-т bind хийхгүй (WC3 exclusive барьдаг тул EACCES) — GHost тоглоомоо
+    // ZT-ээр WC3 руу шууд broadcast хийнэ (VPS-ийн эх-порт-6112 re-broadcast засвартай). ZT IP-ыг эхэнд.
+    const hostIp = CFG.ZT_HOST_IP || CFG.PUBLIC_IP;
     api('POST', `/bot/jobs/${state.job.id}/lobby`, { host_ip: hostIp, host_port: state.port, gameinfo_b64: b64, game_name: gameName })
       .then(() => log(`[job ${state.job.id}] lobby мэдэгдлээ (${gameName} @ ${hostIp}:${state.port})`))
       .catch((e) => { state.lobbyPosted = false; log('lobby POST алдаа', e.message); });
