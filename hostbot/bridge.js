@@ -170,12 +170,26 @@ function handleLogText(state, text) {
 // ЧУХАЛ: WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN жагсаалтад хүлээж авдаг. GHost нь ephemeral
 // эх портоос broadcast хийдэг тул WC3 үл тоомсорлодог. Иймд энэ 6112-т bind хийсэн socket-оор ДАХИН
 // broadcast хийж эх портыг 6112 болгоно → тоглоомчдын WC3 LAN-д харагдана.
-const ZT_BC = (CFG.ZT_HOST_IP || '').replace(/\.\d+$/, '.255') || null;
+const ZT_SELF = CFG.ZT_HOST_IP || '';
+const ZT_BC = ZT_SELF.replace(/\.\d+$/, '.255') || null;
+const ZT_MEMBERS = new Set();   // ZeroTier гишүүдийн IP (unicast илгээхэд — broadcast-аас найдвартай)
+let lastGameInfo = null;        // сүүлийн GAMEINFO cache (SEARCHGAME-д шууд хариулах + давтан цацах)
+let lastGameInfoAt = 0;         // хамгийн сүүлд GHost-оос GAMEINFO ирсэн хугацаа (хуучин тоглоом цацахаас сэргийлнэ)
 const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 udp.on('message', (msg, rinfo) => {
+  const src = rinfo && rinfo.address;
+  const isMember = src && src.indexOf('10.147.99.') === 0 && src !== ZT_SELF;
+  if (isMember) ZT_MEMBERS.add(src);   // тоглогчийн ZeroTier IP-г цээжлэх
+  // WC3 finder-ийн SEARCHGAME (0xF7 0x2F) → cached GAMEINFO-г шууд unicast reply (host эмуляц — хамгийн найдвартай)
+  if (msg.length >= 2 && msg[0] === 0xF7 && msg[1] === 0x2F) {
+    if (isMember && lastGameInfo) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, src); } catch {} }
+    return;
+  }
   if (msg.length < 24 || msg[0] !== 0xF7 || msg[1] !== 0x30) return;
   if (rinfo && rinfo.port === 6112) return;   // өөрийн дахин broadcast-ийн echo — алгасна (давталтаас сэргийлнэ)
-  if (ZT_BC) { try { udp.send(msg, 0, msg.length, 6112, ZT_BC); } catch {} }   // эх порт 6112-оос дахин broadcast
+  lastGameInfo = Buffer.from(msg); lastGameInfoAt = Date.now();   // GAMEINFO-г cache (reply + давтан цацах)
+  if (ZT_BC) { try { udp.send(msg, 0, msg.length, 6112, ZT_BC); } catch {} }   // эх порт 6112-оос broadcast
+  for (const ip of ZT_MEMBERS) { try { udp.send(msg, 0, msg.length, 6112, ip); } catch {} }   // + гишүүн бүрт unicast
   // F7 30 len(2) product(4) version(4) hostcounter(4) entrykey(4) gamename\0 ... port(2)
   const end = msg.indexOf(0, 20);
   if (end < 0) return;
@@ -210,6 +224,15 @@ udp.on('error', (e) => {
   if (jobs.size === 0) { log('идэвхтэй тоглоом алга → restart-д гарч байна'); process.exit(1); }
 });
 udp.bind(6112, '0.0.0.0', () => { try { udp.setBroadcast(true); } catch {} log('UDP 6112 сонсож байна (GAMEINFO + эх порт 6112 re-broadcast)'); });
+
+// Cached GAMEINFO-г 1.5с тутам дахин цацах (broadcast + гишүүн бүрт unicast) — GHost 5с тутам л
+// broadcast хийдэг тул WC3 жагсаалтад тоглоом хурдан гарч, тогтвортой байхын тулд. GHost зогсоод
+// 8с болвол (тоглоом дууссан/эхэлсэн) цацахаа болино — хуучин тоглоом харуулахаас сэргийлнэ.
+setInterval(() => {
+  if (!lastGameInfo || Date.now() - lastGameInfoAt > 8000) return;
+  if (ZT_BC) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, ZT_BC); } catch {} }
+  for (const ip of ZT_MEMBERS) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, ip); } catch {} }
+}, 1500);
 
 // ── Дүн: sqlite → платформ ───────────────────────────────
 function readResult(state) {
