@@ -158,6 +158,8 @@ app.get('/config', async (req, res) => {
     ? [{ image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
     : [
         { image: `${adBase}/assets/gs-ad-1.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
+        { image: `${adBase}/assets/gmn-ad-warkey.png`, link: adBase, text: 'Garena.mn WarKey — WC3 товчлуур тохируулагч · Hotkey remapper · үнэгүй' },
+        { image: `${adBase}/assets/gmn-ad-diamond.png`, link: adBase, text: 'Diamond · QPay — цэнэглээд Silver/Gold эрх, нэр эффект, фрэйм' },
       ];
   // Нэмэлт (жинхэнэ) рекламууд: env AD_EXTRA_JSON = [{image,link,text}, ...] JSON массив.
   // Зар сурталчлагч өөрийн баннер (1120×144) + линкийг өгсөн үед энд нэмнэ — код өөрчлөхгүй.
