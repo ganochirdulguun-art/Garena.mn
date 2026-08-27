@@ -11,7 +11,7 @@ let _gameRunning = false;
 let roomsCache = {}; // id → room object
 let selectedRoomId = null;
 
-// ── ZeroTier IP хадгалалт ────────────────────────────────
+// ── Garena сүлжээ IP хадгалалт ────────────────────────────────
 let roomZtIps = {}; // userId → ip
 
 // ── Sound + Notification систем ─────────────────────────
@@ -231,7 +231,7 @@ async function connectSocket() {
 
   socket.on('zt:authorize_result', (result) => {
     if (!result?.ok && currentRoom) {
-      appendSysMsg(`⚠ ZeroTier authorization алдаа: ${result.error || 'unknown'}`);
+      appendSysMsg(`⚠ Garena сүлжээ authorization алдаа: ${result.error || 'unknown'}`);
     }
   });
 
@@ -454,7 +454,7 @@ async function connectSocket() {
     }
   });
 
-  // Тоглогчдын ZeroTier IP жагсаалт
+  // Тоглогчдын Garena сүлжээ IP жагсаалт
   socket.on('room:zt_ips', async ({ ips }) => {
     if (!ips) return;
     roomZtIps = ips;
@@ -716,21 +716,21 @@ async function init() {
     showToast(`Шинэчлэлийн алдаа: ${msg}`, 'error', 6000);
   });
 
-  // ── ZeroTier автомат тохиргоо статус ─────────────────
+  // ── Garena сүлжээ автомат тохиргоо статус ─────────────────
   _ztSetupInProgress = true;
   window.api.onZtSetupComplete?.(async (result) => {
     _ztSetupInProgress = false;
     if (result.ok) {
-      console.log('[ZT] ZeroTier setup complete. IP:', result.ip || 'pending');
+      console.log('[ZT] Garena сүлжээ setup complete. IP:', result.ip || 'pending');
     } else {
       const msgs = {
-        'not-installed': 'ZeroTier суулгаагүй байна. Тохиргоо → Сүлжээ → "ZeroTier татах" дарна уу.',
-        'service-stopped': 'ZeroTier суусан ч сервис нь ажиллахгүй байна. ZeroTier One-ийг нээх эсвэл Windows-оо дахин асаана уу.',
-        'cli-token': 'ZeroTier-ийн эрх хэрэгтэй: Тохиргоо → Сүлжээ → "Холболт шалгах" дараад UAC цонхонд "Yes" дарна уу.',
-        'join-failed': 'ZeroTier сүлжээнд нэгдэж чадсангүй.',
-        'no-network-id': 'Серверийн ZeroTier сүлжээ тохируулагдаагүй байна.',
+        'not-installed': 'Garena сүлжээ суулгаагүй байна. Тохиргоо → Сүлжээ → "Сүлжээ суулгах" дарна уу.',
+        'service-stopped': 'Garena сүлжээ суусан ч сервис нь ажиллахгүй байна. "Garena сүлжээ" програмыг нээх эсвэл Windows-оо дахин асаана уу.',
+        'cli-token': 'Garena сүлжээний эрх хэрэгтэй: Тохиргоо → Сүлжээ → "Холболт шалгах" дараад UAC цонхонд "Yes" дарна уу.',
+        'join-failed': 'Garena сүлжээ сүлжээнд нэгдэж чадсангүй.',
+        'no-network-id': 'Серверийн Garena сүлжээ сүлжээ тохируулагдаагүй байна.',
       };
-      showToast(msgs[result.error] || `ZeroTier алдаа: ${result.error}`, result.error === 'not-installed' ? 'warning' : 'error', 10000);
+      showToast(msgs[result.error] || `Garena сүлжээ алдаа: ${result.error}`, result.error === 'not-installed' ? 'warning' : 'error', 10000);
     }
   });
 
@@ -1199,7 +1199,7 @@ function renderRoomDetail(r) {
                    (r.members || []).some(m => String(m.id) === myId);
   const status = roomStatusMeta(r, inProgress, isMyRoom);
   const members = roomMemberLinks(r);
-  const networkLabel = r.zerotier_network_id ? 'ZeroTier ready' : 'LAN bridge';
+  const networkLabel = r.zerotier_network_id ? 'Garena сүлжээ ready' : 'LAN bridge';
 
   return `
     <div class="room-detail-card ${inProgress ? 'room-playing' : ''} ${isMyRoom ? 'room-mine' : ''}">
@@ -1658,7 +1658,7 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPl
     // Өрөөний ZT IP-уудыг авах
     roomZtIps = {};
     socket.emit('room:get_zt_ips', { roomId: id });
-    // ZeroTier IP-г серверт мэдэгдэх (relay-д хэрэгтэй) — retry логиктой
+    // Garena сүлжээ IP-г серверт мэдэгдэх (relay-д хэрэгтэй) — retry логиктой
     (async () => {
       if (ztNetId) {
         try {
@@ -1752,7 +1752,7 @@ function resetLaunchBtn(isHost) {
   btn.classList.add('btn-primary');
 }
 
-// ── ZeroTier setup flag (апп эхлэхэд initZeroTier ажиллаж байгааг мэдэх) ──
+// ── Garena сүлжээ setup flag (апп эхлэхэд initGarena сүлжээ ажиллаж байгааг мэдэх) ──
 let _ztSetupInProgress = false;
 
 // Host IP-г UI-д харуулах helper (no-op when elements removed)
@@ -3350,7 +3350,7 @@ async function loadSettings() {
     renderGamesList();
     populateRoomTypeSelect();
   } catch {}
-  // ZeroTier статус харуулах
+  // Garena сүлжээ статус харуулах
   try {
     const st = await window.api.getZerotierStatus();
     const ipEl = document.getElementById('settings-zt-ip');
@@ -3542,7 +3542,7 @@ document.getElementById('btn-clear-cache')?.addEventListener('click', async () =
   }
 });
 
-// ZeroTier IP шинэчлэх товч (Тохируулга)
+// Garena сүлжээ IP шинэчлэх товч (Тохируулга)
 document.getElementById('btn-zt-refresh')?.addEventListener('click', async () => {
   const btn = document.getElementById('btn-zt-refresh');
   const msgEl = document.getElementById('zt-refresh-msg');
@@ -3572,16 +3572,16 @@ document.getElementById('btn-zt-refresh')?.addEventListener('click', async () =>
         lines.push(`IP: ${result.ip}`);
         msgEl.style.color = 'var(--green)';
       } else if (result.error === 'not-installed') {
-        lines.push('ZeroTier суулгаагүй байна');
-        lines.push('Доорх "ZeroTier татах" товчийг ашиглана уу');
+        lines.push('Garena сүлжээ суулгаагүй байна');
+        lines.push('Доорх "Сүлжээ суулгах" товчийг ашиглана уу');
         msgEl.style.color = 'var(--yellow, orange)';
       } else if (result.error === 'service-stopped' || result.error === 'service-failed') {
-        lines.push('ZeroTier сервис ажиллахгүй байна');
-        lines.push('ZeroTier One-ийг нээх эсвэл Windows-оо дахин асаана уу');
+        lines.push('Garena сүлжээ сервис ажиллахгүй байна');
+        lines.push('"Garena сүлжээ" програмыг нээх эсвэл Windows-оо дахин асаана уу');
         msgEl.style.color = 'var(--yellow, orange)';
       } else if (result.error === 'cli-token') {
-        lines.push('ZeroTier-ийн эрх олгогдоогүй (UAC цонхонд "Yes" дарна уу)');
-        lines.push('Эсвэл ZeroTier One програмыг нэг удаа нээгээд дахин "Холболт шалгах"');
+        lines.push('Garena сүлжээний эрх олгогдоогүй (UAC цонхонд "Yes" дарна уу)');
+        lines.push('Эсвэл Garena сүлжээ програмыг нэг удаа нээгээд дахин "Холболт шалгах"');
         msgEl.style.color = 'var(--yellow, orange)';
       } else {
         lines.push('IP хараахан олгогдоогүй — хэдэн секундын дараа дахин шалгана уу');
@@ -4196,7 +4196,7 @@ const ONBOARDING_STEPS = [
   { target: '.userchip',             title: 'Профайл',        text: 'Баннер дээрх нэр/зураг дээрээ дарж профайлаа харж, аватараа солино.', category: 'Табууд', icon: '👤' },
 
   // ── Тохиргоо ──
-  { target: '[data-tab="settings"]', title: 'Тоглоом',        text: 'Тоглоомын exe бүртгэх, ZeroTier сүлжээ, апп болон мэдэгдлийн тохиргоо — бүгд энэ табд.', category: 'Тохиргоо', icon: '🎮' },
+  { target: '[data-tab="settings"]', title: 'Тоглоом',        text: 'Тоглоомын exe бүртгэх, Garena сүлжээ сүлжээ, апп болон мэдэгдлийн тохиргоо — бүгд энэ табд.', category: 'Тохиргоо', icon: '🎮' },
   { target: '.banner-actions',       title: 'Найзууд · Чат · Тохиргоо · Гарах', text: 'Баннерын баруун булангийн товчнууд: найзуудын цонх, нийтийн чат/DM, тохиргоо, гарах.', category: 'Тохиргоо', icon: '🔑' },
 ];
 
@@ -4781,12 +4781,19 @@ init();
     // Реклам (сервер /config → ad)
     (async () => {
       try {
-        const ad = await window.api.getAd?.();
+        const ads = await window.api.getAd?.();   // массив
         const slot = document.getElementById('ad-slot');
-        if (!slot || !ad || !(ad.image || ad.text)) return;
+        if (!slot || !Array.isArray(ads) || !ads.length) return;
         slot.classList.add('has-ad');
-        slot.innerHTML = `<a class="ad-link" href="#" title="${escHtml(ad.text || '')}">${ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text)}</span>`}</a>`;
-        slot.querySelector('.ad-link').addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
+        let idx = 0;
+        const show = () => {
+          const ad = ads[idx % ads.length];
+          if (!ad || !(ad.image || ad.text)) return;
+          slot.innerHTML = `<a class="ad-link" href="#" title="${escHtml(ad.text || '')}">${ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text)}</span>`}</a>`;
+          slot.querySelector('.ad-link').addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
+        };
+        show();
+        if (ads.length > 1) setInterval(() => { idx++; show(); }, 8000);   // ~8с тутам эргэлдэнэ
       } catch {}
     })();
   }
@@ -5193,7 +5200,7 @@ init();
     const st = job?.status || null;
     el('bot-host-state').textContent = st ? st.toUpperCase() : 'БЭЛЭН';
     el('bot-host-state').dataset.state = st || 'idle';
-    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Бот тоглоомыг хостолно — ZeroTier хэрэггүй; тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ, ялагч/K/D/A, XP, 💎 автоматаар.' : 'Host "Тоглолт эхлүүлэх" дарахад энд мэдэгдэнэ — дараа нь "WC3 нээж нэгдэх".');
+    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Бот тоглоомыг хостолно — Garena сүлжээ хэрэггүй; тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ, ялагч/K/D/A, XP, 💎 автоматаар.' : 'Host "Тоглолт эхлүүлэх" дарахад энд мэдэгдэнэ — дараа нь "WC3 нээж нэгдэх".');
     const active = st && ['queued', 'hosting', 'lobby', 'started'].includes(st);
     el('btn-bot-host').classList.toggle('hidden', !isHost || active);
     el('bot-host-map').classList.toggle('hidden', !isHost || active);
@@ -5202,7 +5209,7 @@ init();
     const online = (status?.bots || []).length;
     if (isHost && !active) el('btn-bot-host').disabled = !online;
     if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — доорх "Нэмэлт: өөрөө хостлох" замыг ашиглана уу.';
-    // Бот байхгүй үед л ZeroTier замыг дэлгэнэ
+    // Бот байхгүй үед л Garena сүлжээ замыг дэлгэнэ
     const adv = document.getElementById('adv-host');
     if (adv && isHost && !active && !adv.dataset.userToggled) adv.open = !online;
   }
@@ -5246,7 +5253,7 @@ init();
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
       const isZt = /^10\.147\./.test(String(job.host_ip || ''));
-      appendSysMsg(isZt ? '✓ WC3 нээгдэж байна… ZeroTier-ээр ботын тоглоом LAN-д гарна.' : '✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
+      appendSysMsg(isZt ? '✓ WC3 нээгдэж байна… Garena сүлжээгээр ботын тоглоом LAN-д гарна.' : '✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
       // WC3 бүрэн асаж 6112-ыг эзэлтэл хүлээнэ
       let ready = false;
       for (let i = 0; i < 30; i++) {
@@ -5256,7 +5263,7 @@ init();
       if (ready) await new Promise((r) => setTimeout(r, 800));
       if (!bridgeOn) {
         if (isZt) {
-          // ZeroTier хост: 6112-ыг WC3-д БҮРЭН үлдээнэ (bind хийхгүй), зөвхөн SEARCHGAME илгээж
+          // Garena сүлжээ хост: 6112-ыг WC3-д БҮРЭН үлдээнэ (bind хийхгүй), зөвхөн SEARCHGAME илгээж
           // GHost++-ийг GAMEINFO-гоор хариулуулна (Tuguldur-ын ажилладаг зам).
           await window.api.startGameFinder?.(job.host_ip);
         } else {

@@ -2283,10 +2283,11 @@ body.light .profile-avatar-wrap img {
 /* ── Settings tab ──────────────────────────────────── */
 .settings-shell {
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 238px;   /* цэс баруун талд, самбар зүүн талд */
   gap: 14px;
   align-items: start;
 }
+.settings-shell > .settings-menu { grid-column: 2; grid-row: 1; }
 .settings-menu {
   position: sticky;
   top: 0;

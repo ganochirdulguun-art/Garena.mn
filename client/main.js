@@ -797,7 +797,10 @@ ipcMain.handle('ui:mainAction', (_, a) => {
 });
 // Реклам: сервер /config → ad { image, link, text } (env AD_IMAGE_URL / AD_LINK_URL / AD_TEXT)
 ipcMain.handle('config:ad', async () => {
-  try { const { data } = await axios.get(`${SERVER_URL}/config`, { timeout: 8000 }); return data?.ad || null; } catch { return null; }
+  try {
+    const { data } = await axios.get(`${SERVER_URL}/config`, { timeout: 8000 });
+    return data?.ads?.length ? data.ads : (data?.ad ? [data.ad] : []);   // массив (эргэлдэх)
+  } catch { return []; }
 });
 
 ipcMain.handle('dm:isWindowOpen', (_, userId) => {
