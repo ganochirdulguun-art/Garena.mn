@@ -4786,14 +4786,34 @@ init();
         if (!slot || !Array.isArray(ads) || !ads.length) return;
         slot.classList.add('has-ad');
         let idx = 0;
-        const show = () => {
-          const ad = ads[idx % ads.length];
-          if (!ad || !(ad.image || ad.text)) return;
-          slot.innerHTML = `<a class="ad-link" href="#" title="${escHtml(ad.text || '')}">${ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text)}</span>`}</a>`;
-          slot.querySelector('.ad-link').addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
+        const makeLink = (ad) => {
+          const a = document.createElement('a');
+          a.className = 'ad-link';
+          a.href = '#';
+          a.title = ad.text || '';
+          a.innerHTML = ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text || '')}</span>`;
+          a.addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
+          return a;
         };
-        show();
-        if (ads.length > 1) setInterval(() => { idx++; show(); }, 8000);   // ~8с тутам эргэлдэнэ
+        // Эхний реклам
+        let current = makeLink(ads[0]);
+        slot.innerHTML = '';
+        slot.appendChild(current);
+        // Баруунаас зүүн тийш swipe
+        const swipeTo = (ad) => {
+          if (!ad || !(ad.image || ad.text)) return;
+          const next = makeLink(ad);
+          next.style.transform = 'translateX(100%)';   // баруунаас гарч ирнэ
+          slot.appendChild(next);
+          void next.offsetWidth;                        // reflow → transition эхлүүлнэ
+          next.style.transform = 'translateX(0)';
+          current.style.transform = 'translateX(-100%)'; // хуучин нь зүүн тийш гарна
+          const old = current;
+          current = next;
+          setTimeout(() => { old.remove(); }, 650);
+        };
+        if (ads.length > 1) setInterval(() => { idx = (idx + 1) % ads.length; swipeTo(ads[idx]); }, 8000);   // ~8с тутам эргэлдэнэ
+
       } catch {}
     })();
   }

@@ -3950,6 +3950,7 @@ body:not(.light) .maintab.active {
 
 /* ── 1.8.5: толгойн реклам + Найзууд цонхны профайл чип / удирдлага ─────────── */
 .ad-slot {
+  position: relative;
   flex: 1 1 auto; min-width: 0; max-width: 560px; height: 72px; margin-left: auto;
   display: flex; align-items: center; justify-content: center; gap: 10px;
   border: 1px dashed rgba(255, 140, 146, 0.45); border-radius: 10px;
@@ -3958,8 +3959,14 @@ body:not(.light) .maintab.active {
 }
 .ad-slot .ad-label { padding: 2px 8px; border: 1px solid rgba(255, 140, 146, 0.35); border-radius: 999px; font-size: 10px; }
 .ad-slot.has-ad { border-style: solid; background: transparent; text-transform: none; letter-spacing: 0; color: var(--text); }
-.ad-slot .ad-link { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; color: inherit; text-decoration: none; }
-.ad-slot img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.ad-slot .ad-link {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: inherit; text-decoration: none;
+  transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.ad-slot img { width: 100%; height: 100%; object-fit: cover; border-radius: 9px; display: block; }
 .friends-window-header { padding: 10px 12px; }
 .friends-window-header .userchip { width: 100%; justify-content: flex-start; }
 .friends-window-header .userchip #user-name { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
