@@ -150,17 +150,17 @@ ensureGlobalZtNetwork();
 // Глобал тохиргоо (auth шаардахгүй)
 app.get('/config', async (req, res) => {
   const networkId = _globalZtNetwork || await ensureGlobalZtNetwork();
-  // Клиентийн толгойн реклам: env AD_IMAGE_URL / AD_LINK_URL / AD_TEXT-ээр дарж болно.
-  // Тохируулаагүй бол анхдагчаар GarenaSystem-ийн реклам (/assets/garenasystem-ad.png) харуулна.
+  // Клиентийн толгойн реклам: олон реклам эргэлдэнэ (клиент ~8с тутам солино). env AD_IMAGE_URL/
+  // AD_LINK_URL/AD_TEXT-ээр дарж болно; тохируулаагүй бол GarenaSystem-ийн анхдагч рекламууд.
   const adBase = `https://${req.get('host')}`;
-  const ad = (process.env.AD_IMAGE_URL || process.env.AD_TEXT)
-    ? { image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }
-    : {
-        image: `${adBase}/assets/garenasystem-ad.png`,
-        link: process.env.AD_LINK_URL || 'https://tiersystem-production.up.railway.app',
-        text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем',
-      };
-  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version, ad });
+  const gsLink = process.env.AD_LINK_URL || 'https://tiersystem-production.up.railway.app';
+  const ads = (process.env.AD_IMAGE_URL || process.env.AD_TEXT)
+    ? [{ image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
+    : [
+        { image: `${adBase}/assets/gs-ad-1.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
+        { image: `${adBase}/assets/gs-ad-2.png`, link: gsLink, text: 'GarenaSystem — Tier · MMR · Тэмцээн · QPay төлбөр' },
+      ];
+  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version, ad: ads[0], ads });
 });
 
 let dbForMigration;
