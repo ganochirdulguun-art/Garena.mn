@@ -16,7 +16,7 @@ const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.rai
 
 // ── Auto-updater тохиргоо ─────────────────────────────────
 autoUpdater.autoDownload    = true;   // суллагдмагц дэвсгэрт татна
-autoUpdater.autoInstallOnAppQuit = false; // гараар restart хийнэ
+autoUpdater.autoInstallOnAppQuit = true; // апп хаагдах үед татагдсан шинэчлэлт чимээгүй суудаг
 
 autoUpdater.on('update-available',  (info) => {
   mainWindow?.webContents.send('update:available', { version: info.version });
