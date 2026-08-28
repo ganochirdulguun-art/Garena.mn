@@ -1018,6 +1018,9 @@ ipcMain.handle('game:launch', (_, gameType) => {
   if (!fs.existsSync(game.path)) {
     throw new Error(`"${game.name}" файл олдсонгүй: ${game.path}`);
   }
+  // WC3 аль хэдийн ажиллаж байвал 2 дахь instance нээхгүй — эхнийх нь UDP 6112-ыг барьсан тул
+  // 2 дахь цонхны LAN жагсаалт үүрд хоосон харагддаг. Байгаа WC3-ийг ашиглаж exit хяналтыг залгана.
+  if (isWar3Running() === true) { watchWar3Exit(); return true; }
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
@@ -1036,36 +1039,45 @@ ipcMain.handle('game:launch', (_, gameType) => {
 });
 
 let _war3Watch = null;
+// true/false/null — null = tasklist алдаа/timeout ("мэдэгдэхгүй", exited гэж тооцохгүй)
 function isWar3Running() {
   try {
     const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
     return /war3\.exe/i.test(out);
-  } catch { return false; }
+  } catch { return null; }
 }
 // WC3 UDP 6112-г эзэлсэн эсэх — ботын bridge 6112-т bind хийхээсээ ӨМНӨ WC3 эзэлсэн байх ёстой,
 // эс бөгөөс WC3 өөрөө 6112-т bind хийж чадахгүй LAN алдаа гаргадаг (v1.8.8-ийн гаж нөлөө).
 function isUdp6112InUse() {
+  // ЗӨВХӨН war3.exe өөрөө 6112-ыг эзэлсэн үед true — өөр процесс эзэлсэн бол WC3 bind хийж
+  // чадаагүй гэсэн үг (тэр процесс GAMEINFO-г булаадаг) тул "бэлэн" гэж тооцох нь буруу.
   try {
-    const out = execFileSync('netstat', ['-ano', '-p', 'UDP'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
-    return /:6112\b/.test(out);
-  } catch {
-    try {
-      const out2 = execFileSync('netstat', ['-an'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
-      return /UDP[^\n]*:6112\b/i.test(out2);
-    } catch { return false; }
-  }
+    const ns = execFileSync('netstat', ['-ano', '-p', 'UDP'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
+    const pids = new Set();
+    for (const line of ns.split('\n')) {
+      const m = line.match(/^\s*UDP\s+\S+:6112\s+\S+\s+(\d+)\s*$/i);
+      if (m) pids.add(m[1]);
+    }
+    if (!pids.size) return false;
+    const tl = execFileSync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH', '/FO', 'CSV'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    return [...pids].some((pid) => new RegExp(`"war3\\.exe","${pid}"`).test(tl));
+  } catch { return false; }
 }
 ipcMain.handle('wc3:lanReady', () => isUdp6112InUse());
-ipcMain.handle('wc3:running', () => isWar3Running());
+ipcMain.handle('wc3:running', () => isWar3Running() === true);
 function watchWar3Exit() {
   if (_war3Watch) return;
   const startedAt = Date.now();
   let seen = false;
+  let misses = 0;   // дараалсан false тоолуур — tasklist нэг удаа гацахад худал exited гаргахгүй
   _war3Watch = setInterval(() => {
     const running = isWar3Running();
-    if (running) { seen = true; return; }
+    if (running === true) { seen = true; misses = 0; return; }
+    if (running === null) return;   // tasklist алдаа/timeout — exited гэж тооцохгүй, дараагийн шалгалтыг хүлээнэ
     // 15 сек дотор war3.exe огт гарч ирээгүй бол launcher өөрөө хаагдсан гэж үзнэ
     if (!seen && Date.now() - startedAt < 15000) return;
+    misses += 1;
+    if (misses < 2) return;   // 2 дараалсан false (~6с) = жинхэнэ exit
     clearInterval(_war3Watch); _war3Watch = null;
     broadcastToWindows('game:exited');
   }, 3000);

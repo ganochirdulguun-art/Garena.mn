@@ -216,6 +216,16 @@ botRouter.post('/heartbeat', (req, res) => {
 
 botRouter.get('/maps', (_req, res) => res.json(MAPS));
 
+// Ботын идэвхтэй жобуудын серверийн төлөв — bridge үүгээр цуцлалтыг мэдэж GHost-оо зогсооно
+botRouter.get('/jobs/status', async (req, res) => {
+  const ids = String(req.query.ids || '').split(',').map((s) => parseInt(s, 10)).filter(Number.isFinite).slice(0, 50);
+  if (!ids.length) return res.json({ jobs: [] });
+  try {
+    const r = await db.query('SELECT id, status FROM bot_jobs WHERE id = ANY($1::int[])', [ids]);
+    return res.json({ jobs: r.rows });
+  } catch (e) { console.error(e); return res.status(500).json({ error: 'Server error' }); }
+});
+
 // Дараагийн ажлыг атомаар авна (queued → hosting)
 botRouter.get('/jobs/next', async (req, res) => {
   const name = String(req.query.bot || 'bot').slice(0, 64);
@@ -253,12 +263,15 @@ botRouter.post('/jobs/:id/lobby', async (req, res) => {
   if (!host_ip || !host_port || !gameinfo_b64) return res.status(400).json({ error: 'host_ip, host_port, gameinfo_b64 required' });
   if (String(gameinfo_b64).length > 4096) return res.status(400).json({ error: 'gameinfo too large' });
   try {
+    // Зөвхөн hosting/lobby төлөвт хүлээн авна — цуцлагдсан/дууссан жобын хоцорсон POST
+    // host_ip-г дарж бичээд хэрэглэгчдэд худал "тоглоом нээлээ" событ цацдаг байсныг хаав
     const r = await db.query(
-      `UPDATE bot_jobs SET status = CASE WHEN status IN ('hosting','lobby') THEN 'lobby' ELSE status END,
+      `UPDATE bot_jobs SET status = 'lobby',
          host_ip = $1, host_port = $2, gameinfo_b64 = $3, game_name = COALESCE($4, game_name), updated_at = NOW()
-       WHERE id = $5 RETURNING *`,
+       WHERE id = $5 AND status IN ('hosting','lobby') RETURNING *`,
       [String(host_ip).slice(0, 64), Number(host_port), String(gameinfo_b64), game_name ? sanitizeGameName(game_name) : null, job.id]
     );
+    if (!r.rows[0]) return res.status(409).json({ error: `job is '${job.status}', not hosting/lobby` });
     const pub = await jobToPublic(r.rows[0]);
     emitRoom(job.room_id, 'room:bot_lobby', pub);
     return res.json({ ok: true, job: pub });

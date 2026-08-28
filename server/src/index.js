@@ -798,6 +798,7 @@ io.on('connection', (socket) => {
                 [userId, roomId]
               );
               if (rr.rows[0]) {
+                await dbForMigration.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [roomId]).catch(() => {});
                 await dbForMigration.query('DELETE FROM rooms WHERE id=$1', [roomId]);
                 io.to(roomId).emit('room:closed', { reason: 'Өрөөний эзэн гарлаа' });
                 cleanupRoomState(roomId);
@@ -837,6 +838,7 @@ const autoExpireInterval = setInterval(async () => {
     );
     for (const row of oldWaiting.rows) {
       if (roomHasActiveMembers(row.id)) continue;
+      await dbForMigration.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [row.id]).catch(() => {});
       await dbForMigration.query('DELETE FROM rooms WHERE id=$1', [row.id]);
       io.to(String(row.id)).emit('room:closed', { reason: 'Өрөө удаан идэвхгүй байсан тул хаагдлаа' });
       cleanupRoomState(row.id);
@@ -853,6 +855,7 @@ const autoExpireInterval = setInterval(async () => {
       if (roomHasActiveMembers(row.id)) {
         await dbForMigration.query("UPDATE rooms SET status='waiting' WHERE id=$1", [row.id]);
       } else {
+        await dbForMigration.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [row.id]).catch(() => {});
         await dbForMigration.query('DELETE FROM rooms WHERE id=$1', [row.id]);
         io.to(String(row.id)).emit('room:closed', { reason: 'Өрөө удаан идэвхгүй байсан тул хаагдлаа' });
         cleanupRoomState(row.id);

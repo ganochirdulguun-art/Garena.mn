@@ -268,6 +268,8 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [oldId, userId]);
         const oldRoom = await db.query('SELECT host_id, zerotier_network_id FROM rooms WHERE id = $1', [oldId]);
         if (String(oldRoom.rows[0]?.host_id) === String(userId)) {
+          // Идэвхтэй бот-жобыг цуцална — эс бөгөөс room устахад FK SET NULL-аар өнчирч GHost "сүнс" lobby үлддэг
+          await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [oldId]).catch(() => {});
           await db.query('DELETE FROM rooms WHERE id = $1', [oldId]);
           if (_io) _io.to(String(oldId)).emit('room:closed', { reason: 'Host left the room' });
           cleanupRoom(oldId);
@@ -328,6 +330,7 @@ router.post('/:id/leave', strictAuth, async (req, res) => {
       await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [id, userId]);
       const result = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
       if (result.rows[0] && String(result.rows[0].host_id) === String(userId)) {
+        await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [id]).catch(() => {});
         await db.query('DELETE FROM rooms WHERE id = $1', [id]);
         if (_io) _io.to(id).emit('room:closed', { reason: 'Host left the room' });
         cleanupRoom(id);
@@ -370,6 +373,7 @@ router.delete('/:id', strictAuth, async (req, res) => {
         return res.status(403).json({ error: 'Only the host can close the room' });
       }
 
+      await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [id]).catch(() => {});
       await db.query('DELETE FROM rooms WHERE id = $1', [id]);
       if (_io) _io.to(id).emit('room:closed', { reason: 'Host closed the room' });
       cleanupRoom(id);

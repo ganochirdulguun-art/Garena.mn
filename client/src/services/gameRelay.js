@@ -172,6 +172,7 @@ function addHostPlayerIp(ip) {
 // ═══════════════════════════════════════════════════════════
 function startFinder(hostIp) {
   stopFinder();
+  stopBotBridge();   // өмнөх non-ZT оролдлогын 6112 socket үлдэж GAMEINFO булаахаас сэргийлнэ (симметр cleanup)
   if (!hostIp) {
     console.log('[GameRelay:Finder] Host IP байхгүй');
     return;

@@ -173,21 +173,28 @@ function handleLogText(state, text) {
 const ZT_SELF = CFG.ZT_HOST_IP || '';
 const ZT_BC = ZT_SELF.replace(/\.\d+$/, '.255') || null;
 const ZT_MEMBERS = new Set();   // ZeroTier гишүүдийн IP (unicast илгээхэд — broadcast-аас найдвартай)
-let lastGameInfo = null;        // сүүлийн GAMEINFO cache (SEARCHGAME-д шууд хариулах + давтан цацах)
-let lastGameInfoAt = 0;         // хамгийн сүүлд GHost-оос GAMEINFO ирсэн хугацаа (хуучин тоглоом цацахаас сэргийлнэ)
+const GI_CACHE = new Map();     // port -> {buf, at} — идэвхтэй lobby бүрийн сүүлийн GAMEINFO (MAX_GAMES=2 зэрэгцээ lobby дэмжинэ)
+const GI_FRESH_MS = 8000;       // GHost 8с чимээгүй бол lobby үхсэн гэж үзнэ — хуучирсан cache-аар хариулах/цацахгүй
 const udp = dgram.createSocket({ type: 'udp4', reuseAddr: true });
 udp.on('message', (msg, rinfo) => {
   const src = rinfo && rinfo.address;
   const isMember = src && src.indexOf('10.147.99.') === 0 && src !== ZT_SELF;
   if (isMember) ZT_MEMBERS.add(src);   // тоглогчийн ZeroTier IP-г цээжлэх
-  // WC3 finder-ийн SEARCHGAME (0xF7 0x2F) → cached GAMEINFO-г шууд unicast reply (host эмуляц — хамгийн найдвартай)
+  // WC3 finder-ийн SEARCHGAME (0xF7 0x2F) → шинэхэн lobby бүрийн GAMEINFO-г шууд unicast reply (host эмуляц)
   if (msg.length >= 2 && msg[0] === 0xF7 && msg[1] === 0x2F) {
-    if (isMember && lastGameInfo) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, src); } catch {} }
+    if (isMember) {
+      const now = Date.now();
+      for (const [p, e] of GI_CACHE) {
+        if (now - e.at > GI_FRESH_MS) { GI_CACHE.delete(p); continue; }   // үхсэн lobby-гоор хариулахгүй
+        try { udp.send(e.buf, 0, e.buf.length, 6112, src); } catch {}
+        // клиентийн finder санамсаргүй порттой socket-оороо хувилбар илрүүлдэг → мөн тийш нь давхар
+        if (rinfo.port !== 6112) { try { udp.send(e.buf, 0, e.buf.length, rinfo.port, src); } catch {} }
+      }
+    }
     return;
   }
   if (msg.length < 24 || msg[0] !== 0xF7 || msg[1] !== 0x30) return;
   if (rinfo && rinfo.port === 6112) return;   // өөрийн дахин broadcast-ийн echo — алгасна (давталтаас сэргийлнэ)
-  lastGameInfo = Buffer.from(msg); lastGameInfoAt = Date.now();   // GAMEINFO-г cache (reply + давтан цацах)
   if (ZT_BC) { try { udp.send(msg, 0, msg.length, 6112, ZT_BC); } catch {} }   // эх порт 6112-оос broadcast
   for (const ip of ZT_MEMBERS) { try { udp.send(msg, 0, msg.length, 6112, ip); } catch {} }   // + гишүүн бүрт unicast
   // F7 30 len(2) product(4) version(4) hostcounter(4) entrykey(4) gamename\0 ... port(2)
@@ -195,6 +202,7 @@ udp.on('message', (msg, rinfo) => {
   if (end < 0) return;
   const gameName = msg.toString('latin1', 20, end);
   const port = msg.readUInt16LE(msg.length - 2);
+  GI_CACHE.set(port, { buf: Buffer.from(msg), at: Date.now() });   // давтан цацалт + SEARCHGAME reply-д
   for (const state of jobs.values()) {
     if (state.finished || state.started) continue;
     // Порт = найдвартай түлхүүр. Нэрээр таарах нь 2 зэрэг тоглоомын хооронд андуурч болзошгүй тул хассан.
@@ -229,9 +237,12 @@ udp.bind(6112, '0.0.0.0', () => { try { udp.setBroadcast(true); } catch {} log('
 // broadcast хийдэг тул WC3 жагсаалтад тоглоом хурдан гарч, тогтвортой байхын тулд. GHost зогсоод
 // 8с болвол (тоглоом дууссан/эхэлсэн) цацахаа болино — хуучин тоглоом харуулахаас сэргийлнэ.
 setInterval(() => {
-  if (!lastGameInfo || Date.now() - lastGameInfoAt > 8000) return;
-  if (ZT_BC) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, ZT_BC); } catch {} }
-  for (const ip of ZT_MEMBERS) { try { udp.send(lastGameInfo, 0, lastGameInfo.length, 6112, ip); } catch {} }
+  const now = Date.now();
+  for (const [p, e] of GI_CACHE) {
+    if (now - e.at > GI_FRESH_MS) { GI_CACHE.delete(p); continue; }
+    if (ZT_BC) { try { udp.send(e.buf, 0, e.buf.length, 6112, ZT_BC); } catch {} }
+    for (const ip of ZT_MEMBERS) { try { udp.send(e.buf, 0, e.buf.length, 6112, ip); } catch {} }
+  }
 }, 1500);
 
 // ── Дүн: sqlite → платформ ───────────────────────────────
@@ -280,6 +291,7 @@ async function finalize(state, why) {
   state.finished = true;
   jobs.delete(state.job.id);
   killProc(state.proc);
+  GI_CACHE.delete(state.port);   // энэ lobby-гийн GAMEINFO-г цацахаа болино
   if (!state.started) {
     return fail(state, state.lobbyPosted ? `lobby дууссан (${why})` : `хостолж чадсангүй (${why}): ${state.stdout.slice(-400)}`);
   }
@@ -310,6 +322,7 @@ async function fail(state, error) {
   state.finished = true;
   jobs.delete(state.job.id);
   killProc(state.proc);
+  GI_CACHE.delete(state.port);
   try { await api('POST', `/bot/jobs/${state.job.id}/failed`, { error: String(error).slice(0, 500) }); } catch (e) { log('failed POST алдаа', e.message); }
   log(`[job ${state.job.id}] FAILED: ${error}`);
 }
@@ -325,6 +338,23 @@ async function poll() {
     pollLogFile(st);
     if (!st.started && Date.now() - st.createdAt > CFG.LOBBY_TIMEOUT_MS) finalize(st, 'lobby timeout');
     else if (st.started && !st.finished && Date.now() - st.createdAt > MAX_GAME_MS) finalize(st, 'тоглоомын хугацаа хэтэрсэн (>4ц)');
+  }
+  // Сервер дээр цуцлагдсан жобыг илрүүлж GHost-ыг зогсооно — өрөө устсан/host цуцалсан үед
+  // "сүнс" lobby 30 мин LAN-д амьд үлддэг байсныг засна (/failed илгээхгүй, сервер аль хэдийн мэднэ)
+  if (jobs.size) {
+    try {
+      const ids = [...jobs.keys()].join(',');
+      const st = await api('GET', `/bot/jobs/status?ids=${ids}`);
+      if (st && Array.isArray(st.jobs)) {
+        for (const j of st.jobs) {
+          const state = jobs.get(j.id) || jobs.get(Number(j.id));
+          if (state && !state.finished && ['cancelled', 'failed'].includes(j.status)) {
+            log(`[job ${j.id}] сервер '${j.status}' болгосон → GHost зогсоож байна`);
+            state.finished = true; jobs.delete(state.job.id); killProc(state.proc); GI_CACHE.delete(state.port);
+          }
+        }
+      }
+    } catch {}
   }
   if (jobs.size >= CFG.MAX_GAMES) return;
   try {
