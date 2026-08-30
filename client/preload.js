@@ -54,17 +54,9 @@ contextBridge.exposeInMainWorld('api', {
   selectGameExe:         () => ipcRenderer.invoke('settings:selectGameExe'),
   addGame:               (data) => ipcRenderer.invoke('settings:addGame', data),
   removeGame:            (id)   => ipcRenderer.invoke('settings:removeGame', id),
-  setZerotierNetwork:    (id)   => ipcRenderer.invoke('settings:setZerotierNetwork', id),
 
   // Firewall + сүлжээ тохиргоо
   setupFirewall:     ()          => ipcRenderer.invoke('firewall:setup'),
-
-  // ZeroTier статус
-  getZerotierStatus: (networkId) => ipcRenderer.invoke('zt:status', networkId),
-  getZerotierIp:     (networkId) => ipcRenderer.invoke('zt:ip', networkId),
-  getZerotierNodeId: ()          => ipcRenderer.invoke('zt:nodeId'),
-  refreshZerotier:   ()          => ipcRenderer.invoke('zt:refresh'),
-  downloadZerotier:  ()          => ipcRenderer.invoke('zt:download'),
 
   // Game Relay — Host: capture+forward, Player: search+rebroadcast
   startHostRelay:  (playerIps) => ipcRenderer.invoke('relay:startHost', playerIps),
@@ -139,9 +131,6 @@ contextBridge.exposeInMainWorld('api', {
   editStreamer:    (id, data) => ipcRenderer.invoke('streamers:edit', id, data),
   deleteStreamer:  (id)       => ipcRenderer.invoke('streamers:delete', id),
   openStreamerUrl: (url)      => ipcRenderer.invoke('streamers:openUrl', url),
-
-  // ZeroTier автомат тохиргоо
-  onZtSetupComplete: (cb) => ipcRenderer.on('zt:setup-complete', (_, result) => cb(result)),
 
   // Auto-update
   onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_, info) => cb(info)),

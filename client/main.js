@@ -8,7 +8,7 @@ const { autoUpdater } = require('electron-updater');
 const axios = require('axios');
 const authService = require('./src/services/auth');
 const replayService = require('./src/services/replay');
-const zerotierService = require('./src/services/zerotier');
+const firewallService = require('./src/services/firewall');
 const apiService = require('./src/services/api');
 const gameRelayService = require('./src/services/gameRelay');
 
@@ -35,7 +35,6 @@ autoUpdater.on('error', (err) => {
 let mainWindow;
 let roomWindow = null;
 const dmWindows = new Map(); // userId -> BrowserWindow
-let _ztSetupPromise = null;
 
 // Event-ийг бүх цонх руу илгээх — өрөөний цонх тусдаа BrowserWindow тул
 // зөвхөн mainWindow руу илгээвэл өрөөний logic (currentRoom) хүлээж авдаггүй
@@ -86,34 +85,7 @@ if (!gotLock) {
   app.quit();
 }
 
-// ── ZeroTier автомат суулгалт & тохиргоо ─────────────────
-async function initZeroTier() {
-  try {
-    // 1. Серверээс глобал network ID авах
-    const { data } = await axios.get(`${SERVER_URL}/config`);
-    const networkId = data?.zerotierNetworkId;
-    if (!networkId) {
-      console.warn('[ZT] Серверт глобал network тохируулаагүй байна');
-      mainWindow?.webContents.send('zt:setup-complete', { ok: false, error: 'no-network-id' });
-      return;
-    }
-
-    // 2. Апп эхлэхэд ZeroTier-г суулгах/асаах/join хийх/Firewall тохируулах.
-    // Windows өөрөө UAC prompt харуулна; зөвшөөрвөл дараагийн launch-ууд promptгүй өнгөрнө.
-    console.log('[ZT] Auto setup шалгаж байна... Network:', networkId);
-    const result = await setupZerotierNetwork(networkId);
-    console.log('[ZT] Auto setup result:', result);
-
-    // 3. Settings-д хадгалах
-    writeSettings({ zerotierNetworkId: networkId });
-
-    // 4. Renderer-д мэдэгдэх
-    mainWindow?.webContents.send('zt:setup-complete', result);
-  } catch (e) {
-    console.error('[ZT] Автомат тохиргоо алдаа:', e.message);
-    mainWindow?.webContents.send('zt:setup-complete', { ok: false, error: e.message });
-  }
-}
+// (ZeroTier бүрэн хасагдсан 2026-08-30 — бот-хост public IP тунел ашигладаг)
 
 app.whenReady().then(() => {
   createWindow();
@@ -126,9 +98,6 @@ app.whenReady().then(() => {
   if (app.isPackaged) {
     setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
   }
-
-  // Startup дээр зөвхөн existing ZeroTier-ийг шалгана. Privileged setup нь user action-аар хийгдэнэ.
-  setTimeout(() => initZeroTier(), 3000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -432,12 +401,6 @@ ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, pas
   try {
     room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode, background_url });
   } catch (err) { throw apiError(err); }
-  // ZeroTier — server-аас автоматаар үүссэн network ID ашиглана
-  try {
-    if (room?.zerotier_network_id) {
-      await setupZerotierNetwork(room.zerotier_network_id);
-    }
-  } catch {}
   try { replayService.startWatcher(room.id); } catch {}
   return room;
 });
@@ -445,16 +408,6 @@ ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, pas
 ipcMain.handle('rooms:join', async (event, roomId, password) => {
   try {
     const result = await apiService.joinRoom(roomId, password);
-    let ztJoined = false;
-    if (result?.room?.zerotier_network_id) {
-      try {
-        const setup = await setupZerotierNetwork(result.room.zerotier_network_id);
-        ztJoined = !!setup?.ok;
-      } catch (e) {
-        console.warn('[ZT] join failed:', e.message);
-      }
-    }
-    result.ztJoined = ztJoined;
     try { replayService.startWatcher(roomId); } catch {}
     return result;
   } catch (err) { throw apiError(err); }
@@ -600,15 +553,6 @@ function configuredGamePaths() {
     .filter((p) => typeof p === 'string' && p.trim());
 }
 
-async function setupZerotierNetwork(networkId) {
-  if (!networkId) return { ok: false, error: 'no-network-id' };
-  if (_ztSetupPromise) return _ztSetupPromise;
-  _ztSetupPromise = zerotierService
-    .autoSetup(networkId, configuredGamePaths())
-    .finally(() => { _ztSetupPromise = null; });
-  return _ztSetupPromise;
-}
-
 ipcMain.handle('settings:get', () => {
   const s = readSettings();
   return migrateSettings(s);
@@ -625,12 +569,6 @@ ipcMain.handle('settings:selectGameExe', async () => {
   const filePath = result.filePaths[0];
   const suggestedName = path.basename(filePath, path.extname(filePath));
   return { path: filePath, suggestedName };
-});
-
-// ZeroTier Network ID хадгалах
-ipcMain.handle('settings:setZerotierNetwork', (_, networkId) => {
-  writeSettings({ zerotierNetworkId: networkId || '' });
-  return true;
 });
 
 // Тоглоом нэмэх
@@ -684,7 +622,6 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
       isHost:  roomData.isHost ? '1' : '0',
       hostId:  String(roomData.hostId || ''),
       status:  roomData.status || '',
-      ztNetId: roomData.zerotierNetworkId || '',
       maxPlayers: String(roomData.maxPlayers || roomData.max_players || ''),
       backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
     },
@@ -930,36 +867,11 @@ ipcMain.handle('streamers:openUrl', async (_, url) => {
   }
 });
 
-// ZeroTier статус & IP
-ipcMain.handle('zt:status', (_, networkId) => zerotierService.getStatus(networkId));
-ipcMain.handle('zt:ip',     (_, networkId) => zerotierService.getMyIp(networkId));
-ipcMain.handle('zt:nodeId', ()             => zerotierService.getNodeId());
-ipcMain.handle('zt:refresh', async () => {
-  // Settings-аас network ID авах, эсвэл серверээс
-  const s = migrateSettings(readSettings());
-  let networkId = s.zerotierNetworkId;
-  if (!networkId) {
-    try {
-      const { data } = await axios.get(`${SERVER_URL}/config`);
-      networkId = data?.zerotierNetworkId;
-    } catch {}
-  }
-  if (!networkId) return { ok: false, error: 'no-network-id', installed: false, running: false, ip: null, nodeId: null };
-  const result = await setupZerotierNetwork(networkId);
-  const nodeId = zerotierService.getNodeId();
-  return { ...result, nodeId, networkId };
-});
-
-ipcMain.handle('zt:download', async () => {
-  await shell.openExternal('https://www.zerotier.com/download/');
-  return true;
-});
-
-// Firewall + сүлжээ тохиргоо (тусдаа товчноос)
+// Firewall + сүлжээ тохиргоо (тусдаа товчноос) — ZeroTier хасагдсан, зөвхөн галт хана
 ipcMain.handle('firewall:setup', async () => {
   const s = migrateSettings(readSettings());
   const gamePaths = (s.games || []).map(g => g.path).filter(p => p);
-  const result = zerotierService.elevatedNetworkSetup(gamePaths, true);
+  const result = firewallService.elevatedNetworkSetup(gamePaths, true);
   return result;
 });
 

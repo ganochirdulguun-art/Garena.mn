@@ -8,7 +8,6 @@ const strictAuth = auth;
 let db;
 try { db = require('../config/db'); } catch { db = null; }
 
-const zt = require('../services/zerotier');
 const allowInMemoryFallback = process.env.NODE_ENV !== 'production';
 const router = express.Router();
 
@@ -24,25 +23,6 @@ async function dbOk() {
 
 function requireOperationalDb(res) {
   return res.status(503).json({ error: 'Service temporarily unavailable' });
-}
-
-async function ztCreateNetwork(roomName) {
-  if (!zt.configured()) return null;
-  try {
-    return await zt.createNetwork(`WC3-${roomName}`);
-  } catch (e) {
-    console.error('[ZeroTier] create network:', e.message);
-    return null;
-  }
-}
-
-async function ztDeleteNetwork(networkId) {
-  if (!zt.configured() || !networkId) return;
-  try {
-    await zt.deleteNetwork(networkId);
-  } catch (e) {
-    console.error('[ZeroTier] delete network:', e.message);
-  }
 }
 
 const memRooms = new Map();
@@ -200,12 +180,6 @@ router.post('/', strictAuth, async (req, res) => {
       const room = result.rows[0];
       await db.query('INSERT INTO room_players (room_id, user_id) VALUES ($1, $2)', [room.id, userId]);
 
-      const ztNetId = process.env.ZEROTIER_DEFAULT_NETWORK || null;
-      if (ztNetId) {
-        await db.query('UPDATE rooms SET zerotier_network_id = $1 WHERE id = $2', [ztNetId, room.id]);
-        room.zerotier_network_id = ztNetId;
-      }
-
       emitRoomsUpdated();
       return res.status(201).json({
         ...room,
@@ -232,7 +206,7 @@ router.post('/', strictAuth, async (req, res) => {
     status: 'waiting',
     has_password: hasPassword,
     password_hash: passwordHash,
-    zerotier_network_id: process.env.ZEROTIER_DEFAULT_NETWORK || null,
+    zerotier_network_id: null,
     description: descTrimmed,
     game_mode: game_mode || '',
     background_url: bgUrl,
@@ -266,16 +240,13 @@ router.post('/:id/join', strictAuth, async (req, res) => {
 
         const oldId = already.rows[0].id;
         await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [oldId, userId]);
-        const oldRoom = await db.query('SELECT host_id, zerotier_network_id FROM rooms WHERE id = $1', [oldId]);
+        const oldRoom = await db.query('SELECT host_id FROM rooms WHERE id = $1', [oldId]);
         if (String(oldRoom.rows[0]?.host_id) === String(userId)) {
           // Идэвхтэй бот-жобыг цуцална — эс бөгөөс room устахад FK SET NULL-аар өнчирч GHost "сүнс" lobby үлддэг
           await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [oldId]).catch(() => {});
           await db.query('DELETE FROM rooms WHERE id = $1', [oldId]);
           if (_io) _io.to(String(oldId)).emit('room:closed', { reason: 'Host left the room' });
           cleanupRoom(oldId);
-          if (oldRoom.rows[0]?.zerotier_network_id && !process.env.ZEROTIER_DEFAULT_NETWORK) {
-            await ztDeleteNetwork(oldRoom.rows[0].zerotier_network_id);
-          }
         }
         emitRoomsUpdated();
       }
@@ -334,9 +305,6 @@ router.post('/:id/leave', strictAuth, async (req, res) => {
         await db.query('DELETE FROM rooms WHERE id = $1', [id]);
         if (_io) _io.to(id).emit('room:closed', { reason: 'Host left the room' });
         cleanupRoom(id);
-        if (result.rows[0].zerotier_network_id && !process.env.ZEROTIER_DEFAULT_NETWORK) {
-          await ztDeleteNetwork(result.rows[0].zerotier_network_id);
-        }
         emitRoomsUpdated();
         return res.json({ message: 'Room deleted' });
       }
@@ -367,7 +335,7 @@ router.delete('/:id', strictAuth, async (req, res) => {
 
   if (await dbOk()) {
     try {
-      const result = await db.query('SELECT host_id, zerotier_network_id FROM rooms WHERE id = $1', [id]);
+      const result = await db.query('SELECT host_id FROM rooms WHERE id = $1', [id]);
       if (!result.rows[0]) return res.status(404).json({ error: 'Room not found' });
       if (String(result.rows[0].host_id) !== String(userId)) {
         return res.status(403).json({ error: 'Only the host can close the room' });
@@ -377,9 +345,6 @@ router.delete('/:id', strictAuth, async (req, res) => {
       await db.query('DELETE FROM rooms WHERE id = $1', [id]);
       if (_io) _io.to(id).emit('room:closed', { reason: 'Host closed the room' });
       cleanupRoom(id);
-      if (result.rows[0].zerotier_network_id && !process.env.ZEROTIER_DEFAULT_NETWORK) {
-        await ztDeleteNetwork(result.rows[0].zerotier_network_id);
-      }
       emitRoomsUpdated();
       return res.json({ message: 'Room closed' });
     } catch (e) {
@@ -630,10 +595,9 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
       }
 
       const qname = `Quick Match #${Math.floor(Math.random() * 9000) + 1000}`;
-      const ztNetId = process.env.ZEROTIER_DEFAULT_NETWORK || null;
       const result = await db.query(
-        'INSERT INTO rooms (name, host_id, max_players, game_type, has_password, zerotier_network_id) VALUES ($1, $2, 10, $3, FALSE, $4) RETURNING *',
-        [qname, userId, game_type, ztNetId]
+        'INSERT INTO rooms (name, host_id, max_players, game_type, has_password) VALUES ($1, $2, 10, $3, FALSE) RETURNING *',
+        [qname, userId, game_type]
       );
       const room = result.rows[0];
       await db.query('INSERT INTO room_players (room_id, user_id) VALUES ($1, $2)', [room.id, userId]);
@@ -650,27 +614,6 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
 
   return requireOperationalDb(res);
 });
-
-async function getRoomNetworkId(roomId) {
-  if (!roomId) return null;
-
-  if (await dbOk()) {
-    try {
-      const result = await db.query(
-        "SELECT zerotier_network_id FROM rooms WHERE id = $1 AND status IN ('waiting', 'playing')",
-        [roomId]
-      );
-      return result.rows[0]?.zerotier_network_id || null;
-    } catch (e) {
-      console.error('[RoomNetwork]', e.message);
-      return null;
-    }
-  }
-
-  if (!allowInMemoryFallback) return null;
-  const room = memRooms.get(String(roomId)) || memRooms.get(roomId);
-  return room?.zerotier_network_id || null;
-}
 
 router.patch('/:id/team', strictAuth, async (req, res) => {
   const { id } = req.params;
@@ -738,4 +681,3 @@ module.exports.setIO = setIO;
 module.exports.setRoomCleanup = setRoomCleanup;
 module.exports.memRooms = memRooms;
 module.exports.isUserInRoom = isUserInRoom;
-module.exports.getRoomNetworkId = getRoomNetworkId;

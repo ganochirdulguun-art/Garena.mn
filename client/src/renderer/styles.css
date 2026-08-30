@@ -1967,8 +1967,6 @@ body.light .profile-avatar-wrap img {
   background: rgba(67,181,129,0.1);
 }
 .member-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.member-zt-ip { font-size: 0.7rem; color: var(--accent); opacity: 0.8; font-family: monospace; }
-.zt-settings-row { display: flex; align-items: center; gap: 16px; }
 .max-players-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .max-players-row label { margin-bottom: 0; }
 .select-sm { padding: 3px 8px; font-size: 0.82rem; border-radius: 6px; background: var(--bg2); color: var(--text1); border: 1px solid var(--bg3); }
@@ -3979,12 +3977,6 @@ body:not(.light) .maintab.active {
 
 /* ── 1.8.6: бот хост = үндсэн зам; ZeroTier хост = "Нэмэлт" details ─────── */
 .bot-host-actions .btn-block { flex: 1 1 100%; }
-.adv-host { margin-top: 10px; border: 1px dashed rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 6px 10px; }
-.adv-host summary { cursor: pointer; font-size: 0.78rem; color: var(--text2); letter-spacing: 0.03em; user-select: none; }
-.adv-host summary:hover { color: var(--text); }
-.adv-host[open] summary { margin-bottom: 6px; }
-.adv-host .hint { margin: 0 0 8px; font-size: 0.74rem; line-height: 1.4; }
-.adv-host .btn { width: 100%; }
 .room-action-row > .btn { flex: 1 1 auto; }
 /* QPay лого (гэрээ §5.5.4 — төлбөрийн хуудсанд QPay лого) */
 .pay-qpay-logo { display: block; width: 96px; height: auto; margin: 2px auto 8px; filter: drop-shadow(0 1px 4px rgba(0,0,0,0.35)); }

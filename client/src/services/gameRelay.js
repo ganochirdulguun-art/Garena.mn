@@ -29,20 +29,17 @@ function bblog(msg) {
   if (_BB_LOG) { try { fs.appendFileSync(_BB_LOG, line + '\n'); } catch {} }
 }
 // WC3 руу GAMEINFO илгээхэд эх порт 6112 хэрэгтэй бөгөөд WC3 (0.0.0.0:6112)-той мөргөлдөхгүйн тулд
-// ТОДОРХОЙ IP (ZeroTier эсвэл LAN):6112-т bind хийнэ. Ингэвэл 127.0.0.1 руу илгээсэн пакетыг WC3
-// (wildcard) хүлээж авна, bridge өөрөө биш.
+// ТОДОРХОЙ LAN IP:6112-т bind хийнэ. Ингэвэл 127.0.0.1 руу илгээсэн пакетыг WC3
+// (wildcard) хүлээж авна, bridge өөрөө биш. (ZeroTier хасагдсан 2026-08-30)
 function _localBindIp() {
   const ifs = os.networkInterfaces();
-  let zt = null, lan = null;
+  let lan = null;
   for (const name of Object.keys(ifs)) {
     for (const a of (ifs[name] || [])) {
-      if (a.family === 'IPv4' && !a.internal) {
-        if (/^10\.147\./.test(a.address) || /zerotier/i.test(name)) { if (!zt) zt = a.address; }
-        else if (!lan) lan = a.address;
-      }
+      if (a.family === 'IPv4' && !a.internal && !lan) lan = a.address;
     }
   }
-  return zt || lan || null;
+  return lan || null;
 }
 
 const WC3_PORT = 6112;

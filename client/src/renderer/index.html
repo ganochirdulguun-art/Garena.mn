@@ -715,26 +715,6 @@
 
           <section id="settings-panel-network" class="settings-panel" role="tabpanel" data-settings-panel="network" aria-hidden="true">
             <div class="card settings-card">
-              <h3>Garena сүлжээ сүлжээ</h3>
-              <div class="zt-settings-row">
-                <span class="hint hint-no-margin">IP хаяг: <strong id="settings-zt-ip">---</strong></span>
-                <span class="hint hint-no-margin" id="settings-zt-status"></span>
-              </div>
-              <p class="hint mt-8" id="zt-refresh-msg" style="font-family:monospace;font-size:0.78rem"></p>
-              <div class="settings-actions">
-                <button type="button" id="btn-zt-refresh" class="btn btn-primary btn-with-icon">
-                  <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  Холболт шалгах
-                </button>
-                <button type="button" id="btn-zt-download" class="btn btn-secondary btn-with-icon">
-                  <svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Сүлжээ суулгах
-                </button>
-              </div>
-              <p class="hint mt-4" style="font-size:0.75rem;color:var(--text2)">Апп VPN драйвер суулгахгүй. Garena сүлжээг албан ёсны сайтаас суулгаад холболтоо шалгана.</p>
-            </div>
-
-            <div class="card settings-card">
               <h3>LAN / Firewall</h3>
               <p class="hint">Тоглоом LAN-д харагдахгүй үед Windows firewall-ийн зөвшөөрлийг тохируулна.</p>
               <div id="firewall-status" class="hint mt-4" style="font-family:monospace;font-size:0.78rem"></div>
@@ -990,15 +970,6 @@
             </div>
             <div id="bot-host-result" class="bot-host-result hidden"></div>
           </div>
-          <!-- НЭМЭЛТ: тоглогч өөрөө хостлох (Garena сүлжээ виртуал LAN) — бот байхгүй үед эсвэл өөрийн map-аар -->
-          <details id="adv-host" class="adv-host">
-            <summary>Нэмэлт: өөрөө хостлох (Garena сүлжээ)</summary>
-            <p class="hint">Host өөрийн WC3-оор тоглоом нээж, бусад нь Garena сүлжээ виртуал LAN-аар орно. Бүх тоглогчид Garena сүлжээ суулгасан байх ёстой (Тохиргоо → Сүлжээ). Ботгүй үед эсвэл өөрийн map-аар тоглоход ашиглана.</p>
-            <button type="button" id="btn-launch-wc3" class="btn btn-secondary btn-block btn-with-icon" title="Өөрөө хостлох (Garena сүлжээ)">
-              <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
-              <span>Эхлүүлэх</span>
-            </button>
-          </details>
           <div class="room-action-row">
             <button type="button" id="btn-close-room" class="btn btn-danger btn-block btn-with-icon" title="Өрөөг хаах">
               <svg class="btn-icon-svg"><use href="#ico-close"/></svg>

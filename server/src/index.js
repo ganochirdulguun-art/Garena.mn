@@ -23,8 +23,7 @@ const adminRoutes         = require('./routes/admin');
 const warkeyRoutes        = require('./routes/warkey');
 const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
-const zt                  = require('./services/zerotier');
-const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)   // ZeroTier: өөрийн controller ЭСВЭЛ Central
+const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
@@ -108,48 +107,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Garena.mn Server ажиллаж байна' });
 });
 
-// ── Глобал ZeroTier сүлжээ автомат үүсгэх ────────────────
-let _globalZtNetwork = process.env.ZEROTIER_DEFAULT_NETWORK || null;
-let _globalZtNetworkHardened = false;
-
-async function hardenGlobalZtNetwork(networkId) {
-  if (_globalZtNetworkHardened || !networkId || !zt.configured()) return;
-  try {
-    await zt.hardenNetwork(networkId);
-    _globalZtNetworkHardened = true;
-    console.log(`[ZeroTier] (${zt.mode()}) Глобал network private болгож баталгаажууллаа: ${networkId}`);
-  } catch (e) {
-    console.error('[ZeroTier] Глобал network private болгоход алдаа:', e.message);
-  }
-}
-
-async function ensureGlobalZtNetwork() {
-  if (_globalZtNetwork) {
-    await hardenGlobalZtNetwork(_globalZtNetwork);
-    return _globalZtNetwork;
-  }
-  if (!zt.configured()) return null;
-  try {
-    const id = await zt.createNetwork('WC3-Platform-Global');
-    if (!id) throw new Error('network id ирсэнгүй');
-    _globalZtNetwork = id;
-    process.env.ZEROTIER_DEFAULT_NETWORK = id; // rooms.js-д ашиглагдана
-    _globalZtNetworkHardened = true;
-    console.log(`[ZeroTier] (${zt.mode()}) Глобал network үүслээ: ${id}`);
-    console.log(`[ZeroTier] ⚠ Railway-д ZEROTIER_DEFAULT_NETWORK=${id} тохируулна уу!`);
-    return id;
-  } catch (e) {
-    console.error('[ZeroTier] Глобал network үүсгэж чадсангүй:', e.message);
-    return null;
-  }
-}
-
-// Серверт эхлэхдээ глобал network бэлдэх
-ensureGlobalZtNetwork();
+// ZeroTier БҮРЭН ХАСАГДСАН (2026-08-30): бот-хост public-IP GProxy тунел +
+// сервер API-гаар GAMEINFO дамжуулдаг тул виртуал LAN шаардлагагүй.
 
 // Глобал тохиргоо (auth шаардахгүй)
 app.get('/config', async (req, res) => {
-  const networkId = _globalZtNetwork || await ensureGlobalZtNetwork();
   // Клиентийн толгойн реклам: олон реклам эргэлдэнэ (клиент ~8с тутам солино). env AD_IMAGE_URL/
   // AD_LINK_URL/AD_TEXT-ээр дарж болно; тохируулаагүй бол GarenaSystem-ийн анхдагч рекламууд.
   const adBase = `https://${req.get('host')}`;
@@ -171,7 +133,8 @@ app.get('/config', async (req, res) => {
       }
     }
   } catch {}
-  res.json({ zerotierNetworkId: networkId, zerotierMode: zt.mode(), serverVersion: require('../package.json').version, ad: ads[0], ads });
+  // zerotierNetworkId: null — хуучин (≤v2.4.0) клиентүүд энэ талбарыг уншдаг тул хэлбэрийг хадгална
+  res.json({ zerotierNetworkId: null, zerotierMode: 'off', serverVersion: require('../package.json').version, ad: ads[0], ads });
 });
 
 let dbForMigration;
@@ -247,7 +210,6 @@ function roomHasInGamePlayer(roomId) {
 function cleanupRoomState(roomId) {
   const id = String(roomId);
   delete roomMessages[id];
-  delete roomZtIps[id];
   delete roomReady[id];
   delete roomMembers[id];
 }
@@ -309,8 +271,6 @@ const roomMessages = {};
 // Rejoin grace period: userId → { timer, roomId, username }
 const disconnectTimers = {};
 const REJOIN_GRACE_MS = 45000; // 45 секунд
-// Тоглогчдын ZeroTier IP хадгалах (roomId → Map<userId, ztIp>)
-const roomZtIps = {};
 // Тоглогчдын бэлэн төлөв (roomId → Set<userId>)
 const roomReady = {};
 
@@ -437,12 +397,6 @@ io.on('connection', (socket) => {
         roomMembers[prevRoom].delete(username);
         io.to(prevRoom).emit('room:user_left', { username });
         io.to(prevRoom).emit('room:members', membersArray(prevRoom));
-      }
-      if (roomZtIps[prevRoom]) {
-        roomZtIps[prevRoom].delete(userId);
-        io.to(String(prevRoom)).emit('room:zt_ips', {
-          ips: Object.fromEntries(roomZtIps[prevRoom]),
-        });
       }
       if (roomReady[prevRoom]) roomReady[prevRoom].delete(userId);
     }
@@ -576,54 +530,8 @@ io.on('connection', (socket) => {
     });
   });
 
-  // ZeroTier node-г автоматаар authorize хийх
-  socket.on('zt:authorize', async ({ nodeId, networkId, roomId }) => {
-    if (!nodeId || !networkId) return;
-    if (!/^[0-9a-f]{10}$/i.test(String(nodeId)) || !/^[0-9a-f]{16}$/i.test(String(networkId))) {
-      socket.emit('zt:authorize_result', { ok: false, error: 'invalid-id' });
-      return;
-    }
-    if (!roomId) { socket.emit('zt:authorize_result', { ok: false, error: 'room-required' }); return; }
-    // socket.data.roomId-г room:join async тавьдаг тул клиент шууд дараа нь zt:authorize явуулахад
-    // "room-mismatch" гардаг байсан (race) → зөвхөн DB-ийн гишүүнчлэлээр шалгана
-    if (!await ensureRoomMembership(socket, roomId)) {
-      socket.emit('zt:authorize_result', { ok: false, error: 'room-access-denied' });
-      return;
-    }
-    const expectedNetworkId = await roomRoutes.getRoomNetworkId(roomId);
-    if (!expectedNetworkId || String(expectedNetworkId) !== String(networkId)) {
-      socket.emit('zt:authorize_result', { ok: false, error: 'network-mismatch' });
-      return;
-    }
-    if (!zt.configured()) { socket.emit('zt:authorize_result', { ok: false, error: 'no-api-token' }); return; }
-    try {
-      await zt.authorizeMember(String(networkId).toLowerCase(), String(nodeId).toLowerCase());
-      console.log(`[ZT] (${zt.mode()}) Authorized ${nodeId} on ${networkId} (${socket.user.username})`);
-      socket.emit('zt:authorize_result', { ok: true });
-    } catch (e) {
-      console.error(`[ZT] Authorize failed for ${nodeId}:`, e.message);
-      socket.emit('zt:authorize_result', { ok: false, error: e.message });
-    }
-  });
-
-  // Тоглогчийн ZeroTier IP бүртгэх — relay-д хэрэгтэй
-  socket.on('room:zt_ip', async ({ roomId, ip }) => {
-    if (!ip || !roomId) return;
-    if (checkRateLimit(socket)) return;
-    // Socket тухайн өрөөнд байгаа эсэх шалгах (room isolation)
-    if (String(socket.data.roomId) !== String(roomId)) return;
-    // IP формат шалгах (IPv4 only)
-    if (!await ensureRoomMembership(socket, roomId)) return;
-    if (!/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) return;
-    const userId = String(socket.user.id);
-    if (!roomZtIps[roomId]) roomZtIps[roomId] = new Map();
-    roomZtIps[roomId].set(userId, ip);
-    // Өрөөний бүх тоглогчдод шинэчилсэн IP жагсаалт илгээх
-    io.to(String(roomId)).emit('room:zt_ips', {
-      ips: Object.fromEntries(roomZtIps[roomId]),
-    });
-    console.log(`[ZT-IP] ${socket.user.username} → ${ip} (room ${roomId})`);
-  });
+  // (zt:authorize, room:zt_ip хэсгүүд хасагдсан — ZeroTier 2026-08-30-нд бүрэн хасагдав.
+  //  Хуучин клиентийн эдгээр event-үүд хариугүй үлдэнэ — гэмтэл учруулахгүй.)
 
   // Тоглогчийн бэлэн/бэлэн биш төлөв
   socket.on('room:ready', async ({ roomId, ready }) => {
@@ -634,24 +542,6 @@ io.on('connection', (socket) => {
     if (ready) roomReady[roomId].add(userId);
     else roomReady[roomId].delete(userId);
     io.to(String(roomId)).emit('room:members', membersArray(roomId));
-  });
-
-  // Host relay-д зориулсан тоглогчдын IP жагсаалт авах
-  socket.on('room:get_zt_ips', async ({ roomId }) => {
-    if (!roomId) return;
-    // Socket тухайн өрөөнд байгаа эсэх шалгах (room isolation)
-    if (String(socket.data.roomId) !== String(roomId)) return;
-    if (!await ensureRoomMembership(socket, roomId)) return;
-    const ips = roomZtIps[roomId] ? Object.fromEntries(roomZtIps[roomId]) : {};
-    socket.emit('room:zt_ips', { ips });
-  });
-
-  // Host тоглогчид ZT IP refresh хүсэлт илгээх
-  socket.on('room:refresh_zt', async ({ roomId, targetUserId }) => {
-    if (!roomId || !targetUserId) return;
-    if (String(socket.data.roomId) !== String(roomId)) return;
-    if (!await ensureRoomMembership(socket, roomId)) return;
-    io.to(String(roomId)).emit('room:do_refresh_zt', { targetUserId: String(targetUserId) });
   });
 
   // Тоглолт эхлэхэд статус 'in_game' болгох
@@ -732,13 +622,7 @@ io.on('connection', (socket) => {
       io.to(roomId).emit('room:user_left', { username });
       io.to(roomId).emit('room:members', membersArray(roomId));
     }
-    // Гарсан тоглогчийн ZT IP, ready state устгах
-    if (roomZtIps[roomId]) {
-      roomZtIps[roomId].delete(userId);
-      io.to(String(roomId)).emit('room:zt_ips', {
-        ips: Object.fromEntries(roomZtIps[roomId]),
-      });
-    }
+    // Гарсан тоглогчийн ready state устгах
     if (roomReady[roomId]) roomReady[roomId].delete(userId);
     // Онлайн статус шинэчлэх
     if (onlineUsers.has(socket.id)) {
@@ -781,19 +665,13 @@ io.on('connection', (socket) => {
             io.to(roomId).emit('room:user_left', { username });
             io.to(roomId).emit('room:members', membersArray(roomId));
           }
-          // Тоглогчийн ZT IP, ready state устгах (room isolation)
-          if (roomZtIps[roomId]) {
-            roomZtIps[roomId].delete(userId);
-            io.to(String(roomId)).emit('room:zt_ips', {
-              ips: Object.fromEntries(roomZtIps[roomId]),
-            });
-          }
+          // Тоглогчийн ready state устгах (room isolation)
           if (roomReady[roomId]) roomReady[roomId].delete(userId);
           // Хост байсан бол DB-с өрөөг автоматаар устгах
           if (dbForMigration && userId) {
             try {
               const rr = await dbForMigration.query(
-                `SELECT id, zerotier_network_id FROM rooms
+                `SELECT id FROM rooms
                  WHERE host_id=$1 AND id=$2 AND status IN ('waiting','playing')`,
                 [userId, roomId]
               );

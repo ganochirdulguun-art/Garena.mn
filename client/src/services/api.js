@@ -79,13 +79,6 @@ async function quickMatch(game_type) {
   return data;
 }
 
-async function updateRoomNetwork(roomId, networkId) {
-  const { data } = await getClient().patch(`/rooms/${roomId}`, {
-    zerotier_network_id: networkId,
-  });
-  return data;
-}
-
 async function updateRoom(roomId, updates) {
   const { data } = await getClient().patch(`/rooms/${roomId}`, updates);
   return data;
@@ -262,7 +255,6 @@ module.exports = {
   endRoom,
   closeRoom,
   kickPlayer,
-  updateRoomNetwork,
   updateRoom,
   getPlayerStats,
   getPlayerStatsById,

@@ -12,7 +12,6 @@ let roomsCache = {}; // id → room object
 let selectedRoomId = null;
 
 // ── Garena сүлжээ IP хадгалалт ────────────────────────────────
-let roomZtIps = {}; // userId → ip
 
 // ── Sound + Notification систем ─────────────────────────
 let _audioCtx = null;
@@ -229,18 +228,10 @@ async function connectSocket() {
     showRoomInvite(fromUsername, roomId, roomName);
   });
 
-  socket.on('zt:authorize_result', (result) => {
-    if (!result?.ok && currentRoom) {
-      appendSysMsg(`⚠ Garena сүлжээ authorization алдаа: ${result.error || 'unknown'}`);
-    }
-  });
-
   socket.on('disconnect', (reason) => {
     console.log('Socket салгагдлаа:', reason);
     updateConnectionStatus('offline');
-    // ZT setup-ийн үед routing table өөрчлөгдөж түр тасрах нь хэвийн
-    // Socket.io автомат дахин холбогдоно — хэрэглэгчид мэдэгдэх шаардлагагүй
-    if (currentRoom && !_ztSetupInProgress) {
+    if (currentRoom) {
       appendSysMsg('⚠ Холболт тасарлаа. Дахин холбогдож байна...');
     }
   });
@@ -394,7 +385,6 @@ async function connectSocket() {
     if (!currentRoom) return;
     appendSysMsg(`⚠️ ${reason || 'Өрөө хаагдлаа'}`);
     _hostRelayStarted = false;
-    roomZtIps = {};
     try { window.api.stopRelay(); } catch {}
     setTimeout(() => {
       currentRoom = null;
@@ -408,7 +398,6 @@ async function connectSocket() {
     if (!currentUser || String(userId) !== String(currentUser.id)) return;
     appendSysMsg('⚠️ Та өрөөнөөс гаргагдлаа!');
     _hostRelayStarted = false;
-    roomZtIps = {};
     try { window.api.stopRelay(); } catch {}
     setTimeout(() => {
       currentRoom = null;
@@ -441,60 +430,8 @@ async function connectSocket() {
     }
   });
 
-  // Host IP хүлээн авах (бусад тоглогчид) → Game Finder автомат эхлүүлэх
-  socket.on('room:host_ip', async ({ ip, hostUsername }) => {
-    showHostIp(ip);
-    appendSysMsg(`🎯 ${hostUsername} тоглоом host хийлээ`);
-    // PLAYER: Game Finder эхлүүлэх — host руу SEARCHGAME илгээж тоглоом олно
-    if (!currentRoom?.isHost) {
-      try {
-        await window.api.startGameFinder(ip);
-        appendSysMsg('📡 Тоглоом хайж байна... WC3 LAN жагсаалтад удахгүй харагдана.');
-      } catch {}
-    }
-  });
-
-  // Тоглогчдын Garena сүлжээ IP жагсаалт
-  socket.on('room:zt_ips', async ({ ips }) => {
-    if (!ips) return;
-    roomZtIps = ips;
-    if (currentRoom?.members) renderMembers(currentRoom.members);
-
-    const myId = String(currentUser?.id);
-    if (currentRoom?.isHost) {
-      // HOST: тоглогчдын IP-р relay эхлүүлэх/шинэчлэх
-      const playerIps = Object.entries(ips)
-        .filter(([uid]) => uid !== myId)
-        .map(([, ip]) => ip);
-      if (playerIps.length > 0) {
-        if (_hostRelayStarted) {
-          // Relay аль хэдийн ажиллаж байвал зөвхөн шинэ IP нэмнэ
-          for (const ip of playerIps) {
-            try { await window.api.addRelayPlayer(ip); } catch {}
-          }
-        } else {
-          try {
-            await window.api.startHostRelay(playerIps);
-            _hostRelayStarted = true;
-            appendSysMsg(`📡 Game relay: ${playerIps.length} тоглогчид дамжуулж байна`);
-          } catch {}
-        }
-      }
-    }
-  });
-
-  // Host-оос ZT IP refresh хүсэлт ирэхэд
-  socket.on('room:do_refresh_zt', async ({ targetUserId }) => {
-    if (String(currentUser?.id) === String(targetUserId) && currentRoom) {
-      try {
-        const ip = await window.api.getZerotierIp();
-        if (ip) {
-          socket.emit('room:zt_ip', { roomId: currentRoom.id, ip });
-          showToast(`IP автоматаар шинэчлэгдлээ: ${ip}`, 'success');
-        }
-      } catch {}
-    }
-  });
+  // (room:host_ip / room:zt_ips / room:do_refresh_zt хэсгүүд хасагдсан —
+  //  ZeroTier болон өөрөө-хостлох зам 2026-08-30-нд бүрэн хасагдав; бот-хост л үлдсэн)
 
   // WC3 хаагдсан
   let _hostKilledGame = false; // host хаасан учир game:exited давхар харуулахгүй
@@ -643,10 +580,9 @@ async function init() {
     const isHost  = p.get('isHost') === '1';
     const hostId  = p.get('hostId') || '';
     const status  = p.get('status') || '';
-    const ztNetId = p.get('ztNetId') || '';
     const maxPlayers = Number(p.get('maxPlayers') || 10);
 
-    _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPlayers);
+    _enterRoomUI(id, name, gameType, isHost, hostId, status, maxPlayers);
 
     // Цонх хаагдахад өрөөнөөс гарах + relay зогсоох
     window.addEventListener('beforeunload', () => {
@@ -714,24 +650,6 @@ async function init() {
   window.api.onUpdateError?.((msg) => {
     setUpdateMsg(`Шинэчлэлийн алдаа: ${msg}`, 'error');
     showToast(`Шинэчлэлийн алдаа: ${msg}`, 'error', 6000);
-  });
-
-  // ── Garena сүлжээ автомат тохиргоо статус ─────────────────
-  _ztSetupInProgress = true;
-  window.api.onZtSetupComplete?.(async (result) => {
-    _ztSetupInProgress = false;
-    if (result.ok) {
-      console.log('[ZT] Garena сүлжээ setup complete. IP:', result.ip || 'pending');
-    } else {
-      const msgs = {
-        'not-installed': 'Garena сүлжээ суулгаагүй байна. Тохиргоо → Сүлжээ → "Сүлжээ суулгах" дарна уу.',
-        'service-stopped': 'Garena сүлжээ суусан ч сервис нь ажиллахгүй байна. "Garena сүлжээ" програмыг нээх эсвэл Windows-оо дахин асаана уу.',
-        'cli-token': 'Garena сүлжээний эрх хэрэгтэй: Тохиргоо → Сүлжээ → "Холболт шалгах" дараад UAC цонхонд "Yes" дарна уу.',
-        'join-failed': 'Garena сүлжээ сүлжээнд нэгдэж чадсангүй.',
-        'no-network-id': 'Серверийн Garena сүлжээ сүлжээ тохируулагдаагүй байна.',
-      };
-      showToast(msgs[result.error] || `Garena сүлжээ алдаа: ${result.error}`, result.error === 'not-installed' ? 'warning' : 'error', 10000);
-    }
   });
 
   // ── Хувилбар харуулах + гараар шалгах ─────────────────
@@ -1152,7 +1070,7 @@ function roomGridRow(r, inProgress, idx = 0) {
   const status = roomStatusMeta(r, inProgress, isMyRoom);
   const desc = (r.description || '').trim();
   const memberCount = (r.members || []).length;
-  const networkLabel = r.zerotier_network_id ? 'ZT' : 'LAN';
+  const networkLabel = 'LAN';
   const roomFlags = [
     r.has_password ? '<span class="room-lock">Lock</span>' : '',
     isMyRoom ? '<span class="my-room-tag">Миний өрөө</span>' : '',
@@ -1199,7 +1117,7 @@ function renderRoomDetail(r) {
                    (r.members || []).some(m => String(m.id) === myId);
   const status = roomStatusMeta(r, inProgress, isMyRoom);
   const members = roomMemberLinks(r);
-  const networkLabel = r.zerotier_network_id ? 'Garena сүлжээ ready' : 'LAN bridge';
+  const networkLabel = 'LAN bridge';
 
   return `
     <div class="room-detail-card ${inProgress ? 'room-playing' : ''} ${isMyRoom ? 'room-mine' : ''}">
@@ -1232,7 +1150,7 @@ function renderRoomDetail(r) {
 
 function rejoinMyRoom(id, name, gameType, hostId, isHost) {
   const cached = roomsCache[id] || {};
-  enterRoom(id, name, gameType, isHost, hostId, cached.status, cached.zerotier_network_id);
+  enterRoom(id, name, gameType, isHost, hostId, cached.status);
 }
 
 async function joinPlayingRoom(id, name, gameType, hostId) {
@@ -1303,7 +1221,7 @@ document.getElementById('btn-quickmatch').onclick = async () => {
     const room = result.room;
     roomsCache[String(room.id)] = room;
     const isHost = !result.joined && String(room.host_id) === String(currentUser?.id);
-    enterRoom(String(room.id), room.name, room.game_type, isHost, String(room.host_id), room.status, room.zerotier_network_id);
+    enterRoom(String(room.id), room.name, room.game_type, isHost, String(room.host_id), room.status);
   } catch (err) {
     showToast(`Хурдан тоглолт: ${err.message}`, 'error');
   } finally {
@@ -1346,7 +1264,7 @@ document.getElementById('btn-submit-room').onclick = async () => {
     document.getElementById('room-password').value = '';
     document.getElementById('room-password').style.display = 'none';
     showToast(`"${room.name}" өрөө үүслээ`, 'success');
-    enterRoom(room.id, room.name, room.game_type, true, null, room.status, room.zerotier_network_id);
+    enterRoom(room.id, room.name, room.game_type, true, null, room.status);
   }
   try {
     await _doCreateRoom();
@@ -1418,7 +1336,7 @@ document.getElementById('join-password').addEventListener('keydown', e => {
 
 // ── Өрөөнд орох ──────────────────────────────────────────
 // Үндсэн цонхноос дуудагдана → шинэ цонх нээнэ
-function enterRoom(id, name, gameType, isHost, hostId, status, ztNetId) {
+function enterRoom(id, name, gameType, isHost, hostId, status) {
   const resolvedHostId = hostId ? String(hostId) : String(currentUser?.id);
   const cached = roomsCache[id] || {};
   window.api.openRoomWindow({
@@ -1428,7 +1346,6 @@ function enterRoom(id, name, gameType, isHost, hostId, status, ztNetId) {
     isHost,
     hostId: resolvedHostId,
     status: status || '',
-    zerotierNetworkId: ztNetId || '',
     maxPlayers: cached.max_players || cached.maxPlayers || 10,
     backgroundUrl: cached.background_url || '',
   });
@@ -1578,10 +1495,9 @@ document.addEventListener('click', e => {
 });
 
 // Өрөөний цонхны UI тохируулга (room цонхноос шууд дуудагдана)
-function _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPlayers = 10) {
+function _enterRoomUI(id, name, gameType, isHost, hostId, status, maxPlayers = 10) {
   // Хуучин relay зогсоож, state reset хийх
   _hostRelayStarted = false;
-  _launchInProgress = false;
   try { window.api.stopRelay(); } catch {}
   const cached = roomsCache[id] || {};
   currentRoom = {
@@ -1592,7 +1508,6 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPl
     hostId: hostId || String(currentUser?.id),
     maxPlayers: Number(cached.max_players || maxPlayers || 10),
     status: status || 'waiting',
-    ztNetId,
   };
 
   document.getElementById('room-title').textContent = name;
@@ -1632,18 +1547,7 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPl
     }
   }
 
-  // Host биш бол "Тоглолт эхлүүлэх" товчийг нуух — host эхлүүлэхэд автоматаар нээгдэнэ
-  const launchBtn = document.getElementById('btn-launch-wc3');
-  if (status === 'playing') {
-    launchBtn.style.display = '';
-    setLaunchBtnRejoin();
-  } else if (isHost) {
-    launchBtn.style.display = '';
-    resetLaunchBtn(isHost);
-  } else {
-    // Бусад тоглогч: товч нуугдана, host эхлүүлэхэд WC3 автомат нээгдэнэ
-    launchBtn.style.display = 'none';
-  }
+  // (Өөрөө-хостлох товч хасагдсан — тоглолтыг бот-хост панель удирдана)
 
   // Найз урих товч (бүх тоглогчид харуулна)
   const inviteBtn = document.getElementById('btn-invite-friends');
@@ -1655,36 +1559,6 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, ztNetId, maxPl
 
   if (socket && currentUser) {
     socket.emit('room:join', { roomId: id });
-    // Өрөөний ZT IP-уудыг авах
-    roomZtIps = {};
-    socket.emit('room:get_zt_ips', { roomId: id });
-    // Garena сүлжээ IP-г серверт мэдэгдэх (relay-д хэрэгтэй) — retry логиктой
-    (async () => {
-      if (ztNetId) {
-        try {
-          const nodeId = await window.api.getZerotierNodeId();
-          if (nodeId && socket) {
-            socket.emit('zt:authorize', { roomId: id, nodeId, networkId: ztNetId });
-            await new Promise(r => setTimeout(r, 2500));
-          }
-        } catch (e) {
-          console.warn('[ZT] Authorize request failed:', e.message);
-        }
-      }
-
-      for (let attempt = 0; attempt < 10; attempt++) {
-        await new Promise(r => setTimeout(r, 2000));
-        try {
-          const myIp = await window.api.getZerotierIp(ztNetId);
-          if (myIp && socket) {
-            socket.emit('room:zt_ip', { roomId: id, ip: myIp });
-            console.log('[ZT] IP бүртгэгдлээ:', myIp);
-            return;
-          }
-        } catch {}
-      }
-      console.warn('[ZT] IP бүртгэж чадсангүй (10 оролдлого)');
-    })();
   }
   appendSysMsg(`"${name}" өрөөнд нэгдлээ.`);
 }
@@ -1699,7 +1573,6 @@ document.getElementById('btn-leave-room').onclick = async () => {
   }
   try { await window.api.leaveRoom(currentRoom.id); } catch {}
   currentRoom = null;
-  roomZtIps = {};
   if (isRoomMode()) { window.close(); }
   else { showPage('page-main'); loadRooms(); }
 };
@@ -1715,7 +1588,6 @@ document.getElementById('btn-close-room').onclick = async (e) => {
   btn.disabled = true;
   btn.classList.add('is-loading');
   _hostRelayStarted = false;
-  roomZtIps = {};
   try { await window.api.stopRelay(); } catch {}
   try {
     appendSysMsg('Өрөө хааж байна...');
@@ -1752,95 +1624,9 @@ function resetLaunchBtn(isHost) {
   btn.classList.add('btn-primary');
 }
 
-// ── Garena сүлжээ setup flag (апп эхлэхэд initGarena сүлжээ ажиллаж байгааг мэдэх) ──
-let _ztSetupInProgress = false;
-
-// Host IP-г UI-д харуулах helper (no-op when elements removed)
-function showHostIp(ip) {
-  const el = document.getElementById('zt-host-ip');
-  const val = document.getElementById('zt-host-ip-val');
-  if (el && val && ip) {
-    val.textContent = ip;
-    el.style.display = 'block';
-  }
-}
-
-// Тоглоом эхлүүлэх / дахин нэвтрэх
+// (Өөрөө-хостлох btn-launch-wc3 урсгал хасагдсан — ZeroTier-тэй хамт 2026-08-30.
+//  Тоглолтыг зөвхөн бот хостолно: btn-bot-host / btn-bot-join.)
 let _hostRelayStarted = false;
-let _launchInProgress = false;
-document.getElementById('btn-launch-wc3').onclick = async () => {
-  if (_launchInProgress) return; // Double-click хамгаалалт
-  if (!currentRoom) {
-    appendSysMsg('⚠ Өрөөний мэдээлэл олдсонгүй.');
-    return;
-  }
-  _launchInProgress = true;
-  const launchBtn = document.getElementById('btn-launch-wc3');
-  if (launchBtn) {
-    launchBtn.disabled = true;
-    launchBtn.classList.add('is-loading');
-  }
-  const gameType = currentRoom?.gameType || '';
-  const isRejoin = launchBtn?.querySelector('span')?.textContent?.includes('Дахин');
-  appendSysMsg(isRejoin ? '↩ WC3 дахин нээж байна...' : `"${gameType}" тоглоом эхлүүлж байна...`);
-
-  // HOST: Relay-г WC3 нээхээс ӨМНӨ эхлүүлэх (port 6112-г relay эхлээд bind хийнэ,
-  // WC3 дараа нь bind хийж "last to bind" болно → unicast пакетүүд WC3 рүү ирнэ)
-  if (!isRejoin && currentRoom?.isHost && !_hostRelayStarted) {
-    try {
-      const myId = String(currentUser?.id);
-      const earlyIps = Object.entries(roomZtIps || {})
-        .filter(([uid]) => uid !== myId)
-        .map(([, ip]) => ip);
-      if (earlyIps.length > 0) {
-        await window.api.startHostRelay(earlyIps);
-        _hostRelayStarted = true;
-        appendSysMsg(`📡 Relay эхэллээ: ${earlyIps.length} тоглогч`);
-      }
-    } catch {}
-  }
-
-  try {
-    await window.api.launchGame(gameType);
-    _gameRunning = true;
-    // Бүх launch зам дээр (host, тоглогч, дахин нэвтрэх) in_game статус илгээнэ —
-    // үгүй бол rejoin хийсэн тоглогчийг сервер мөрдөж чадахгүй
-    if (socket) socket.emit('room:game_started');
-    appendSysMsg('✓ Тоглоом нээгдлээ. LAN горим сонгоно уу.');
-    if (!isRejoin && currentRoom?.isHost) {
-      try {
-        await window.api.startRoom(currentRoom.id);
-        currentRoom.status = 'playing';
-        updateRoomChrome(currentRoom.members?.length || 0);
-        appendSysMsg('▶ Тоглолт эхэллээ!');
-        setLaunchBtnRejoin();
-        try {
-          const ip = await window.api.getZerotierIp();
-          if (ip && socket) {
-            socket.emit('room:host_ip', { roomId: currentRoom.id, ip });
-            showHostIp(ip);
-            appendSysMsg(`🎯 Таны IP: ${ip}`);
-            // Тоглогчдын ZT IP жагсаалт авч relay шинэчлэх
-            socket.emit('room:get_zt_ips', { roomId: currentRoom.id });
-          }
-        } catch {}
-      } catch (err) {
-        appendSysMsg(`⚠ Тоглолтын төлөв эхлүүлэхэд алдаа: ${err.message}`);
-        showToast(`Тоглолт эхлүүлэхэд алдаа: ${err.message}`, 'error');
-        resetLaunchBtn(true);
-      }
-    }
-  } catch (err) {
-    appendSysMsg(`⚠️ ${err.message}`);
-    showToast(`WC3 нээхэд алдаа: ${err.message}`, 'error');
-  } finally {
-    _launchInProgress = false;
-    if (launchBtn) {
-      launchBtn.disabled = false;
-      launchBtn.classList.remove('is-loading');
-    }
-  }
-};
 
 // ── Өрөөний чат ──────────────────────────────────────────
 function formatChatTime(time) {
@@ -1929,11 +1715,9 @@ function renderMembers(members) {
       ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${id}" data-name="${name}">Kick</button>`
       : '';
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${id}">${name}</span>` : name;
-    const ztIp = id && roomZtIps[id] ? `<span class="member-zt-ip">${roomZtIps[id]}</span>` : '';
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
         <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}</div>
-        ${ztIp}
       </div>
       ${kickBtn}
     </li>`;
@@ -3350,31 +3134,6 @@ async function loadSettings() {
     renderGamesList();
     populateRoomTypeSelect();
   } catch {}
-  // Garena сүлжээ статус харуулах
-  try {
-    const st = await window.api.getZerotierStatus();
-    const ipEl = document.getElementById('settings-zt-ip');
-    const stEl = document.getElementById('settings-zt-status');
-    if (ipEl) ipEl.textContent = st.ip || '---';
-    if (stEl) {
-      if (!st.installed) stEl.textContent = '(суулгаагүй)';
-      else if (!st.running) stEl.textContent = '(сервис зогссон)';
-      else if (st.cli === false) stEl.textContent = '(эрх хэрэгтэй — "Холболт шалгах" дарна уу)';
-      else if (!st.connected) stEl.textContent = '(холбогдоогүй)';
-      else stEl.textContent = '(холбогдсон)';
-    }
-    // Node ID харуулах (диагностик)
-    const nodeId = await window.api.getZerotierNodeId();
-    const msgEl = document.getElementById('zt-refresh-msg');
-    if (msgEl && (nodeId || st.networkId)) {
-      const parts = [];
-      if (nodeId) parts.push(`Node ID: ${nodeId}`);
-      if (st.networkId) parts.push(`Network: ${st.networkId}`);
-      msgEl.innerHTML = parts.join('<br>');
-      msgEl.style.color = '';
-    }
-  } catch {}
-
   // Firewall тохиргоо хийгдсэн эсэх шалгах
   const firewallDone = localStorage.getItem('firewall_configured');
   const fwStatusEl = document.getElementById('firewall-status');
@@ -3540,69 +3299,6 @@ document.getElementById('btn-clear-cache')?.addEventListener('click', async () =
     btn.disabled = false;
     btn.innerHTML = '<svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Cache цэвэрлэх';
   }
-});
-
-// Garena сүлжээ IP шинэчлэх товч (Тохируулга)
-document.getElementById('btn-zt-refresh')?.addEventListener('click', async () => {
-  const btn = document.getElementById('btn-zt-refresh');
-  const msgEl = document.getElementById('zt-refresh-msg');
-  btn.disabled = true;
-  if (btn.querySelector('svg')) {
-    // SVG icon байвал зөвхөн текстийг солих
-    btn.lastChild.textContent = ' Тохируулж байна...';
-  } else {
-    btn.textContent = 'Тохируулж байна...';
-  }
-  if (msgEl) { msgEl.textContent = ''; msgEl.style.color = ''; }
-  try {
-    const result = await window.api.refreshZerotier();
-    const ipEl = document.getElementById('settings-zt-ip');
-    const stEl = document.getElementById('settings-zt-status');
-    if (ipEl) ipEl.textContent = result.ip || '---';
-    if (stEl) {
-      if (result.ok && result.ip) stEl.textContent = '(холбогдсон)';
-      else if (result.ok) stEl.textContent = '(IP хүлээж байна)';
-      else stEl.textContent = `(${result.error || 'алдаа'})`;
-    }
-    if (msgEl) {
-      const lines = [];
-      if (result.nodeId) lines.push(`Node ID: ${result.nodeId}`);
-      if (result.networkId) lines.push(`Network: ${result.networkId}`);
-      if (result.ip) {
-        lines.push(`IP: ${result.ip}`);
-        msgEl.style.color = 'var(--green)';
-      } else if (result.error === 'not-installed') {
-        lines.push('Garena сүлжээ суулгаагүй байна');
-        lines.push('Доорх "Сүлжээ суулгах" товчийг ашиглана уу');
-        msgEl.style.color = 'var(--yellow, orange)';
-      } else if (result.error === 'service-stopped' || result.error === 'service-failed') {
-        lines.push('Garena сүлжээ сервис ажиллахгүй байна');
-        lines.push('"Garena сүлжээ" програмыг нээх эсвэл Windows-оо дахин асаана уу');
-        msgEl.style.color = 'var(--yellow, orange)';
-      } else if (result.error === 'cli-token') {
-        lines.push('Garena сүлжээний эрх олгогдоогүй (UAC цонхонд "Yes" дарна уу)');
-        lines.push('Эсвэл Garena сүлжээ програмыг нэг удаа нээгээд дахин "Холболт шалгах"');
-        msgEl.style.color = 'var(--yellow, orange)';
-      } else {
-        lines.push('IP хараахан олгогдоогүй — хэдэн секундын дараа дахин шалгана уу');
-        msgEl.style.color = 'var(--red)';
-      }
-      msgEl.innerHTML = lines.join('<br>');
-    }
-  } catch (err) {
-    if (msgEl) { msgEl.textContent = `Алдаа: ${err.message}`; msgEl.style.color = 'var(--red)'; }
-  } finally {
-    btn.disabled = false;
-    if (btn.querySelector('svg')) {
-      btn.lastChild.textContent = ' Холболт шалгах';
-    } else {
-      btn.textContent = 'Холболт шалгах';
-    }
-  }
-});
-
-document.getElementById('btn-zt-download')?.addEventListener('click', async () => {
-  await window.api.downloadZerotier();
 });
 
 function renderGamesList() {
@@ -4848,7 +4544,7 @@ init();
     if (meta) meta.textContent = [r.game_type || r.gameType, players != null ? `${players}/${r.max_players || r.maxPlayers || 10} тоглогч` : null].filter(Boolean).join(' · ');
     const open = document.getElementById('btn-room-tab-open');
     if (open) open.onclick = () => enterRoom(r.id, r.name, r.game_type || r.gameType,
-      String(r.host_id ?? r.hostId) === String(currentUser?.id), r.host_id ?? r.hostId, r.status, r.zerotier_network_id || r.zerotierNetworkId);
+      String(r.host_id ?? r.hostId) === String(currentUser?.id), r.host_id ?? r.hostId, r.status);
   }
   const _showTab = showTab;
   showTab = function (name) { _showTab(name); if (name === 'room') renderRoomTab(); };
@@ -4901,7 +4597,7 @@ init();
       <div class="room-cell rl-game" role="cell" title="${escHtml(r.game_type || '')}"><i class="rl-gt" style="background:${gameTypeColor(r.game_type)}">${gameAbbr(r.game_type)}</i><span>${escHtml(r.game_type || '-')}</span></div>
       <div class="room-cell rl-host" role="cell"><span class="clickable-name" data-user-id="${escHtml(String(r.host_id || ''))}">${escHtml(r.host_name || '-')}</span></div>
       <div class="room-cell rl-name" role="cell" title="${escHtml(r.name)}${desc ? ' — ' + escHtml(desc) : ''}"><b>${escHtml(r.name)}</b>${desc ? `<span class="rl-desc"> — ${escHtml(desc)}</span>` : ''}${isMyRoom ? '<span class="my-room-tag">Миний</span>' : ''}${r.game_mode ? `<span class="rl-mode">${escHtml(r.game_mode)}</span>` : ''}</div>
-      <div class="room-cell rl-net" role="cell">${r.zerotier_network_id ? 'ZT' : 'LAN'}</div>
+      <div class="room-cell rl-net" role="cell">LAN</div>
       <div class="room-cell rl-players" role="cell">${r.player_count || 0}/${r.max_players || '-'}</div>
       <div class="room-cell rl-state" role="cell" title="${stateTitle}"><span class="room-state-dot ${state}"></span></div>
       <div class="room-cell rl-lock" role="cell" title="${r.has_password ? 'Нууц үгтэй' : ''}">${r.has_password ? LOCK_SVG : ''}</div>
@@ -5228,17 +4924,13 @@ init();
     el('btn-bot-join').classList.toggle('hidden', !(st === 'lobby' || st === 'started'));
     const online = (status?.bots || []).length;
     if (isHost && !active) el('btn-bot-host').disabled = !online;
-    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — доорх "Нэмэлт: өөрөө хостлох" замыг ашиглана уу.';
-    // Бот байхгүй үед л Garena сүлжээ замыг дэлгэнэ
-    const adv = document.getElementById('adv-host');
-    if (adv && isHost && !active && !adv.dataset.userToggled) adv.open = !online;
+    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — түр хүлээгээд дахин оролдоно уу.';
   }
 
-  document.getElementById('adv-host')?.addEventListener('toggle', (e) => { e.target.dataset.userToggled = '1'; });
   async function loadStatus() {
     try {
       status = await api('get', '/rooms/bot-host/status');
-      if (!status?.enabled) { panel.classList.add('hidden'); const adv = document.getElementById('adv-host'); if (adv) adv.open = true; return; }
+      if (!status?.enabled) { panel.classList.add('hidden'); return; }
       panel.classList.remove('hidden');
       const sel = el('bot-host-map');
       sel.innerHTML = (status.maps || []).map((m) => `<option value="${m.key}" ${m.default ? 'selected' : ''}>${m.name}</option>`).join('');
