@@ -41,6 +41,24 @@ function _localBindIp() {
   }
   return lan || null;
 }
+// LAN IP + түүний дэд сүлжээний broadcast хаяг (жинхэнэ LAN хост шиг GAMEINFO цацахад)
+function _localBindInfo() {
+  const ifs = os.networkInterfaces();
+  for (const name of Object.keys(ifs)) {
+    for (const a of (ifs[name] || [])) {
+      if (a.family === 'IPv4' && !a.internal && a.address) {
+        let bcast = '255.255.255.255';
+        try {
+          const ip = a.address.split('.').map(Number);
+          const mask = (a.netmask || '255.255.255.0').split('.').map(Number);
+          bcast = ip.map((o, i) => (o & mask[i]) | (~mask[i] & 0xff)).join('.');
+        } catch {}
+        return { ip: a.address, bcast };
+      }
+    }
+  }
+  return null;
+}
 
 const WC3_PORT = 6112;
 const W3_HEADER = 0xF7;
@@ -309,79 +327,65 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн port талбарыг локал proxy порт болгоно
   let sentCount = 0;
-  // GProxy++-ийн ЖИНХЭНЭ загвар (2026-08-31): relay нь WC3-аас ӨМНӨ 0.0.0.0:6112-ыг
-  // эзэлнэ → WC3 асахдаа 6112 завгүйг хараад 6113..6119-ийн аль нэгэнд суудаг →
-  // WC3-ийн LAN дэлгэц SEARCHGAME (F7 2F)-ээ broadcast:6112 руу цацна → БИД хүлээж
-  // аваад GAMEINFO-г ТҮҮНИЙ жинхэнэ порт руу эх порт 6112-оос ХАРИУЛНА → жагсаалтад
-  // гарна. Урьдын "сохроор 127.0.0.1:6112 руу пуш" нь relay 6112-ыг өөрөө эзэлсэн
-  // үед ӨӨРИЙНХ нь socket-д залгигдаж, WC3 6113-т байхад хэзээ ч хүрдэггүй байв.
-  const beginSend = (sock, how, ownsWellKnown) => {
+  // ЗӨВ ЗАГВАР (2026-08-31 v2.5.3, war3 binary дээр бодитоор туршив):
+  // war3.exe нь 0.0.0.0:6112-ыг ЭЗЭМШДЭГ бөгөөд 6112 завгүй бол 6113-т fallback
+  // ХИЙХГҮЙ — шууд "Could not connect to the network" алдаа өгнө (Phase-2 тест).
+  // Тиймээс relay НЬ 0.0.0.0:6112-т ХЭЗЭЭ Ч bind хийхгүй (war3-г эвдэнэ). Харин
+  // war3-ийн ДАРАА ТОДОРХОЙ LAN IP:6112-т зэрэгцэн суудаг (Windows зөвшөөрдөг —
+  // v2.5.1 production log-оор батлагдсан). Ингэснээр илгээх пакетуудын ЭХ ПОРТ 6112
+  // болно (war3-ийн шаардлага). GAMEINFO-г жинхэнэ LAN хост шиг дэд-сүлжээний
+  // BROADCAST:6112 + loopback 6112 руу цацна → war3-ийн 0.0.0.0:6112 wildcard авна.
+  // Нэмж SEARCHGAME (F7 2F) сонсож, ирвэл шууд хариулна (зарим тохиолдолд broadcast
+  // relay-ийн specific socket-д ирдэг).
+  const beginSend = (sock, how, bcast) => {
     state.udp = sock;
-    state.wc3Port = null;   // SEARCHGAME-аас илэрсэн WC3-ийн жинхэнэ UDP порт
+    try { sock.setBroadcast(true); } catch {}
     sock.on('message', (msg, rinfo) => {
       if (msg.length >= 2 && msg[0] === W3_HEADER && msg[1] === W3_SEARCHGAME) {
-        state.wc3Port = rinfo.port;
         const b = state.packet || local;
         try { sock.send(b, 0, b.length, rinfo.port, rinfo.address); } catch {}
-        if (!state.sgLogged) { state.sgLogged = true; bblog(`SEARCHGAME ← ${rinfo.address}:${rinfo.port} → GAMEINFO хариуллаа (GProxy горим ажиллав)`); }
+        if (!state.sgLogged) { state.sgLogged = true; bblog(`SEARCHGAME ← ${rinfo.address}:${rinfo.port} → GAMEINFO хариуллаа`); }
       }
     });
+    // ЧУХАЛ (тестээр батлав): ТОДОРХОЙ IP:6112 socket-оос 127.0.0.1 руу илгээх нь
+    // WinError 10049-ээр УНАДАГ (v2.5.1-ийн нам гүм алдаа!). Харин дэд-сүлжээний
+    // broadcast + 255.255.255.255 руу илгээхэд war3-ийн 0.0.0.0:6112 эх порт 6112-той
+    // хүлээж авдаг. Иймд specific socket → broadcast; unbound fallback → loopback.
+    const dests = bcast
+      ? [{ ip: bcast, port: WC3_PORT }, { ip: '255.255.255.255', port: WC3_PORT }]
+      : [{ ip: '127.0.0.1', port: WC3_PORT }];
     const tick = () => {
       if (!state.running) return;
       const b = state.packet || local;
-      // Илгээх портууд: SEARCHGAME-аас мэдэгдсэн порт (хамгийн найдвартай) +
-      // бид 6112-ыг эзэлсэн бол WC3-ийн fallback портууд 6113..6119, эс бол 6112 (WC3 эзэмшигч).
-      const targets = new Set();
-      if (state.wc3Port) targets.add(state.wc3Port);
-      if (ownsWellKnown) { for (let p = 6113; p <= 6119; p++) targets.add(p); }
-      else targets.add(WC3_PORT);
-      for (const p of targets) {
-        try { sock.send(b, 0, b.length, p, '127.0.0.1'); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
+      for (const d of dests) {
+        try { sock.send(b, 0, b.length, d.port, d.ip); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
       }
       sentCount += 1;
-      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO → 127.0.0.1:[${[...targets].join(',')}] x${sentCount} (эх ${how})`);
-      state.timer = setTimeout(tick, 2000);
+      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO → [${dests.map((d) => d.ip).join(',')}]:6112 x${sentCount} (эх ${how})`);
+      state.timer = setTimeout(tick, 1500);
     };
     tick();
-    bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP тунел 127.0.0.1:${lp}, эх=${how}${ownsWellKnown ? ' [GProxy горим: 6112 эзэмшиж SEARCHGAME хүлээнэ]' : ''}`);
+    bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP тунел 127.0.0.1:${lp}, эх=${how}, broadcast=${bcast || 'үгүй'}`);
   };
-  // Bind-ийн 3 шатлал (2026-08-31, GProxy загвар):
-  //  1) 0.0.0.0:6112 — ГОЛ ЗАМ. Relay-г WC3-аас ӨМНӨ асаавал энд амжилттай бэхлэгдэж,
-  //     WC3 дараа нь 6113+-д суугаад SEARCHGAME-ээ бидэн рүү цацна (жинхэнэ GProxy горим).
-  //  2) ТОДОРХОЙ LAN IP:6112 — WC3 аль хэдийн 6112-ыг эзэлсэн үеийн зам: war3-ийн
-  //     wildcard-тай зэрэгцэн зөвшөөрөгддөг; 127.0.0.1:6112 руу илгээхэд war3 хүлээж авна.
-  //  3) unbound (санамсаргүй порт) — сүүлчийн арга; WC3 ихэвчлэн үл тоомсорлодог.
+  // Bind: ЗӨВХӨН тодорхой LAN IP:6112 (war3-г ЭВДЭХГҮЙ). Амжилтгүй бол unbound (сүүлчийн арга).
   const tryUnbound = () => {
     const ub = dgram.createSocket('udp4');
     ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
-    ub.bind(() => beginSend(ub, 'OS(unbound)', false));
+    ub.bind(() => beginSend(ub, 'OS(unbound)', null));
   };
-  const trySpecific = () => {
-    const lanIp = _localBindIp();
-    if (!lanIp) { tryUnbound(); return; }
+  const info = _localBindInfo();
+  if (!info) { tryUnbound(); }
+  else {
     const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     let bound = false;
     sock.on('error', (e) => {
       if (bound) { bblog('udp алдаа: ' + e.message); return; }
-      bblog(`bind ${lanIp}:6112 амжилтгүй: ${e.message} → unbound fallback`);
+      bblog(`bind ${info.ip}:6112 амжилтгүй: ${e.message} → unbound fallback`);
       try { sock.close(); } catch {}
       tryUnbound();
     });
-    sock.bind(WC3_PORT, lanIp, () => { bound = true; beginSend(sock, `6112 (${lanIp})`, false); });
-  };
-  const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-  let bound = false;
-  sock.on('error', (e) => {
-    if (bound) { bblog('udp алдаа: ' + e.message); return; }
-    bblog(`bind 0.0.0.0:6112 амжилтгүй (WC3 аль хэдийн эзэлсэн?): ${e.message} → LAN IP оролдоно`);
-    try { sock.close(); } catch {}
-    trySpecific();
-  });
-  sock.bind(WC3_PORT, '0.0.0.0', () => {
-    bound = true;
-    try { sock.setBroadcast(true); } catch {}
-    beginSend(sock, '6112 (0.0.0.0)', true);
-  });
+    sock.bind(WC3_PORT, info.ip, () => { bound = true; beginSend(sock, `6112 (${info.ip})`, info.bcast); });
+  }
   _bot = state;
   return { localPort: lp };
 }

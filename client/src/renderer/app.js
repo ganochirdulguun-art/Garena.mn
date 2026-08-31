@@ -4960,18 +4960,24 @@ init();
     const btn = el('btn-bot-join');
     btn.disabled = true;
     try {
-      // GProxy++-ийн жинхэнэ дараалал (2026-08-31): relay-г WC3-аас ӨМНӨ асаана —
-      // relay UDP 6112-ыг эзэлж, WC3 дараа нь 6113+-д суугаад SEARCHGAME-ээ бидэн рүү
-      // цацна → relay GAMEINFO-гоор хариулж LAN жагсаалтад тоглоом гарна.
-      // (Урьдын "WC3 эхэлж 6112-ыг эзэлнэ" дараалал нь relay-г EACCES-т оруулж,
-      //  санамсаргүй эх порттой пакет WC3-д гологддог байв.)
-      await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
-      bridgeOn = true;
-      // 2) Одоо WC3-ыг асаана
+      // ЗӨВ ДАРААЛАЛ (2026-08-31 v2.5.3, бодит тестээр батлав): WC3 ЭХЛЭЭД асна →
+      // war3.exe 0.0.0.0:6112-ыг эзэмшинэ. Relay-г ЭХЛҮҮЛБЭЛ war3 6112-ыг авч чадахгүй,
+      // 6113-т fallback ХИЙДЭГГҮЙ → "Could not connect to the network" алдаа гардаг
+      // (Phase-2 тестээр war3 ямар ч UDP порт авалгүй унасныг батлав). Тиймээс relay нь
+      // war3-ийн ДАРАА тусдаа IP:6112-т зэрэгцэн суудаг (war3-г огт эвдэхгүй).
       reportJoin(await getWc3Name());
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
-      appendSysMsg('✓ WC3 нээгдэж байна…');
+      appendSysMsg('✓ WC3 нээгдэж байна… (LAN бэлдэж байна)');
+      // war3 бүрэн асаж 6112-ыг эзэлтэл хүлээнэ (~15 сек)
+      let ready = false;
+      for (let i = 0; i < 30; i++) {
+        if (await window.api.isWc3LanReady?.()) { ready = true; break; }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (!ready) await new Promise((r) => setTimeout(r, 3000));
+      await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
+      bridgeOn = true;
       appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
