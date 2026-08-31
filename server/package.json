@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node tests/server.test.js"
+    "test": "node tests/server.test.js && node tests/lanhost.test.js",
+    "test:lan": "node tests/lanhost.test.js"
   },
   "dependencies": {
     "axios": "^1.6.0",

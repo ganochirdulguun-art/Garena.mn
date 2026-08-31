@@ -23,6 +23,7 @@ const adminRoutes         = require('./routes/admin');
 const warkeyRoutes        = require('./routes/warkey');
 const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
+const lanHostRoutes       = require('./routes/lanhost');
 const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
@@ -77,6 +78,7 @@ app.use(apiLimiter);
 // REST Routes
 app.use('/auth', authRoutes);
 app.use('/rooms', botRoutes.roomRouter);   // бот хост (/rooms/:id/bot-host) — roomRoutes-оос ӨМНӨ
+app.use('/rooms', lanHostRoutes.router);   // тоглогч-хост LAN (/rooms/:id/lan-host) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', roomRoutes);
 app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
@@ -161,6 +163,7 @@ roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 socialRoutes.setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
+lanHostRoutes.setIO(io);
 tierSync.start();
 // Diamond 💎 шилжүүлэг / олголтын мэдэгдэл (diamonds:received, membership:updated)
 membershipRoutes.setIO(io);
@@ -212,6 +215,7 @@ function cleanupRoomState(roomId) {
   delete roomMessages[id];
   delete roomReady[id];
   delete roomMembers[id];
+  try { lanHostRoutes.clearRoom(id); } catch {}   // өрөө устахад LAN тоглоомуудыг цэвэрлэнэ
 }
 
 async function setRoomWaitingIfNoPlayersInGame(roomId) {
@@ -624,6 +628,8 @@ io.on('connection', (socket) => {
     }
     // Гарсан тоглогчийн ready state устгах
     if (roomReady[roomId]) roomReady[roomId].delete(userId);
+    // Гарсан тоглогчийн LAN тоглоомуудыг өрөөнөөс устгах (room:lan_lobby_gone)
+    try { lanHostRoutes.removeUserGames(roomId, userId); } catch {}
     // Онлайн статус шинэчлэх
     if (onlineUsers.has(socket.id)) {
       onlineUsers.set(socket.id, { username, userId, status: 'online' });
@@ -667,6 +673,8 @@ io.on('connection', (socket) => {
           }
           // Тоглогчийн ready state устгах (room isolation)
           if (roomReady[roomId]) roomReady[roomId].delete(userId);
+          // Салсан тоглогчийн LAN тоглоомуудыг цэвэрлэх (relay control ч тасарна)
+          try { lanHostRoutes.removeUserGames(roomId, userId); } catch {}
           // Хост байсан бол DB-с өрөөг автоматаар устгах
           if (dbForMigration && userId) {
             try {
