@@ -319,18 +319,40 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
     tick();
     bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP тунел 127.0.0.1:${lp}, эх порт=${how}`);
   };
-  // 0.0.0.0:6112-т reuseAddr-ээр bind (WC3-тай зэрэгцэн) → бүтэхгүй бол unbound (эх порт 6112 биш, сүүлчийн арга)
-  const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-  let bound = false;
-  sock.on('error', (e) => {
-    if (bound) { bblog('udp алдаа: ' + e.message); return; }
-    bblog(`bind 0.0.0.0:6112 амжилтгүй: ${e.message} → unbound fallback`);
-    try { sock.close(); } catch {}
-    const ub = dgram.createSocket('udp4');
-    ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
-    ub.bind(() => beginSend(ub, 'OS(unbound)'));
-  });
-  sock.bind(WC3_PORT, '0.0.0.0', () => { bound = true; beginSend(sock, '6112'); });
+  // Bind-ийн 3 шатлал (2026-08-31 засвар — WC3 нээлттэй үед ч эх порт 6112 хадгална):
+  //  1) ТОДОРХОЙ LAN IP:6112 — Windows дээр war3-ийн 0.0.0.0:6112 wildcard bind-тэй
+  //     ЗЭРЭГЦЭН зөвшөөрөгддөг (war3 SO_EXCLUSIVEADDRUSE тавьдаггүй). 127.0.0.1:6112 руу
+  //     илгээхэд очих хаягийн тодорхой socket байхгүй тул war3-ийн wildcard хүлээж авна;
+  //     эх нь LAN_IP:6112 → WC3-ийн "эх порт 6112" шаардлага хангагдана.
+  //  2) 0.0.0.0:6112 reuseAddr — WC3 хараахан асаагүй үед ажилладаг хуучин зам.
+  //  3) unbound (санамсаргүй порт) — сүүлчийн арга; WC3 ихэвчлэн үл тоомсорлодог.
+  const tryWildcard = () => {
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    let bound = false;
+    sock.on('error', (e) => {
+      if (bound) { bblog('udp алдаа: ' + e.message); return; }
+      bblog(`bind 0.0.0.0:6112 амжилтгүй: ${e.message} → unbound fallback`);
+      try { sock.close(); } catch {}
+      const ub = dgram.createSocket('udp4');
+      ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
+      ub.bind(() => beginSend(ub, 'OS(unbound)'));
+    });
+    sock.bind(WC3_PORT, '0.0.0.0', () => { bound = true; beginSend(sock, '6112 (wildcard)'); });
+  };
+  const lanIp = _localBindIp();
+  if (lanIp) {
+    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    let bound = false;
+    sock.on('error', (e) => {
+      if (bound) { bblog('udp алдаа: ' + e.message); return; }
+      bblog(`bind ${lanIp}:6112 амжилтгүй: ${e.message} → wildcard оролдоно`);
+      try { sock.close(); } catch {}
+      tryWildcard();
+    });
+    sock.bind(WC3_PORT, lanIp, () => { bound = true; beginSend(sock, `6112 (${lanIp})`); });
+  } else {
+    tryWildcard();
+  }
   _bot = state;
   return { localPort: lp };
 }
