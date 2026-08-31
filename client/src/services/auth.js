@@ -5,7 +5,17 @@ const { app } = require('electron');
 const TOKEN_PATH = path.join(app.getPath('userData'), 'token.json');
 
 function saveToken(token, userData) {
-  const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+  // JWT-г найдваргүй эх сурвалжаас (deep-link garenamn://auth?token=...) авч болзошгүй тул
+  // 3 хэсэгтэй, payload нь зөв JSON, exp талбартай эсэхийг шалгана — гэмтэлтэй token uncaught throw хийхээс сэргийлнэ.
+  let payload;
+  try {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) throw new Error('malformed jwt');
+    payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+    if (!payload || typeof payload !== 'object' || !payload.exp) throw new Error('invalid payload');
+  } catch (e) {
+    throw new Error('Буруу нэвтрэх токен');
+  }
   // userData байвал бүрэн хэрэглэгчийн мэдээлэл хадгална (avatar_url, email, wins, losses г.м.)
   const user = userData ? { ...payload, ...userData } : payload;
   fs.writeFileSync(TOKEN_PATH, JSON.stringify({ token, user }), 'utf-8');

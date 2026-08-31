@@ -118,6 +118,13 @@ async function runMigrations(db) {
     -- WC3-ийн LAN нэр (registry userlocal / REQJOIN) — платформын нэрээс өөр байдаг тул дүн тааруулахад хэрэглэнэ (2026-08-23)
     ALTER TABLE users ADD COLUMN IF NOT EXISTS wc3_name VARCHAR(64);
 
+    -- Платформ дээр бот-хостоор тоглосон тоглолтын хож/хожигдол. wins/losses нь TierBot-ын
+    -- гадаад ранкингийн эрх мэдэгч утга бөгөөд 10 мин тутам sync-ээр дардаг тул платформын
+    -- тоглолтыг ТУСДАА баганад хуримтлуулна. Дэлгэцэнд (wins+platform_wins) нийлбэрээр харуулна.
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS platform_wins   INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS platform_losses INTEGER DEFAULT 0;
+
     -- Ботын тоглоомд "WC3 нээж нэгдэх" дарсан гишүүд: WC3 нэр + нийтийн IP → GHost++-ийн тоглогчийн жагсаалттай тааруулна
     CREATE TABLE IF NOT EXISTS bot_job_players (
       job_id      INTEGER REFERENCES bot_jobs(id) ON DELETE CASCADE,

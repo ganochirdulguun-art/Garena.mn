@@ -14,6 +14,21 @@ const gameRelayService = require('./src/services/gameRelay');
 
 const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.railway.app';
 
+// preload (getToken/request)-той цонхнуудыг хатууруулна: гаднын origin руу шилжих буюу
+// popup нээхийг хориглоно — ингэснээр renderer-т ямар нэг script орлого гарсан ч JWT/API-г
+// гаднын хост руу гаргах боломжгүй (зөвхөн локал file:// навигаци зөвшөөрнө).
+function hardenWindow(win) {
+  if (!win || !win.webContents) return;
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Гадаад http(s) холбоосыг системийн browser-т нээнэ, апп цонхонд БИШ
+    if (/^https?:\/\//i.test(url)) { shell.openExternal(url).catch(() => {}); }
+    return { action: 'deny' };
+  });
+  win.webContents.on('will-navigate', (e, url) => {
+    if (!/^file:\/\//i.test(url)) e.preventDefault();
+  });
+}
+
 // ── Auto-updater тохиргоо ─────────────────────────────────
 autoUpdater.autoDownload    = true;   // суллагдмагц дэвсгэрт татна
 autoUpdater.autoInstallOnAppQuit = true; // апп хаагдах үед татагдсан шинэчлэлт чимээгүй суудаг
@@ -63,6 +78,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile('src/renderer/index.html');
+  hardenWindow(mainWindow);
   // Найзууд цонх үндсэн цонхны хажууд наалдаж явна; үндсэн цонх хаагдахад хамт хаагдана
   mainWindow.on('moved', dockFriendsWindow);
   mainWindow.on('resized', dockFriendsWindow);
@@ -151,16 +167,20 @@ app.on('open-url', (event, url) => {
 });
 
 function handleDeepLink(url) {
-  const parsed = new URL(url);
-  if (parsed.hostname === 'auth') {
-    const token = parsed.searchParams.get('token');
-    if (token) {
-      authService.saveToken(token);
-      // Серверээс бүрэн мэдээлэл (avatar_url г.м.) авах
-      fetchAndSaveUser().then(() => {
-        mainWindow?.webContents.send('auth:success', authService.getUser());
-      });
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === 'auth') {
+      const token = parsed.searchParams.get('token');
+      if (token) {
+        authService.saveToken(token); // гэмтэлтэй/хуурамч token бол throw хийнэ
+        // Серверээс бүрэн мэдээлэл (avatar_url г.м.) авах
+        fetchAndSaveUser().then(() => {
+          mainWindow?.webContents.send('auth:success', authService.getUser());
+        }).catch((e) => console.error('[DeepLink] fetchAndSaveUser', e?.message));
+      }
     }
+  } catch (e) {
+    console.error('[DeepLink] буруу URL/токен:', e?.message);
   }
 }
 
@@ -390,7 +410,13 @@ ipcMain.handle('rooms:mine', async () => {
 // Ерөнхий нэвтэрсэн API хүсэлт (Банк, гишүүнчлэл гэх мэт шинэ endpoint-ууд)
 ipcMain.handle('api:request', async (_event, { method, path: urlPath, body } = {}) => {
   const allowed = ['get', 'post', 'put', 'patch', 'delete'];
-  if (!allowed.includes(String(method || '').toLowerCase()) || typeof urlPath !== 'string' || !urlPath.startsWith('/')) {
+  // urlPath заавал нэг '/'-ээр эхэлж, дараа нь '/' эсвэл '\' БИШ байх ёстой.
+  // "//host" эсвэл "/\host" нь axios-т protocol-relative абсолют URL болж, baseURL-ыг
+  // тойрч JWT-г гаднын хост руу илгээх эрсдэлтэй. Абсолют URL (scheme://)-г мөн хаана.
+  const badPath = typeof urlPath !== 'string'
+    || !/^\/(?![/\\])/.test(urlPath)
+    || /^[a-z][a-z\d+.-]*:\/\//i.test(urlPath);
+  if (!allowed.includes(String(method || '').toLowerCase()) || badPath) {
     throw new Error('Буруу хүсэлт');
   }
   try { return await apiService.request(method, urlPath, body); } catch (err) { throw apiError(err); }
@@ -626,6 +652,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
       backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
     },
   });
+  hardenWindow(roomWindow);
   // Тоглолт явагдаж байхад санамсаргүй хаахаас сэргийлнэ — цонх хаагдвал
   // өрөөнөөс гарч (host бол өрөө устаж), relay зогсож холболт тасарна
   roomWindow.on('close', (e) => {
@@ -674,6 +701,7 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
   dmWin.loadFile('src/renderer/index.html', {
     query: { mode: 'dm', dmUserId: uid, dmUsername: username },
   });
+  hardenWindow(dmWin);
   dmWin.on('closed', () => {
     dmWindows.delete(uid);
     mainWindow?.webContents.send('dm:window-closed', { userId: uid });
@@ -714,6 +742,7 @@ function openFriendsWindow() {
     backgroundColor: '#0d0d1a',
   });
   friendsWindow.loadFile('src/renderer/index.html', { query: { mode: 'friends' } });
+  hardenWindow(friendsWindow);
   friendsWindow.on('closed', () => { friendsWindow = null; });
   friendsWindow.once('ready-to-show', dockFriendsWindow);
   dockFriendsWindow();

@@ -822,7 +822,7 @@ function makeDiamondMockDb(users) {
       const rows = [...users.values()].filter((u) => u.username.toLowerCase() === String(params[0]).toLowerCase()).map((u) => ({ id: u.id, username: u.username, diamonds: u.diamonds }));
       return { rows };
     }
-    if (s.startsWith('SELECT id, username, email, discord_id, discord_username, avatar_url, wins, losses, membership')) {
+    if (s.startsWith('SELECT id, username, email, discord_id, discord_username, avatar_url,') && s.includes('membership')) {
       const u = users.get(Number(params[0]));
       return { rows: u ? [{ ...u }] : [] };
     }
@@ -1058,6 +1058,49 @@ async function testBotResultMapsWc3NamesAndIps() {
   }
 }
 
+// Аюулгүй байдал: сөрөг kills/assists XP-г хасахгүй (итгэлгүй хост/replay өгөгдөл)
+async function testXpClampsNegativeStats() {
+  const { xpFor, RULES } = require(path.join(serverDir, 'src', 'services', 'progression.js'));
+  // Сөрөг kills → KDA бонус 0, суурь XP хэвээр
+  assert.equal(xpFor({ isWinner: true, kills: -1000000, assists: -5 }), RULES.XP_WIN);
+  assert.equal(xpFor({ isWinner: false, kills: -10, assists: 0 }), RULES.XP_LOSS);
+  // Эерэг утга дээд хязгаараар хязгаарлагдана
+  assert.equal(xpFor({ isWinner: true, kills: 100000, assists: 0 }), RULES.XP_WIN + RULES.XP_KDA_CAP);
+}
+
+// Аюулгүй байдал: дуусаагүй/цуцлагдсан жоб дээр дүн бүртгэхийг татгалзана (хуурамч XP/💎/wins-ээс сэргийлнэ)
+async function testBotResultRejectsInactiveJob() {
+  const inserted = [];
+  const job = { id: 11, room_id: 3, status: 'cancelled', map_key: 'lod', map_name: 'LoD', game_name: 'GMN#11' };
+  const query = async (sql) => {
+    const s = sql.replace(/\s+/g, ' ').trim();
+    if (s === 'SELECT 1' || s === 'BEGIN' || s === 'COMMIT' || s === 'ROLLBACK') return { rows: [{ '?column?': 1 }], rowCount: 1 };
+    if (s.startsWith('SELECT * FROM bot_jobs WHERE id = $1')) return { rows: [job] };
+    if (s.startsWith('INSERT INTO game_results')) { inserted.push(1); return { rows: [{ id: 1 }] }; }
+    return { rows: [], rowCount: 0 };
+  };
+  const mockDb = { query, connect: async () => ({ query, release() {} }) };
+  const server = await startServer({ BOT_API_KEY: 'bot-secret' }, { mockDb });
+  try {
+    // Цуцлагдсан жоб дээр дүн → 409, дүн бүртгэгдэхгүй
+    let res = await fetch(`${server.baseUrl}/bot/jobs/11/result`, {
+      method: 'POST', headers: { 'x-bot-key': 'bot-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ winner_team: 1, duration_minutes: 20, players: [{ name: 'X', team: 1 }] }),
+    });
+    assert.equal(res.status, 409, 'cancelled job result must be rejected');
+    assert.equal(inserted.length, 0, 'no game_results row for inactive job');
+
+    // Цуцлагдсан жоб дээр started → 409
+    res = await fetch(`${server.baseUrl}/bot/jobs/11/started`, {
+      method: 'POST', headers: { 'x-bot-key': 'bot-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ players: [] }),
+    });
+    assert.equal(res.status, 409, 'cancelled job cannot be marked started');
+  } finally {
+    await server.stop();
+  }
+}
+
 // C4: abuse хамгаалалт — forgot-password IP limiter (10/15 мин) + хэрэглэгч бүрийн perUser limiter
 async function testRateLimits() {
   const rl = require(path.join(serverDir, 'src', 'middleware', 'ratelimit.js'));
@@ -1141,6 +1184,8 @@ async function testBotAdminOverview() {
   await runTest('platform owner has unlimited diamonds (transfer + membership without deduction)', testOwnerUnlimitedDiamonds);
   await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
   await runTest('bot result maps GHost++ players to users by WC3 name, then IP; learns wc3_name', testBotResultMapsWc3NamesAndIps);
+  await runTest('bot result/started reject inactive (cancelled) jobs with 409', testBotResultRejectsInactiveJob);
+  await runTest('XP calc clamps negative kills/assists to base (no XP drain)', testXpClampsNegativeStats);
   await runTest('rate limits: forgot-password per IP, perUser limiter per account', testRateLimits);
   await runTest('bot admin overview is admin-only and lists jobs/events', testBotAdminOverview);
 

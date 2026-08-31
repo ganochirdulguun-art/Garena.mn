@@ -6,6 +6,8 @@ let db;
 try { db = require('../config/db'); } catch { db = null; }
 
 function toInt(v, d = 0) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : d; }
+// Итгэлгүй тоглогчийн статистикийг 0..cap мужид барих (сөрөг/утгагүй өгөгдлөөс хамгаална)
+function clampStat(v) { return Math.max(0, Math.min(10000, toInt(v, 0))); }
 
 /**
  * players: [{ user_id?, name?, ip?, discord_id?, team (1|2), kills?, deaths?, assists?, hero?, left_at_sec?, is_leaver? }]
@@ -18,18 +20,6 @@ async function recordGameResult({
 }) {
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
-
-  const existing = await db.query('SELECT id, played_at, source FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL \'12 hours\' ORDER BY id DESC LIMIT 1', [roomId]);
-  const roomStatus = await db.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
-  // Давхар бүртгэлээс хамгаална: (а) өрөө 'playing' биш байхад (replay watcher хожуу ирсэн гэх мэт),
-  // (б) сүүлийн 10 минутад энэ өрөөнд дүн бүртгэгдсэн бол — бот хостын дүн + хостын replay хоёулаа
-  // нэг тоглолтын төлөө ирдэг (XP/💎 давхар олгохгүй). Дараагийн жинхэнэ тоглолт 8+ минут үргэлжилнэ.
-  if (existing.rows[0]) {
-    const ageMs = Date.now() - new Date(existing.rows[0].played_at).getTime();
-    if (roomStatus.rows[0]?.status !== 'playing' || ageMs < 10 * 60 * 1000) {
-      return { duplicate: true, result: existing.rows[0] };
-    }
-  }
 
   const membersResult = await db.query(
     `SELECT u.id, u.username, u.discord_id, u.wc3_name, rp.team AS room_team
@@ -82,7 +72,7 @@ async function recordGameResult({
       || (leftAt != null && leftAt < RULES.LEAVER_BEFORE_SEC && leftAt < toInt(durationMinutes, 0) * 60 - 60);
     return {
       user_id: userId, wc3_name: p.name || null, team,
-      kills: toInt(p.kills), deaths: toInt(p.deaths), assists: toInt(p.assists),
+      kills: clampStat(p.kills), deaths: clampStat(p.deaths), assists: clampStat(p.assists),
       hero: p.hero ? String(p.hero).slice(0, 64) : null, left_at_sec: leftAt, is_leaver: isLeaver,
     };
   });
@@ -90,6 +80,21 @@ async function recordGameResult({
   const client = await db.connect();
   try {
     await client.query('BEGIN');
+    // Өрөө бүрт транзакцын хугацаанд advisory lock — бот хостын дүн ба хостын replay
+    // нэг тоглолтод бараг зэрэг ирдэг тул давхар бүртгэлийг (XP/💎/wins давхардал) атомоор хаана.
+    const lockKey = Number.parseInt(roomId, 10);
+    if (Number.isFinite(lockKey)) await client.query('SELECT pg_advisory_xact_lock($1)', [lockKey]);
+    // Lock авсны дараа транзакц дотор давхар шалгалт: (а) өрөө 'playing' биш (replay хожуу),
+    // (б) сүүлийн 10 мин дотор энэ өрөөнд дүн бүртгэгдсэн бол → давхардал гэж үзнэ.
+    const existing = await client.query('SELECT id, played_at, source FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL \'12 hours\' ORDER BY id DESC LIMIT 1', [roomId]);
+    const roomStatus = await client.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
+    if (existing.rows[0]) {
+      const ageMs = Date.now() - new Date(existing.rows[0].played_at).getTime();
+      if (roomStatus.rows[0]?.status !== 'playing' || ageMs < 10 * 60 * 1000) {
+        await client.query('COMMIT');
+        return { duplicate: true, result: existing.rows[0] };
+      }
+    }
     const rr = await client.query(
       `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path, source, bot_job_id, map_name, game_name)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
@@ -101,9 +106,11 @@ async function recordGameResult({
       const isWinner = p.team === Number(winnerTeam) && !p.is_leaver;
       let award = { xp_earned: 0, diamonds_earned: 0 };
       if (p.user_id) {
-        const col = isWinner ? 'wins' : 'losses';
+        // Платформын бот-тоглолтын хож/хожигдлыг ТУСДАА баганад — wins/losses нь TierBot-ын
+        // эрх мэдэгч утга бөгөөд sync-ээр дардаг (үгүй бол платформын тоглолт 10 мин тутам устана).
+        const col = isWinner ? 'platform_wins' : 'platform_losses';
         if (toInt(durationMinutes) >= RULES.MIN_GAME_MINUTES) {
-          await client.query(`UPDATE users SET ${col} = ${col} + 1 WHERE id = $1`, [p.user_id]);
+          await client.query(`UPDATE users SET ${col} = COALESCE(${col}, 0) + 1 WHERE id = $1`, [p.user_id]);
         }
         award = await awardGameOutcome(client, {
           userId: p.user_id, isWinner, isLeaver: p.is_leaver, kills: p.kills, assists: p.assists,

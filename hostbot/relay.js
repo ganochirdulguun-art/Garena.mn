@@ -23,6 +23,7 @@ const CFG = {
   KEY: process.env.RELAY_KEY || process.env.BOT_KEY || '',
   PUBLIC_IP: process.env.PUBLIC_IP || '',
   SESSION_TIMEOUT_MS: Number(process.env.RELAY_SESSION_TIMEOUT_MS || 15000),
+  HANDSHAKE_TIMEOUT_MS: Number(process.env.RELAY_HANDSHAKE_TIMEOUT_MS || 10000),
   MAX_HANDSHAKE: 8192,
 };
 
@@ -35,13 +36,17 @@ function log(...a) { console.log(new Date().toISOString(), '[relay]', ...a); }
 // Socket-оос эхний newline хүртэлх JSON-ыг уншаад {msg, leftover}-ыг буцаана.
 function readHandshake(sock, cb) {
   let buf = Buffer.alloc(0);
+  // Handshake newline ирэхгүй бол socket мөнхөд нээлттэй үлдэхээс сэргийлж timeout тавина
+  // (auth-гүй slowloris маягийн FD/санах ой шавхах DoS-оос хамгаална).
+  const hsTimer = setTimeout(() => { try { sock.destroy(); } catch {} }, CFG.HANDSHAKE_TIMEOUT_MS);
   const onData = (d) => {
     buf = Buffer.concat([buf, d]);
     const nl = buf.indexOf(0x0a);
     if (nl === -1) {
-      if (buf.length > CFG.MAX_HANDSHAKE) { try { sock.destroy(); } catch {} }
+      if (buf.length > CFG.MAX_HANDSHAKE) { clearTimeout(hsTimer); try { sock.destroy(); } catch {} }
       return;
     }
+    clearTimeout(hsTimer);
     sock.removeListener('data', onData);
     const line = buf.slice(0, nl).toString('utf8').trim();
     const leftover = buf.slice(nl + 1);
@@ -50,7 +55,8 @@ function readHandshake(sock, cb) {
     cb(msg, leftover);
   };
   sock.on('data', onData);
-  sock.on('error', () => {});
+  sock.on('error', () => { clearTimeout(hsTimer); });
+  sock.on('close', () => { clearTimeout(hsTimer); });
 }
 
 // 2 socket-ыг хос чиглэлд холбоно. Тус бүрийн leftover (handshake-ийн дараах байт)-ыг эсрэг тал руу түлхэнэ.

@@ -34,9 +34,10 @@ contextBridge.exposeInMainWorld('api', {
   getRanking:       (opts)      => ipcRenderer.invoke('stats:ranking', opts),
   syncTierBot:      (payload)   => ipcRenderer.invoke('stats:tierbotSync', payload),
 
-  // Тоглоом дуусах event
-  onGameResult: (cb) => ipcRenderer.on('game:result', (_, data) => cb(data)),
-  onGameExited: (cb) => ipcRenderer.on('game:exited', () => cb()),
+  // Тоглоом дуусах event — connectSocket() дахин ажиллах бүрт бүртгэгддэг тул
+  // хуучин handler-ыг эхлээд устгана (үгүй бол давхарлаж game-end 2 удаа боловсрогдоно)
+  onGameResult: (cb) => { ipcRenderer.removeAllListeners('game:result'); ipcRenderer.on('game:result', (_, data) => cb(data)); },
+  onGameExited: (cb) => { ipcRenderer.removeAllListeners('game:exited'); ipcRenderer.on('game:exited', () => cb()); },
   killGame:     ()   => ipcRenderer.invoke('game:kill'),
   setReplayMembers: (members) => ipcRenderer.invoke('replay:setMembers', members),
 

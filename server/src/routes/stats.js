@@ -42,7 +42,9 @@ async function ensureTierBotColumns() {
       ADD COLUMN IF NOT EXISTS tierbot_rating INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS tierbot_tier VARCHAR(100),
       ADD COLUMN IF NOT EXISTS tierbot_rank INTEGER,
-      ADD COLUMN IF NOT EXISTS tierbot_synced_at TIMESTAMP;
+      ADD COLUMN IF NOT EXISTS tierbot_synced_at TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS platform_wins INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS platform_losses INTEGER DEFAULT 0;
 
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_id ON users(tierbot_id);
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_rating ON users(tierbot_rating DESC);
@@ -197,7 +199,7 @@ router.get('/player/:discord_id', async (req, res) => {
   if (await dbAvailable()) {
     try {
       const result = await db.query(
-        'SELECT id, username, avatar_url, wins, losses, created_at FROM users WHERE discord_id = $1',
+        'SELECT id, username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at FROM users WHERE discord_id = $1',
         [discord_id]
       );
       if (!result.rows[0]) return res.status(404).json({ error: 'Тоглогч олдсонгүй' });
@@ -216,7 +218,7 @@ router.get('/player/id/:userId', async (req, res) => {
   if (await dbAvailable()) {
     try {
       const result = await db.query(
-        'SELECT id, username, avatar_url, wins, losses, created_at FROM users WHERE id = $1',
+        'SELECT id, username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at FROM users WHERE id = $1',
         [userId]
       );
       if (!result.rows[0]) return res.status(404).json({ error: 'Тоглогч олдсонгүй' });
@@ -278,11 +280,14 @@ router.get('/ranking', async (req, res) => {
   const offset = (page - 1) * limit;
   const sortBy = req.query.sort || 'wins';
 
+  // tw/tl = нийт хож/хожигдол (TierBot + платформ). Эрэмбэ/винрэйтэд нийлбэрийг ашиглана.
+  const TW = '(COALESCE(wins,0)+COALESCE(platform_wins,0))';
+  const TL = '(COALESCE(losses,0)+COALESCE(platform_losses,0))';
   const allowedSorts = {
-    wins:        'wins DESC',
-    winrate:     'CASE WHEN (wins+losses)>0 THEN wins::DECIMAL/(wins+losses) ELSE 0 END DESC',
-    total_games: '(wins+losses) DESC',
-    rating:      'tierbot_rating DESC NULLS LAST, tierbot_rank ASC NULLS LAST, wins DESC',
+    wins:        `${TW} DESC`,
+    winrate:     `CASE WHEN (${TW}+${TL})>0 THEN ${TW}::DECIMAL/(${TW}+${TL}) ELSE 0 END DESC`,
+    total_games: `(${TW}+${TL}) DESC`,
+    rating:      `tierbot_rating DESC NULLS LAST, tierbot_rank ASC NULLS LAST, ${TW} DESC`,
   };
   const orderClause = allowedSorts[sortBy] || allowedSorts.wins;
 
@@ -290,23 +295,24 @@ router.get('/ranking', async (req, res) => {
     try {
       await ensureTierBotColumns();
       const result = await db.query(`
-        SELECT id, username, avatar_url, wins, losses,
+        SELECT id, username, avatar_url,
+          ${TW} AS wins, ${TL} AS losses,
           COALESCE(tierbot_rating, 0) AS tierbot_rating,
           tierbot_tier,
           tierbot_rank,
           tierbot_synced_at,
-          CASE WHEN (wins+losses)>0
-            THEN ROUND((wins::DECIMAL/(wins+losses))*100, 1)
+          CASE WHEN (${TW}+${TL})>0
+            THEN ROUND((${TW}::DECIMAL/(${TW}+${TL}))*100, 1)
             ELSE 0
           END AS winrate
         FROM users
-        WHERE (wins + losses) > 0 OR COALESCE(tierbot_rating, 0) > 0 OR tierbot_rank IS NOT NULL
+        WHERE (${TW} + ${TL}) > 0 OR COALESCE(tierbot_rating, 0) > 0 OR tierbot_rank IS NOT NULL
         ORDER BY ${orderClause}
         LIMIT $1 OFFSET $2
       `, [limit, offset]);
 
       const countResult = await db.query(
-        'SELECT COUNT(*) FROM users WHERE (wins + losses) > 0 OR COALESCE(tierbot_rating, 0) > 0 OR tierbot_rank IS NOT NULL'
+        `SELECT COUNT(*) FROM users WHERE (${TW} + ${TL}) > 0 OR COALESCE(tierbot_rating, 0) > 0 OR tierbot_rank IS NOT NULL`
       );
 
       return res.json({

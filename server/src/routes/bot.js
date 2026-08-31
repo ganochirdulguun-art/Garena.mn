@@ -299,8 +299,12 @@ botRouter.post('/jobs/:id/lobby', async (req, res) => {
 // Тоглолт эхэллээ: { players: [{name, ip?, slot?, team?}] }
 botRouter.post('/jobs/:id/started', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
+  if (job.status === 'started') return res.json({ ok: true, already: true });
   try {
-    await db.query(`UPDATE bot_jobs SET status = 'started', started_at = NOW(), updated_at = NOW() WHERE id = $1`, [job.id]);
+    // Зөвхөн hosting/lobby төлөвөөс started болгоно — цуцлагдсан/дууссан жоб дээр
+    // хуурамч "тоглолт эхэллээ" цацаж өрөөг playing болгохоос сэргийлнэ
+    const upd = await db.query(`UPDATE bot_jobs SET status = 'started', started_at = NOW(), updated_at = NOW() WHERE id = $1 AND status IN ('hosting','lobby') RETURNING id`, [job.id]);
+    if (!upd.rows[0]) return res.status(409).json({ error: `job is '${job.status}', not hosting/lobby` });
     botops.record('info', 'job_started', `Ажил #${job.id} (${job.game_name}) эхэллээ — ${(req.body?.players || []).length} тоглогч`, { job_id: job.id });
     if (job.room_id) {
       await db.query(`UPDATE rooms SET status = 'playing' WHERE id = $1`, [job.room_id]);
@@ -317,6 +321,9 @@ botRouter.post('/jobs/:id/result', async (req, res) => {
   const { winner_team, duration_minutes, players } = req.body || {};
   if (![1, 2].includes(Number(winner_team)) || !Array.isArray(players)) return res.status(400).json({ error: 'winner_team (1|2) + players[] required' });
   if (job.status === 'finished') return res.json({ ok: true, already: true, game_result_id: job.game_result_id });
+  // Зөвхөн бодит тоглолт эхэлсэн (lobby/started) жобын дүнг хүлээн авна —
+  // queued/cancelled/failed жоб дээр хуурамч дүнгээр XP/💎/wins үүсгэхээс сэргийлнэ
+  if (!['lobby', 'started'].includes(job.status)) return res.status(409).json({ error: `job is '${job.status}', cannot record result` });
   try {
     const out = await recordGameResult({
       roomId: job.room_id, winnerTeam: Number(winner_team), durationMinutes: Number(duration_minutes || 0),
@@ -344,8 +351,10 @@ botRouter.post('/jobs/:id/result', async (req, res) => {
 // Алдаа: { error }
 botRouter.post('/jobs/:id/failed', async (req, res) => {
   const job = await loadJob(req, res); if (!job) return;
+  // Дууссан жобыг 'failed' болгож дүнгийн холбоосыг арилгахаас сэргийлнэ
+  if (job.status === 'finished') return res.json({ ok: true, already: true });
   try {
-    await db.query(`UPDATE bot_jobs SET status = 'failed', error = $1, finished_at = NOW(), updated_at = NOW() WHERE id = $2`, [String(req.body?.error || 'unknown').slice(0, 500), job.id]);
+    await db.query(`UPDATE bot_jobs SET status = 'failed', error = $1, finished_at = NOW(), updated_at = NOW() WHERE id = $2 AND status <> 'finished'`, [String(req.body?.error || 'unknown').slice(0, 500), job.id]);
     const err = String(req.body?.error || 'unknown');
     // lobby timeout (хэн ч нэгдээгүй) = энгийн; бусад алдаа = Discord мэдэгдэл
     botops.alert(/lobby (дууссан|timeout)/i.test(err) ? 'info' : 'warn', 'job_failed', `Ажил #${job.id} (${job.game_name}, өрөө ${job.room_id}) FAILED: ${err.slice(0, 300)}`, { job_id: job.id, bot: job.bot_name });

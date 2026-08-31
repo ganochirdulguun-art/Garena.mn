@@ -200,6 +200,18 @@ function checkRateLimit(socket) {
   return false;
 }
 
+// Хэрэглэгч тухайн өрөөнд өөр амьд socket-той эсэх (олон цонх нээсэн үед
+// нэг цонх хаагдахад grace timer өрөөг нь устгачихгүйн тулд)
+function userHasLiveSocketInRoom(userId, roomId, excludeSocketId = null) {
+  const uid = String(userId);
+  const rid = String(roomId);
+  for (const sock of io.sockets.sockets.values()) {
+    if (excludeSocketId && sock.id === excludeSocketId) continue;
+    if (String(sock.user?.id || '') === uid && String(sock.data.roomId || '') === rid) return true;
+  }
+  return false;
+}
+
 // Тухайн өрөөнд in_game статустай идэвхтэй socket байгаа эсэх
 function roomHasInGamePlayer(roomId) {
   return [...onlineUsers.entries()].some(([socketId, user]) => {
@@ -332,6 +344,7 @@ io.on('connection', (socket) => {
   // Лоббид бүртгүүлэх (апп нээгдэхэд дуудагдана)
   // JWT-ийн мэдээллийг ашиглана — client-ийн утгыг хэрэглэхгүй
   socket.on('lobby:register', () => {
+    if (checkRateLimit(socket)) return;   // broadcast-storm спамаас хамгаална
     const username = socket.user.username;
     const userId   = String(socket.user.id);
     socket.data.username = username;
@@ -397,12 +410,14 @@ io.on('connection', (socket) => {
     const prevRoom = socket.data.roomId;
     if (prevRoom && String(prevRoom) !== String(roomId)) {
       socket.leave(prevRoom);
-      if (roomMembers[prevRoom]) {
+      // Энэ socket-оос бусад амьд цонх prevRoom-д үлдсэн эсэх (өөрийгөө хасна)
+      const stillInPrev = userHasLiveSocketInRoom(userId, prevRoom, socket.id);
+      if (!stillInPrev && roomMembers[prevRoom]) {
         roomMembers[prevRoom].delete(username);
         io.to(prevRoom).emit('room:user_left', { username });
         io.to(prevRoom).emit('room:members', membersArray(prevRoom));
       }
-      if (roomReady[prevRoom]) roomReady[prevRoom].delete(userId);
+      if (!stillInPrev && roomReady[prevRoom]) roomReady[prevRoom].delete(userId);
     }
 
     socket.join(roomId);
@@ -602,11 +617,15 @@ io.on('connection', (socket) => {
   });
 
   // Typing indicator (DM)
-  socket.on('typing:start', ({ toUserId }) => {
+  socket.on('typing:start', async ({ toUserId }) => {
+    if (checkRateLimit(socket)) return;
+    // Хаасан хэрэглэгч рүү typing дохио явуулахгүй (private:message-тэй ижил бодлого)
+    try { if (await socialRoutes.isUserBlocked(String(toUserId), String(socket.user.id))) return; } catch {}
     io.to(`user:${String(toUserId)}`).emit('typing:start', { fromUserId: String(socket.user.id), fromUsername: socket.user.username });
   });
 
   socket.on('typing:stop', ({ toUserId }) => {
+    if (checkRateLimit(socket)) return;
     io.to(`user:${String(toUserId)}`).emit('typing:stop', { fromUserId: String(socket.user.id) });
   });
 
@@ -621,13 +640,15 @@ io.on('connection', (socket) => {
     }
     socket.leave(roomId);
     socket.data.roomId = null;
-    if (roomMembers[roomId]) {
+    // Хэрэглэгч энэ өрөөнд өөр амьд цонхтой хэвээр байвал гишүүнчлэлийг хадгална
+    const stillInRoom = userHasLiveSocketInRoom(userId, roomId, socket.id);
+    if (!stillInRoom && roomMembers[roomId]) {
       roomMembers[roomId].delete(username);
       io.to(roomId).emit('room:user_left', { username });
       io.to(roomId).emit('room:members', membersArray(roomId));
     }
     // Гарсан тоглогчийн ready state устгах
-    if (roomReady[roomId]) roomReady[roomId].delete(userId);
+    if (!stillInRoom && roomReady[roomId]) roomReady[roomId].delete(userId);
     // Гарсан тоглогчийн LAN тоглоомуудыг өрөөнөөс устгах (room:lan_lobby_gone)
     try { lanHostRoutes.removeUserGames(roomId, userId); } catch {}
     // Онлайн статус шинэчлэх
@@ -665,6 +686,12 @@ io.on('connection', (socket) => {
         username,
         timer: setTimeout(async () => {
           delete disconnectTimers[userId];
+          // Хэрэглэгч тухайн өрөөнд өөр амьд socket-той (олон цонх) байвал
+          // өрөө/гишүүнчлэлийг устгахгүй — нэг цонх хаагдсан нь бусдыг хөндөхгүй
+          if (userHasLiveSocketInRoom(userId, roomId)) {
+            console.log(`[Rejoin] ${username} өөр цонхоор өрөө ${roomId}-д амьд — grace цуцлав`);
+            return;
+          }
           // Хугацаа дуусав — өрөөнөөс бүрмөсөн гарна
           if (roomMembers[roomId]) {
             roomMembers[roomId].delete(username);

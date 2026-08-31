@@ -35,7 +35,11 @@ function levelProgress(xp) {
 function xpFor({ isWinner, isLeaver, kills = 0, assists = 0 }) {
   if (isLeaver) return RULES.XP_LEAVER;
   const base = isWinner ? RULES.XP_WIN : RULES.XP_LOSS;
-  const kda = Math.min(RULES.XP_KDA_CAP, Math.round(kills * RULES.XP_PER_KILL + assists * RULES.XP_PER_ASSIST));
+  // kills/assists сөрөг байж болзошгүй (хост/replay-с ирсэн итгэлгүй өгөгдөл) —
+  // KDA бонусыг 0..CAP мужид барина. Ингэснээр сөрөг тоо XP-г хасахгүй.
+  const k = Math.max(0, Number(kills) || 0);
+  const a = Math.max(0, Number(assists) || 0);
+  const kda = Math.max(0, Math.min(RULES.XP_KDA_CAP, Math.round(k * RULES.XP_PER_KILL + a * RULES.XP_PER_ASSIST)));
   return base + kda;
 }
 

@@ -1711,10 +1711,12 @@ function renderMembers(members) {
     const name = m.name !== undefined ? m.name : m;
     const isMe       = id ? id === myId   : name === currentUser?.username;
     const isRoomHost = id ? id === hostId : false;
+    const safeName = escHtml(name);
+    const safeId   = escHtml(id);
     const kickBtn = (isHost && !isMe)
-      ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${id}" data-name="${name}">Kick</button>`
+      ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${safeId}" data-name="${safeName}">Kick</button>`
       : '';
-    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${id}">${name}</span>` : name;
+    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${safeName}</span>` : safeName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
         <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}</div>
@@ -2822,7 +2824,7 @@ async function loadRanking(page = rankingPage, sort = rankingSort) {
       const isSelf = currentUser && String(p.id) === String(currentUser.id);
       const tier = p.tierbot_tier || '-';
       const rating = Number(p.tierbot_rating || 0);
-      return `<tr class="ranking-row${isSelf ? ' ranking-self' : ''}" data-userid="${p.id}" data-username="${p.username}" style="cursor:pointer">
+      return `<tr class="ranking-row${isSelf ? ' ranking-self' : ''}" data-userid="${escHtml(p.id)}" data-username="${escHtml(p.username)}" style="cursor:pointer">
         <td>${medal}</td>
         <td>${escHtml(p.username)}</td>
         <td>${escHtml(tier)}</td>
@@ -3595,7 +3597,9 @@ function updateConnectionStatus(status) {
 
 // ── Хэрэгслүүд ───────────────────────────────────────────
 function escHtml(t) {
-  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  // Хашилтыг ч escape хийнэ — attr="${escHtml(x)}" контекстээс салж гарахаас сэргийлнэ
+  return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
 // @mention parse: escHtml() дараа дуудна — аюулгүй HTML оруулна
