@@ -31,33 +31,47 @@ function bblog(msg) {
 // WC3 руу GAMEINFO илгээхэд эх порт 6112 хэрэгтэй бөгөөд WC3 (0.0.0.0:6112)-той мөргөлдөхгүйн тулд
 // ТОДОРХОЙ LAN IP:6112-т bind хийнэ. Ингэвэл 127.0.0.1 руу илгээсэн пакетыг WC3
 // (wildcard) хүлээж авна, bridge өөрөө биш. (ZeroTier хасагдсан 2026-08-30)
-function _localBindIp() {
+// Жинхэнэ LAN interface-ийг илүүд үзэх дараалал. ZeroTier (10.147.x — memory-оор ZT дэд сүлжээ)
+// болон бусад virtual adapter-ийг СҮҮЛД тавина: WC3 голдуу жинхэнэ Wi-Fi/Ethernet (192.168.x /
+// 172.16-31.x)-д байдаг тул тэр interface-ээс GAMEINFO цацвал найдвартай. ZT interface-ийг сонговол
+// LAN хоосон гарах эрсдэлтэй (өмнөх бүтэлгүйтлийн нэг шалтгаан).
+function _rankIp(addr) {
+  const p = String(addr || '').split('.').map(Number);
+  if (p[0] === 10 && p[1] === 147) return 90;   // ZeroTier — хамгийн сүүлд
+  if (p[0] === 192 && p[1] === 168) return 10;   // энгийн гэрийн LAN — тэргүүнд
+  if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return 20;
+  if (p[0] === 10) return 40;                     // бусад 10.x
+  if (p[0] === 169 && p[1] === 254) return 95;    // APIPA — бараг сүүлд
+  if (p[0] === 25) return 85;                      // Hamachi
+  return 50;
+}
+function _candidateIps() {
   const ifs = os.networkInterfaces();
-  let lan = null;
+  const out = [];
   for (const name of Object.keys(ifs)) {
     for (const a of (ifs[name] || [])) {
-      if (a.family === 'IPv4' && !a.internal && !lan) lan = a.address;
+      if (a.family === 'IPv4' && !a.internal && a.address) out.push(a);
     }
   }
-  return lan || null;
+  out.sort((x, y) => _rankIp(x.address) - _rankIp(y.address));
+  return out;
+}
+function _localBindIp() {
+  const c = _candidateIps();
+  return c.length ? c[0].address : null;
 }
 // LAN IP + түүний дэд сүлжээний broadcast хаяг (жинхэнэ LAN хост шиг GAMEINFO цацахад)
 function _localBindInfo() {
-  const ifs = os.networkInterfaces();
-  for (const name of Object.keys(ifs)) {
-    for (const a of (ifs[name] || [])) {
-      if (a.family === 'IPv4' && !a.internal && a.address) {
-        let bcast = '255.255.255.255';
-        try {
-          const ip = a.address.split('.').map(Number);
-          const mask = (a.netmask || '255.255.255.0').split('.').map(Number);
-          bcast = ip.map((o, i) => (o & mask[i]) | (~mask[i] & 0xff)).join('.');
-        } catch {}
-        return { ip: a.address, bcast };
-      }
-    }
-  }
-  return null;
+  const c = _candidateIps();
+  if (!c.length) return null;
+  const a = c[0];
+  let bcast = '255.255.255.255';
+  try {
+    const ip = a.address.split('.').map(Number);
+    const mask = (a.netmask || '255.255.255.0').split('.').map(Number);
+    bcast = ip.map((o, i) => (o & mask[i]) | (~mask[i] & 0xff)).join('.');
+  } catch {}
+  return { ip: a.address, bcast };
 }
 
 const WC3_PORT = 6112;
@@ -272,6 +286,59 @@ let _bot = null;
 let _onBotJoin = null;   // (wc3Name) => void — WC3 ботын lobby-д орохдоо илгээсэн W3GS_REQJOIN-ийн нэр
 function setBotJoinListener(fn) { _onBotJoin = typeof fn === 'function' ? fn : null; }
 
+// ── Тоглогч-хост LAN (relay) төлөв (2026-08-31) ──
+let _lanHost = null;   // Хост тал: локал WC3 GAMEINFO барих + relay control + per-joiner splice
+let _lanJoin = null;   // Joiner тал: relay-ээр хостод холбогдож WC3 LAN-д GAMEINFO inject
+
+// GAMEINFO-г локал WC3 руу цацах ЕРӨНХИЙ функц (v2.5.3 батлагдсан техник, bot+lan хоёул хуваалцна).
+// ТОДОРХОЙ LAN IP:6112 socket-оос дэд-сүлжээ broadcast + 255.255.255.255 руу ЭХ ПОРТ 6112-оор
+// илгээнэ → war3-ийн 0.0.0.0:6112 хүлээж авна. Loopback руу илгээхгүй (specific socket → WinError 10049).
+// state шаардлага: { running:bool, localPort:num, packet:Buffer, udp, timer, _label:str }
+function _gameInfoInject(state) {
+  let sentCount = 0;
+  const beginSend = (sock, how, bcast) => {
+    state.udp = sock;
+    try { sock.setBroadcast(true); } catch {}
+    sock.on('message', (msg, rinfo) => {
+      if (msg.length >= 2 && msg[0] === W3_HEADER && msg[1] === W3_SEARCHGAME) {
+        try { sock.send(state.packet, 0, state.packet.length, rinfo.port, rinfo.address); } catch {}
+        if (!state.sgLogged) { state.sgLogged = true; bblog(`SEARCHGAME ← ${rinfo.address}:${rinfo.port} → GAMEINFO хариуллаа`); }
+      }
+    });
+    const dests = bcast
+      ? [{ ip: bcast, port: WC3_PORT }, { ip: '255.255.255.255', port: WC3_PORT }]
+      : [{ ip: '127.0.0.1', port: WC3_PORT }];
+    const tick = () => {
+      if (!state.running) return;
+      const b = state.packet;
+      for (const d of dests) {
+        try { sock.send(b, 0, b.length, d.port, d.ip); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
+      }
+      sentCount += 1;
+      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO → [${dests.map((d) => d.ip).join(',')}]:6112 x${sentCount} (эх ${how})`);
+      state.timer = setTimeout(tick, 1500);
+    };
+    tick();
+    bblog(`${state._label || 'inject'} — TCP тунел 127.0.0.1:${state.localPort}, эх=${how}, broadcast=${bcast || 'үгүй'}`);
+  };
+  const tryUnbound = () => {
+    const ub = dgram.createSocket('udp4');
+    ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
+    ub.bind(() => beginSend(ub, 'OS(unbound)', null));
+  };
+  const info = _localBindInfo();
+  if (!info) { tryUnbound(); return; }
+  const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  let bound = false;
+  sock.on('error', (e) => {
+    if (bound) { bblog('udp алдаа: ' + e.message); return; }
+    bblog(`bind ${info.ip}:6112 амжилтгүй: ${e.message} → unbound fallback`);
+    try { sock.close(); } catch {}
+    tryUnbound();
+  });
+  sock.bind(WC3_PORT, info.ip, () => { bound = true; beginSend(sock, `6112 (${info.ip})`, info.bcast); });
+}
+
 // W3GS_REQJOIN (0x1E): F7 1E len(2) hostcounter(4) entrykey(4) ?(1) listenport(2) peerkey(4) name\0 …
 // WC3-ийн бодит LAN нэр энд байдаг → GHost++-ийн тоглогчийн нэртэй яг ижил (дүн тааруулах, owner/!start).
 function parseReqJoinName(buf) {
@@ -326,66 +393,9 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
   //    руу холбогдоно → тунел ботын нийтийн IP руу дамжуулна. ZeroTier огт шаардлагагүй.
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн port талбарыг локал proxy порт болгоно
-  let sentCount = 0;
-  // ЗӨВ ЗАГВАР (2026-08-31 v2.5.3, war3 binary дээр бодитоор туршив):
-  // war3.exe нь 0.0.0.0:6112-ыг ЭЗЭМШДЭГ бөгөөд 6112 завгүй бол 6113-т fallback
-  // ХИЙХГҮЙ — шууд "Could not connect to the network" алдаа өгнө (Phase-2 тест).
-  // Тиймээс relay НЬ 0.0.0.0:6112-т ХЭЗЭЭ Ч bind хийхгүй (war3-г эвдэнэ). Харин
-  // war3-ийн ДАРАА ТОДОРХОЙ LAN IP:6112-т зэрэгцэн суудаг (Windows зөвшөөрдөг —
-  // v2.5.1 production log-оор батлагдсан). Ингэснээр илгээх пакетуудын ЭХ ПОРТ 6112
-  // болно (war3-ийн шаардлага). GAMEINFO-г жинхэнэ LAN хост шиг дэд-сүлжээний
-  // BROADCAST:6112 + loopback 6112 руу цацна → war3-ийн 0.0.0.0:6112 wildcard авна.
-  // Нэмж SEARCHGAME (F7 2F) сонсож, ирвэл шууд хариулна (зарим тохиолдолд broadcast
-  // relay-ийн specific socket-д ирдэг).
-  const beginSend = (sock, how, bcast) => {
-    state.udp = sock;
-    try { sock.setBroadcast(true); } catch {}
-    sock.on('message', (msg, rinfo) => {
-      if (msg.length >= 2 && msg[0] === W3_HEADER && msg[1] === W3_SEARCHGAME) {
-        const b = state.packet || local;
-        try { sock.send(b, 0, b.length, rinfo.port, rinfo.address); } catch {}
-        if (!state.sgLogged) { state.sgLogged = true; bblog(`SEARCHGAME ← ${rinfo.address}:${rinfo.port} → GAMEINFO хариуллаа`); }
-      }
-    });
-    // ЧУХАЛ (тестээр батлав): ТОДОРХОЙ IP:6112 socket-оос 127.0.0.1 руу илгээх нь
-    // WinError 10049-ээр УНАДАГ (v2.5.1-ийн нам гүм алдаа!). Харин дэд-сүлжээний
-    // broadcast + 255.255.255.255 руу илгээхэд war3-ийн 0.0.0.0:6112 эх порт 6112-той
-    // хүлээж авдаг. Иймд specific socket → broadcast; unbound fallback → loopback.
-    const dests = bcast
-      ? [{ ip: bcast, port: WC3_PORT }, { ip: '255.255.255.255', port: WC3_PORT }]
-      : [{ ip: '127.0.0.1', port: WC3_PORT }];
-    const tick = () => {
-      if (!state.running) return;
-      const b = state.packet || local;
-      for (const d of dests) {
-        try { sock.send(b, 0, b.length, d.port, d.ip); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
-      }
-      sentCount += 1;
-      if (sentCount === 3 || sentCount % 30 === 0) bblog(`GAMEINFO → [${dests.map((d) => d.ip).join(',')}]:6112 x${sentCount} (эх ${how})`);
-      state.timer = setTimeout(tick, 1500);
-    };
-    tick();
-    bblog(`Эхэллээ — bot ${hostIp}:${hostPort}, TCP тунел 127.0.0.1:${lp}, эх=${how}, broadcast=${bcast || 'үгүй'}`);
-  };
-  // Bind: ЗӨВХӨН тодорхой LAN IP:6112 (war3-г ЭВДЭХГҮЙ). Амжилтгүй бол unbound (сүүлчийн арга).
-  const tryUnbound = () => {
-    const ub = dgram.createSocket('udp4');
-    ub.on('error', (er) => bblog('udp(unbound) алдаа: ' + er.message));
-    ub.bind(() => beginSend(ub, 'OS(unbound)', null));
-  };
-  const info = _localBindInfo();
-  if (!info) { tryUnbound(); }
-  else {
-    const sock = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-    let bound = false;
-    sock.on('error', (e) => {
-      if (bound) { bblog('udp алдаа: ' + e.message); return; }
-      bblog(`bind ${info.ip}:6112 амжилтгүй: ${e.message} → unbound fallback`);
-      try { sock.close(); } catch {}
-      tryUnbound();
-    });
-    sock.bind(WC3_PORT, info.ip, () => { bound = true; beginSend(sock, `6112 (${info.ip})`, info.bcast); });
-  }
+  state.packet = local;
+  state._label = `Bot bridge ${hostIp}:${hostPort}`;
+  _gameInfoInject(state);   // v2.5.3 батлагдсан GAMEINFO цацалт (общий helper)
   _bot = state;
   return { localPort: lp };
 }
@@ -412,14 +422,159 @@ function stopBotBridge() {
   console.log('[BotBridge] Зогслоо');
 }
 
+// ═══════════════════════════════════════════════════════════
+// ТОГЛОГЧ-ХОСТ LAN — JOINER тал (2026-08-31)
+// WC3 → локал proxy(127.0.0.1:localPort) → relay(joiner handshake) → хост тоглогчийн WC3.
+// GAMEINFO-г локал WC3 руу inject (v2.5.3 техник, _gameInfoInject) → LAN жагсаалтад гарна.
+// ═══════════════════════════════════════════════════════════
+function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
+  stopLanJoin();
+  stopBotBridge(); stopHost(); stopFinder();   // 6112-ийг булаах бусад socket-уудыг цэвэрлэнэ
+  if (!relayIp || !relayPort || !game || !gameInfoB64) throw new Error('LAN join мэдээлэл дутуу');
+  const pkt = Buffer.from(String(gameInfoB64), 'base64');
+  if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) throw new Error('GAMEINFO пакет буруу');
+  const lp = Number(localPort) || 6250;
+  const state = { relayIp, relayPort: Number(relayPort), game: String(game), localPort: lp, running: true,
+                  server: null, udp: null, timer: null, conns: new Set(), _label: `LAN join relay ${relayIp}:${relayPort}` };
+  const local = Buffer.from(pkt);
+  local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн порт талбарыг локал proxy порт болгоно
+  state.packet = local;
+
+  // TCP proxy: WC3 бүрийн холболтыг relay руу (joiner handshake урдаа) дамжуулна.
+  state.server = net.createServer((client) => {
+    const up = net.connect(state.relayPort, state.relayIp);
+    state.conns.add(client);
+    const done = () => { state.conns.delete(client); try { client.destroy(); } catch {} try { up.destroy(); } catch {} };
+    client.setNoDelay(true); up.setNoDelay(true);
+    client.pause();   // handshake илгээх хүртэл WC3-ийн байтыг түр саатуулна
+    up.on('connect', () => {
+      try { up.write(JSON.stringify({ t: 'joiner', game: state.game }) + '\n'); } catch {}
+      const nm = null; // WC3 REQJOIN нэрийг доор pipe дундаас барьж болно (одоохондоо шаардлагагүй)
+      client.pipe(up); up.pipe(client);
+      client.resume();
+    });
+    client.on('error', done); up.on('error', done); client.on('close', done); up.on('close', done);
+  });
+  state.server.on('error', (e) => bblog('lanjoin tcp: ' + e.message));
+  state.server.listen(lp, '127.0.0.1');
+
+  _gameInfoInject(state);   // GAMEINFO-г WC3 LAN-д цацна
+  _lanJoin = state;
+  return { localPort: lp };
+}
+
+// Lobby өөрчлөгдөхөд (хүн орж/гарах) GAMEINFO-г дахин эхлүүлэлгүй солино.
+function updateLanJoin({ gameInfoB64 }) {
+  if (!_lanJoin || !gameInfoB64) return false;
+  const pkt = Buffer.from(String(gameInfoB64), 'base64');
+  if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) return false;
+  pkt.writeUInt16LE(_lanJoin.localPort, pkt.length - 2);
+  _lanJoin.packet = pkt;
+  return true;
+}
+
+function stopLanJoin() {
+  if (!_lanJoin) return;
+  const s = _lanJoin; _lanJoin = null;
+  s.running = false;
+  clearTimeout(s.timer);
+  try { s.udp?.close(); } catch {}
+  try { s.server?.close(); } catch {}
+  s.conns.forEach((c) => { try { c.destroy(); } catch {} });
+  bblog('LAN join зогслоо');
+}
+
+// ═══════════════════════════════════════════════════════════
+// ТОГЛОГЧ-ХОСТ LAN — ХОСТ тал (2026-08-31)
+// 1) Локал WC3-ийн GAMEINFO-г SEARCHGAME probe-оор барина (onGameInfo callback → платформд зарлана).
+// 2) Relay руу control холболт нээж бүртгүүлнэ (game = санамсаргүй токен).
+// 3) newjoiner бүрд relay-д hostdata холболт + локал WC3(127.0.0.1:6112) руу splice.
+// ═══════════════════════════════════════════════════════════
+function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo }) {
+  stopLanHost();
+  if (!relayIp || !relayPort || !game) throw new Error('LAN host мэдээлэл дутуу');
+  const state = { relayIp, relayPort: Number(relayPort), game: String(game), running: true,
+                  control: null, probe: null, timer: null, conns: new Set(), giB64: null };
+
+  // 1) GAMEINFO capture — эфемер socket-оос 127.0.0.1:6112 руу SEARCHGAME probe (6112-т bind ХИЙХГҮЙ,
+  //    war3-тай мөргөлдөхгүй). WC3 host бол GAMEINFO-гоор хариулна → барьж авна.
+  state.probe = dgram.createSocket('udp4');
+  state.probe.on('error', () => {});
+  state.probe.on('message', (msg) => {
+    if (msg.length >= 24 && msg[0] === W3_HEADER && msg[1] === W3_GAMEINFO) {
+      const b64 = msg.toString('base64');
+      if (b64 !== state.giB64) { state.giB64 = b64; bblog('LAN host: локал WC3 GAMEINFO баригдав'); try { onGameInfo?.(b64); } catch {} }
+    }
+  });
+  state.probe.bind(() => {
+    const probeTick = () => {
+      if (!state.running) return;
+      for (const v of SEARCH_VERSIONS) { try { state.probe.send(makeSearchPacket(v.product, v.version), 0, 16, WC3_PORT, '127.0.0.1'); } catch {} }
+      state.timer = setTimeout(probeTick, state.giB64 ? 5000 : 1500);
+    };
+    probeTick();
+  });
+
+  // per-joiner: relay-ийн hostdata холболт ↔ локал WC3
+  const openHostData = (session) => {
+    const hd = net.connect(state.relayPort, state.relayIp);
+    const wc3 = net.connect(WC3_PORT, '127.0.0.1');
+    state.conns.add(hd); state.conns.add(wc3);
+    let hdOk = false, wc3Ok = false, spliced = false;
+    const done = () => { state.conns.delete(hd); state.conns.delete(wc3); try { hd.destroy(); } catch {} try { wc3.destroy(); } catch {} };
+    const maybeSplice = () => { if (spliced || !hdOk || !wc3Ok) return; spliced = true; hd.pipe(wc3); wc3.pipe(hd); };
+    hd.setNoDelay(true); wc3.setNoDelay(true);
+    hd.on('connect', () => { try { hd.write(JSON.stringify({ t: 'hostdata', game: state.game, session }) + '\n'); } catch {} hdOk = true; maybeSplice(); });
+    wc3.on('connect', () => { wc3Ok = true; maybeSplice(); });
+    hd.on('error', done); wc3.on('error', done); hd.on('close', done); wc3.on('close', done);
+    bblog(`LAN host: joiner session=${session} → локал WC3`);
+  };
+
+  // 2) control холболт (тасрахад дахин холбогдоно)
+  const connectControl = () => {
+    if (!state.running) return;
+    const ctl = net.connect(state.relayPort, state.relayIp);
+    state.control = ctl; ctl.setNoDelay(true);
+    let cbuf = Buffer.alloc(0);
+    ctl.on('connect', () => { try { ctl.write(JSON.stringify({ t: 'register', game: state.game, key: relayKey || '', name: wc3Name || '' }) + '\n'); } catch {} });
+    ctl.on('data', (d) => {
+      cbuf = Buffer.concat([cbuf, d]); let nl;
+      while ((nl = cbuf.indexOf(0x0a)) !== -1) {
+        const line = cbuf.slice(0, nl).toString('utf8').trim(); cbuf = cbuf.slice(nl + 1);
+        let m; try { m = JSON.parse(line); } catch { continue; }
+        if (m.t === 'registered') bblog(`LAN host relay-д бүртгэгдлээ game=${state.game.slice(0, 12)}`);
+        else if (m.t === 'newjoiner') openHostData(m.session);
+      }
+    });
+    ctl.on('close', () => { if (state.running) setTimeout(connectControl, 2000); });
+    ctl.on('error', () => {});
+  };
+  connectControl();
+
+  _lanHost = state;
+}
+
+function stopLanHost() {
+  if (!_lanHost) return;
+  const s = _lanHost; _lanHost = null;
+  s.running = false;
+  clearTimeout(s.timer);
+  try { s.probe?.close(); } catch {}
+  try { s.control?.destroy(); } catch {}
+  s.conns.forEach((c) => { try { c.destroy(); } catch {} });
+  bblog('LAN host зогслоо');
+}
+
 function stopAll() {
   stopBotBridge();
   stopHost();
   stopFinder();
+  stopLanHost();
+  stopLanJoin();
 }
 
 function isRunning() {
-  return !!_hostRelay || !!_finder;
+  return !!_hostRelay || !!_finder || !!_lanHost || !!_lanJoin;
 }
 
 module.exports = {
@@ -430,5 +585,7 @@ module.exports = {
   parseReqJoinName,
   startHost, stopHost, addHostPlayerIp,
   startFinder, stopFinder,
+  startLanHost, stopLanHost,
+  startLanJoin, updateLanJoin, stopLanJoin,
   stopAll, isRunning,
 };
