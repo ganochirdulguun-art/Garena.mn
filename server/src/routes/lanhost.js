@@ -20,8 +20,8 @@ function emitRoom(roomId, event, payload) { if (_io && roomId) _io.to(String(roo
 // Relay сервер (public IP) — платформ хостод зааж өгнө. MVP: нэг relay (датаком).
 const RELAY_IP = process.env.LAN_RELAY_IP || '';
 const RELAY_PORT = Number(process.env.LAN_RELAY_PORT || 7000);
-const RELAY_KEY = process.env.LAN_RELAY_KEY || '';
-function relayConfigured() { return !!RELAY_IP && !!RELAY_KEY; }
+const RELAY_KEY = process.env.LAN_RELAY_KEY || '';   // MVP: заавал биш (game_token = таамаглашгүй, өрөө-хамрах тусгаарлалт)
+function relayConfigured() { return !!RELAY_IP; }
 
 // Санах ой дахь идэвхтэй тоглоомууд: roomId -> Map<token, game>
 const roomGames = new Map();
