@@ -31,6 +31,20 @@ const MAX_GAME_MIN = 240;                 // started тоглолт 4ц-аас �
 
 const bots = new Map();                   // bot_name -> { last_seen, games, max_games, version }
 
+// Ботын давуу эрх: env BOT_PRIORITY="ub-bot-1,mn-bot-1" — жагсаалтын эхний АМЬД,
+// БАГТААМЖТАЙ бот ажил авна; бусад нь зөвхөн тэр unavailable үед fallback болно.
+// (2026-08-31: УБ бот 5ms тул тэргүүн ээлжинд, Tokyo 66ms — нөөц.)
+const BOT_PRIORITY = (process.env.BOT_PRIORITY || '').split(',').map((s) => s.trim()).filter(Boolean);
+
+function preferredAliveBot() {
+  for (const b of BOT_PRIORITY) {
+    const info = bots.get(b);
+    if (info && Date.now() - info.last_seen < BOT_STALE_SEC * 1000
+        && Number(info.games || 0) < Number(info.max_games || 1)) return b;
+  }
+  return null;
+}
+
 async function dbOk() { if (!db) return false; try { await db.query('SELECT 1'); return true; } catch { return false; } }
 function safeEqual(a, b) { const A = Buffer.from(String(a)), B = Buffer.from(String(b)); return A.length === B.length && crypto.timingSafeEqual(A, B); }
 function botAuth(req, res, next) {
@@ -231,6 +245,10 @@ botRouter.get('/jobs/next', async (req, res) => {
   const name = String(req.query.bot || 'bot').slice(0, 64);
   bots.set(name, { ...(bots.get(name) || { games: 0, max_games: 1, version: '' }), last_seen: Date.now() });
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
+  // Давуу эрхтэй бот амьд + багтаамжтай байвал ажлыг ТҮҮНД үлдээнэ (бусдад null).
+  // Тэр бот offline/дүүрэн болмогц дараагийнх нь автоматаар авна (fallback хэвээр).
+  const pref = preferredAliveBot();
+  if (pref && pref !== name) return res.json(null);
   try {
     // Гацсан ажлуудыг цэвэрлэнэ (queued/lobby/started timeout) — standalone watchdog-той ижил логик
     await sweepStaleJobs();
