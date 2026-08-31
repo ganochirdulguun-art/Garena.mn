@@ -4887,152 +4887,123 @@ init();
 })();
 
 // ══════════════════════════════════════════════════════════════
-// Бот хост (RGC маяг) — өрөөний цонх: "Бот хост хийх" → бот GHost++-ээр map-ийг хостолно →
-// клиент ботын тоглоомыг WC3 LAN жагсаалтад харуулна (UDP GAMEINFO + TCP proxy) → дүн автоматаар
+// Тоглогч-хост LAN (RGC/GameRanger) — өрөөний гишүүн ӨӨРИЙН PC дээр WC3 LAN тоглоом нээж,
+// public relay-ээр дамжуулан өрөөнийхэнтэйгээ (ямар ч NAT-аас үл хамааран) холбогдоно.
+// Тоглоом ЗӨВХӨН тухайн ӨРӨӨНД харагдана (сервер зөвхөн өрөөнд room:lan_lobby emit).
 // ══════════════════════════════════════════════════════════════
-(function botHostModule() {
+(function lanHostModule() {
   if (!isRoomMode()) return;
   const el = (id) => document.getElementById(id);
   const api = (method, path, body) => window.api.request(method, path, body);
   const errMsg = (e) => String(e?.message || e || 'Алдаа гарлаа').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
-  const panel = el('bot-host-panel');
+  const panel = el('lan-host-panel');
   if (!panel) return;
-  let job = null;
-  let bridgeOn = false;
-  let status = null;
 
-  const STATE_TEXT = {
-    queued: 'Бот хүлээж байна… (дараалалд)',
-    hosting: 'Бот тоглоомыг нээж байна…',
-    lobby: 'Lobby нээлттэй — "WC3 нээж нэгдэх" дараад LAN-аас тоглоомд орно. Host lobby чатад !start бичиж эхлүүлнэ (!start ажиллахгүй бол эхлээд !owner, дараа нь !start).',
-    started: 'Тоглолт явагдаж байна — дуусахад дүн автоматаар бүртгэгдэнэ.',
-    finished: 'Тоглолт дууслаа — дүн бүртгэгдсэн.',
-    failed: 'Бот хостолж чадсангүй.',
-    cancelled: 'Цуцлагдсан.',
-  };
+  let hosting = null;          // { token } — миний хостолж буй тоглоом
+  const games = new Map();     // token -> game (өрөөний идэвхтэй тоглоомууд)
+  let joinedToken = null;      // одоо WC3-д нээж буй тоглоом
 
-  function render() {
-    const isHost = Boolean(currentRoom?.isHost);
-    const st = job?.status || null;
-    el('bot-host-state').textContent = st ? st.toUpperCase() : 'БЭЛЭН';
-    el('bot-host-state').dataset.state = st || 'idle';
-    el('bot-host-text').textContent = st ? `${STATE_TEXT[st] || st}${job?.error ? ` (${job.error})` : ''}${job?.bot_name ? ` · бот: ${job.bot_name}` : ''}` : (isHost ? 'Бот тоглоомыг хостолно — Garena сүлжээ хэрэггүй; тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ, ялагч/K/D/A, XP, 💎 автоматаар.' : 'Host "Тоглолт эхлүүлэх" дарахад энд мэдэгдэнэ — дараа нь "WC3 нээж нэгдэх".');
-    const active = st && ['queued', 'hosting', 'lobby', 'started'].includes(st);
-    el('btn-bot-host').classList.toggle('hidden', !isHost || active);
-    el('bot-host-map').classList.toggle('hidden', !isHost || active);
-    el('btn-bot-cancel').classList.toggle('hidden', !isHost || !active || st === 'started');
-    el('btn-bot-join').classList.toggle('hidden', !(st === 'lobby' || st === 'started'));
-    const online = (status?.bots || []).length;
-    if (isHost && !active) el('btn-bot-host').disabled = !online;
-    if (isHost && !active && !online) el('bot-host-text').textContent = 'Одоогоор онлайн бот алга — түр хүлээгээд дахин оролдоно уу.';
-  }
-
-  async function loadStatus() {
-    try {
-      status = await api('get', '/rooms/bot-host/status');
-      if (!status?.enabled) { panel.classList.add('hidden'); return; }
-      panel.classList.remove('hidden');
-      const sel = el('bot-host-map');
-      sel.innerHTML = (status.maps || []).map((m) => `<option value="${m.key}" ${m.default ? 'selected' : ''}>${m.name}</option>`).join('');
-      job = await api('get', `/rooms/${currentRoom.id}/bot-host`);
-      render();
-    } catch { panel.classList.add('hidden'); }
-  }
-
-  // WC3 нэрийг серверт мэдэгдэнэ (registry userlocal эсвэл REQJOIN-оос) → дүн ирэхэд энэ хэрэглэгчтэй тааруулна
   const getWc3Name = async () => { try { return (await window.api.getWc3Name?.()) || null; } catch { return null; } };
-  let lastReported = null;
-  async function reportJoin(name) {
-    if (!currentRoom?.id || !job || !['lobby', 'started'].includes(job.status)) return;
-    const key = `${job.id}:${name || ''}`;
-    if (lastReported === key) return;
-    lastReported = key;
-    try { await api('post', `/rooms/${currentRoom.id}/bot-host/join`, { wc3_name: name || undefined }); } catch {}
-  }
-  window.api.onBotWc3Join?.(({ name } = {}) => {
-    if (!name) return;
-    appendSysMsg(`🎮 WC3 «${name}» ботын lobby-д холбогдлоо`);
-    reportJoin(name);
-  });
+  const esc = (s) => (typeof escHtml === 'function' ? escHtml(s || '') : String(s || ''));
 
-  async function startBridgeAndJoin() {
-    if (!job?.gameinfo_b64 || !job.host_ip) { showToast('Ботын тоглоомын мэдээлэл хараахан ирээгүй', 'warning'); return; }
-    const btn = el('btn-bot-join');
-    btn.disabled = true;
+  function setHostState(txt, state) {
+    const s = el('lan-host-state'); if (s) { s.textContent = state ? state.toUpperCase() : 'БЭЛЭН'; s.dataset.state = state || 'idle'; }
+    const t = el('lan-host-text'); if (t && txt) t.textContent = txt;
+    el('btn-lan-host')?.classList.toggle('hidden', !!hosting);
+    el('btn-lan-stop')?.classList.toggle('hidden', !hosting);
+  }
+
+  function renderGames() {
+    const box = el('lan-games-list'); if (!box) return;
+    const list = [...games.values()].filter((g) => String(g.host_user_id) !== String(currentUser?.id));
+    if (!list.length) { box.innerHTML = '<div class="lan-hint">Идэвхтэй тоглоом алга. Хэн нэг нь "LAN тоглоом нээх" дарвал энд гарч ирнэ.</div>'; return; }
+    box.innerHTML = list.map((g) => `
+      <div class="lan-game-row" data-token="${g.game_token}">
+        <span class="lan-game-info">🎮 <b>${esc(g.host_wc3_name || g.host_username || 'Тоглогч')}</b>-ийн тоглоом</span>
+        <button class="lan-join-btn ${joinedToken === g.game_token ? 'joined' : ''}" data-join="${g.game_token}">${joinedToken === g.game_token ? '✓ WC3-д нээгдсэн' : 'Нэгдэх'}</button>
+      </div>`).join('');
+    box.querySelectorAll('[data-join]').forEach((b) => b.addEventListener('click', () => joinGame(b.getAttribute('data-join'))));
+  }
+
+  // ── ХОСТ болох ──
+  async function startHosting() {
+    const btn = el('btn-lan-host'); if (btn) btn.disabled = true;
     try {
-      // ЗӨВ ДАРААЛАЛ (2026-08-31 v2.5.3, бодит тестээр батлав): WC3 ЭХЛЭЭД асна →
-      // war3.exe 0.0.0.0:6112-ыг эзэмшинэ. Relay-г ЭХЛҮҮЛБЭЛ war3 6112-ыг авч чадахгүй,
-      // 6113-т fallback ХИЙДЭГГҮЙ → "Could not connect to the network" алдаа гардаг
-      // (Phase-2 тестээр war3 ямар ч UDP порт авалгүй унасныг батлав). Тиймээс relay нь
-      // war3-ийн ДАРАА тусдаа IP:6112-т зэрэгцэн суудаг (war3-г огт эвдэхгүй).
-      reportJoin(await getWc3Name());
+      const r = await api('post', `/rooms/${currentRoom.id}/lan-host/begin`);
+      hosting = { token: r.game_token };
+      const wc3Name = await getWc3Name();
       await window.api.launchGame(currentRoom?.gameType || '');
-      if (socket) socket.emit('room:game_started');
-      appendSysMsg('✓ WC3 нээгдэж байна… (LAN бэлдэж байна)');
-      // war3 бүрэн асаж 6112-ыг эзэлтэл хүлээнэ (~15 сек)
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        if (await window.api.isWc3LanReady?.()) { ready = true; break; }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      if (!ready) await new Promise((r) => setTimeout(r, 3000));
-      await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
-      bridgeOn = true;
-      appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
-    } catch (e) { showToast(errMsg(e), 'error'); }
-    finally { btn.disabled = false; }
+      await window.api.startLanHost({ relayIp: r.relay_ip, relayPort: r.relay_port, game: r.game_token, relayKey: r.relay_key, wc3Name: wc3Name || '' });
+      setHostState('WC3 нээгдэж байна… "Local Area Network" → "Create Game" → өөрийн map-аа сонгож тоглоом үүсгэ. Дараа өрөөнийхэн чинь автоматаар харна.', 'hosting');
+      appendSysMsg('🎮 WC3 нээгдэж байна. LAN → Create Game → map сонгож тоглоомоо үүсгээрэй — өрөөнийхэн чинь нэгдэнэ.');
+    } catch (e) { hosting = null; showToast(errMsg(e), 'error'); setHostState('LAN тоглоом нээгээд өрөөнийхнөө урина.', 'idle'); }
+    finally { if (btn) btn.disabled = false; }
   }
 
-  el('btn-bot-host').addEventListener('click', async () => {
-    const btn = el('btn-bot-host');
-    btn.disabled = true;
+  async function stopHosting() {
+    const tok = hosting?.token; hosting = null;
+    setHostState('Зогсоов.', 'idle');
+    try { await window.api.stopLanHost?.(); } catch {}
+    if (tok) { try { await api('delete', `/rooms/${currentRoom.id}/lan-host/${tok}`); } catch {} }
+  }
+
+  // GAMEINFO баригдмагц серверт зарлана (announce) → room:lan_lobby зөвхөн өрөөнд
+  window.api.onLanGameInfo?.(async ({ gameinfo_b64 } = {}) => {
+    if (!hosting?.token || !gameinfo_b64) return;
     try {
       const wc3Name = await getWc3Name();
-      job = await api('post', `/rooms/${currentRoom.id}/bot-host`, { map_key: el('bot-host-map').value, owner_name: wc3Name || undefined });
-      appendSysMsg(`▶ Тоглолт эхлүүлэх хүсэлт илгээгдлээ — бот тоглоомыг нээмэгц (~30 сек) "WC3 нээж нэгдэх" товч гарна.${job?.owner_name ? ` Lobby-ийн эзэн (!start эрхтэй WC3 нэр): «${job.owner_name}»` : ''}`);
-      render();
-    } catch (e) { showToast(errMsg(e), 'error'); }
-    finally { btn.disabled = false; }
+      await api('post', `/rooms/${currentRoom.id}/lan-host/announce`, { game_token: hosting.token, gameinfo_b64, host_wc3_name: wc3Name || undefined });
+      setHostState('✅ Тоглоом зарлагдлаа — өрөөнийхэн чинь LAN жагсаалтаас нэгдэнэ.', 'live');
+    } catch { /* дараагийн probe-д дахин оролдоно */ }
   });
-  el('btn-bot-cancel').addEventListener('click', async () => {
-    try { await api('delete', `/rooms/${currentRoom.id}/bot-host`); job = { ...job, status: 'cancelled' }; render(); }
-    catch (e) { showToast(errMsg(e), 'error'); }
-  });
-  el('btn-bot-join').addEventListener('click', startBridgeAndJoin);
 
-  function showResult(r) {
-    const box = el('bot-host-result');
-    if (!box) return;
-    const side = (t) => (t === 1 ? 'Sentinel' : 'Scourge');
-    const rows = (r.players || []).map((p) => `<tr class="${p.is_winner ? 'win' : ''}"><td>${escHtml(p.name || '')}</td><td>${side(p.team)}</td><td>${p.kills}/${p.deaths}/${p.assists}</td><td>${p.is_leaver ? 'leaver' : (p.is_winner ? 'хожил' : 'хожигдол')}</td><td>${p.xp_earned > 0 ? '+' : ''}${p.xp_earned} XP${p.diamonds_earned ? ` · +${p.diamonds_earned} 💎` : ''}</td></tr>`).join('');
-    box.innerHTML = `<div class="bot-result-head">🏆 ${side(r.winner_team)} ялав · ${r.duration_minutes} мин</div><table class="bot-result-table"><thead><tr><th>Тоглогч</th><th>Баг</th><th>K/D/A</th><th>Дүн</th><th>Шагнал</th></tr></thead><tbody>${rows}</tbody></table>`;
-    box.classList.remove('hidden');
+  // ── ТОГЛООМД НЭГДЭХ (joiner) ──
+  async function joinGame(token) {
+    const g = games.get(token); if (!g) return;
+    try {
+      if (joinedToken && joinedToken !== token) { try { await window.api.stopLanJoin?.(); } catch {} }
+      await window.api.launchGame(currentRoom?.gameType || '');
+      await window.api.startLanJoin({ relayIp: g.relay_ip, relayPort: g.relay_port, game: g.game_token, gameInfoB64: g.gameinfo_b64 });
+      joinedToken = token; renderGames();
+      appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}»-ийн тоглоомд нэгдэж байна — WC3 → Local Area Network → тоглоомоо сонгож ор.`);
+    } catch (e) { showToast(errMsg(e), 'error'); }
   }
 
   function attach(s) {
-    s.on('room:bot_job', (j) => { job = j; render(); });
-    s.on('room:bot_lobby', (j) => {
-      const wasLobby = job && job.status === 'lobby' && String(job.id) === String(j.id);
-      job = j; render();
-      if (!wasLobby) { bridgeOn = false; appendSysMsg(`🤖 Бот "${j.bot_name || ''}" тоглоом нээлээ: "${j.game_name}" — "WC3 нээж нэгдэх" дарна уу.`); playSound?.('join'); }
-      else if (bridgeOn && j.gameinfo_b64) window.api.updateBotBridge?.({ gameInfoB64: j.gameinfo_b64 }).catch(() => {});
+    s.on('room:lan_lobby', (g) => {
+      if (!g?.game_token) return;
+      games.set(g.game_token, g);
+      if (String(g.host_user_id) === String(currentUser?.id)) return;   // өөрийн тоглоом
+      if (joinedToken === g.game_token && g.gameinfo_b64) window.api.updateLanJoin?.({ gameInfoB64: g.gameinfo_b64 }).catch(() => {});
+      else appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}» LAN тоглоом нээлээ — "Нэгдэх" дарж WC3-даа харна.`);
+      renderGames();
     });
-    s.on('room:bot_started', () => { if (job) job.status = 'started'; render(); appendSysMsg('▶ Ботын тоглолт эхэллээ.'); });
-    s.on('room:bot_join', (d) => { if (d?.username && String(d.user_id) !== String(currentUser?.id)) appendSysMsg(`🎮 ${d.username}${d.wc3_name ? ` (WC3: ${d.wc3_name})` : ''} ботын тоглоомд нэгдэж байна`); });
-    s.on('room:bot_result', (r) => {
-      if (job) job.status = 'finished';
-      render();
-      showResult(r);
-      appendSysMsg(`🏁 Дүн бүртгэгдлээ: ${r.winner_team === 1 ? 'Sentinel' : 'Scourge'} ялав (${r.duration_minutes} мин).`);
-      if (bridgeOn) { window.api.stopRelay?.().catch(() => {}); window.api.stopBotBridge?.().catch(() => {}); bridgeOn = false; }
-      window.api.refreshUser?.().catch(() => {});
+    s.on('room:lan_lobby_gone', ({ game_token } = {}) => {
+      if (!game_token) return;
+      games.delete(game_token);
+      if (joinedToken === game_token) { joinedToken = null; window.api.stopLanJoin?.().catch(() => {}); appendSysMsg('⏹ Тоглоом хаагдлаа.'); }
+      renderGames();
     });
   }
+
+  async function loadExisting() {
+    try {
+      const r = await api('get', `/rooms/${currentRoom.id}/lan-host`);
+      if (!r?.relay_configured) { panel.classList.add('hidden'); return; }
+      panel.classList.remove('hidden');
+      (r.games || []).forEach((g) => games.set(g.game_token, g));
+      renderGames();
+    } catch { /* relay тохируулаагүй */ }
+  }
+
+  el('btn-lan-host')?.addEventListener('click', startHosting);
+  el('btn-lan-stop')?.addEventListener('click', stopHosting);
+
   const timer = setInterval(() => {
-    if (typeof socket !== 'undefined' && socket && !socket.__botHandlers) { socket.__botHandlers = true; attach(socket); }
-    if (currentRoom?.id && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadStatus(); }
+    if (typeof socket !== 'undefined' && socket && !socket.__lanHandlers) { socket.__lanHandlers = true; attach(socket); }
+    if (currentRoom?.id && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadExisting(); }
   }, 800);
-  window.addEventListener('beforeunload', () => { clearInterval(timer); if (bridgeOn) window.api.stopBotBridge?.().catch(() => {}); });
+  window.addEventListener('beforeunload', () => { clearInterval(timer); if (hosting) window.api.stopLanHost?.().catch(() => {}); window.api.stopLanJoin?.().catch(() => {}); });
 })();
 
 // ══════════════════════════════════════════════════════════════

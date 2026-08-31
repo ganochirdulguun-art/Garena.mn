@@ -66,6 +66,13 @@ contextBridge.exposeInMainWorld('api', {
   startBotBridge:  (opts)      => ipcRenderer.invoke('relay:startBotBridge', opts),
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),
   updateBotBridge: (opts)      => ipcRenderer.invoke('relay:updateBotBridge', opts),
+  // Тоглогч-хост LAN (relay)
+  startLanHost:    (opts)      => ipcRenderer.invoke('relay:startLanHost', opts),
+  stopLanHost:     ()          => ipcRenderer.invoke('relay:stopLanHost'),
+  startLanJoin:    (opts)      => ipcRenderer.invoke('relay:startLanJoin', opts),
+  updateLanJoin:   (opts)      => ipcRenderer.invoke('relay:updateLanJoin', opts),
+  stopLanJoin:     ()          => ipcRenderer.invoke('relay:stopLanJoin'),
+  onLanGameInfo:   (cb)        => ipcRenderer.on('lan:gameinfo', (_, d) => cb(d)),
   getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),
   isWc3LanReady:   ()          => ipcRenderer.invoke('wc3:lanReady'),
   isWc3Running:    ()          => ipcRenderer.invoke('wc3:running'),

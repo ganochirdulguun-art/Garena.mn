@@ -3902,6 +3902,24 @@ body:not(.light) .maintab.active {
 .bot-host-panel .hint { margin: 0; font-size: 0.76rem; line-height: 1.4; }
 .bot-host-panel .input { margin: 0; }
 .bot-host-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Тоглогч-хост LAN панель (1.9.0) */
+.lan-host-panel { margin-top: 10px; padding: 10px; border-radius: 8px; border: 1px solid rgba(216, 35, 42, 0.3); background: rgba(20, 10, 12, 0.72); display: flex; flex-direction: column; gap: 8px; }
+.lan-host-head { display: flex; align-items: center; justify-content: space-between; }
+.lan-host-title { font: 600 0.92rem var(--font-d); letter-spacing: 0.06em; text-transform: uppercase; }
+.lan-host-state { font-size: 0.64rem; letter-spacing: 0.1em; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.2); color: var(--text2); }
+.lan-host-state[data-state="hosting"] { color: #f1c563; border-color: rgba(217, 169, 58, 0.5); }
+.lan-host-state[data-state="live"] { color: #3fcf7a; border-color: rgba(63, 207, 122, 0.5); }
+.lan-host-panel .hint { margin: 0; font-size: 0.76rem; line-height: 1.4; }
+.lan-host-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.lan-host-actions .btn-block { flex: 1 1 100%; }
+.lan-games-list { display: flex; flex-direction: column; gap: 6px; }
+.lan-hint { font-size: 0.74rem; color: var(--text2); line-height: 1.4; }
+.lan-game-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 9px; border-radius: 7px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04); }
+.lan-game-info { font-size: 0.8rem; }
+.lan-join-btn { font-size: 0.76rem; font-weight: 600; padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer; background: linear-gradient(135deg, #e33b41, #b8232a); color: #fff; }
+.lan-join-btn:hover { filter: brightness(1.08); }
+.lan-join-btn.joined { background: rgba(63, 207, 122, 0.2); color: #3fcf7a; border: 1px solid rgba(63, 207, 122, 0.4); cursor: default; }
 .bot-host-result { margin-top: 4px; overflow-x: auto; }
 .bot-result-head { font: 600 0.86rem var(--font-d); letter-spacing: 0.04em; margin-bottom: 6px; color: var(--gold); }
 .bot-result-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; }

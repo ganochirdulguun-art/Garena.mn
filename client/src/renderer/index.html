@@ -952,23 +952,18 @@
             </div>
           </div>
           <p class="hint" id="room-info-text"></p>
-          <!-- ҮНДСЭН ЗАМ (1.8.6): бот хост — RGC/GameRanger шиг, Garena сүлжээ хэрэггүй -->
-          <div id="bot-host-panel" class="bot-host-panel hidden">
-            <div class="bot-host-head"><span class="bot-host-title">▶ Тоглолт</span><span id="bot-host-state" class="bot-host-state" data-state="idle">БЭЛЭН</span></div>
-            <select id="bot-host-map" class="input input-sm" title="Map"></select>
-            <p id="bot-host-text" class="hint"></p>
-            <div class="bot-host-actions">
-              <button type="button" id="btn-bot-host" class="btn btn-primary btn-block btn-with-icon" title="Бот тоглоомыг хостолно — тоглогчид WC3-ийн LAN жагсаалтаас нэгдэнэ">
+          <!-- ҮНДСЭН ЗАМ (1.9.0): тоглогч-хост LAN — RGC/GameRanger шиг, өөрсдөө хост хийж relay-ээр холбогдоно -->
+          <div id="lan-host-panel" class="lan-host-panel hidden">
+            <div class="lan-host-head"><span class="lan-host-title">🎮 LAN тоглоом</span><span id="lan-host-state" class="lan-host-state" data-state="idle">БЭЛЭН</span></div>
+            <p id="lan-host-text" class="hint">Өөрийн WC3 LAN тоглоом нээж, өрөөнийхнөө урина. Ямар ч интернэтээс холбогдоно.</p>
+            <div class="lan-host-actions">
+              <button type="button" id="btn-lan-host" class="btn btn-primary btn-block btn-with-icon" title="Өөрийн PC дээр WC3 LAN тоглоом нээнэ — өрөөнийхэн чинь харна">
                 <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
-                <span>Тоглолт эхлүүлэх</span>
+                <span>LAN тоглоом нээх</span>
               </button>
-              <button type="button" id="btn-bot-cancel" class="btn btn-sm hidden">Цуцлах</button>
-              <button type="button" id="btn-bot-join" class="btn btn-primary btn-block btn-with-icon hidden">
-                <svg class="btn-icon-svg"><use href="#ico-play"/></svg>
-                <span>WC3 нээж нэгдэх</span>
-              </button>
+              <button type="button" id="btn-lan-stop" class="btn btn-sm hidden">Зогсоох</button>
             </div>
-            <div id="bot-host-result" class="bot-host-result hidden"></div>
+            <div id="lan-games-list" class="lan-games-list"></div>
           </div>
           <div class="room-action-row">
             <button type="button" id="btn-close-room" class="btn btn-danger btn-block btn-with-icon" title="Өрөөг хаах">

@@ -892,6 +892,17 @@ ipcMain.handle('relay:startBotBridge', (_, opts) => gameRelayService.startBotBri
 ipcMain.handle('relay:stopBotBridge', () => { gameRelayService.stopBotBridge(); return true; });
 ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotBridge(opts || {}));
 
+// ── Тоглогч-хост LAN (relay) ──
+// Хост тал: локал WC3 GAMEINFO баригдмагц onGameInfo → renderer руу 'lan:gameinfo' event
+ipcMain.handle('relay:startLanHost', (_, opts) => {
+  gameRelayService.startLanHost({ ...(opts || {}), onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }) });
+  return true;
+});
+ipcMain.handle('relay:stopLanHost', () => { gameRelayService.stopLanHost(); return true; });
+ipcMain.handle('relay:startLanJoin', (_, opts) => gameRelayService.startLanJoin(opts || {}));
+ipcMain.handle('relay:updateLanJoin', (_, opts) => gameRelayService.updateLanJoin(opts || {}));
+ipcMain.handle('relay:stopLanJoin', () => { gameRelayService.stopLanJoin(); return true; });
+
 // WC3-ийн LAN нэр — registry HKCU\Software\Blizzard Entertainment\Warcraft III\String\userlocal.
 // GHost++ зөвхөн autohost_owner-тэй ижил нэртэй тоглогчийн !start-ыг зөвшөөрдөг, дүн ч энэ нэрээр ирдэг тул
 // платформын нэр биш WC3 нэрийг серверт мэдэгдэнэ. (PowerShell: кирилл нэрийг UTF-8-аар зөв уншина.)
