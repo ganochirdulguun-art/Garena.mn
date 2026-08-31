@@ -4960,30 +4960,18 @@ init();
     const btn = el('btn-bot-join');
     btn.disabled = true;
     try {
-      // 1) WC3-ыг ЭХЛЭЭД асаана — WC3 өөрөө UDP 6112-ыг эзлэх ёстой (LAN алдаа гаргахгүй)
+      // GProxy++-ийн жинхэнэ дараалал (2026-08-31): relay-г WC3-аас ӨМНӨ асаана —
+      // relay UDP 6112-ыг эзэлж, WC3 дараа нь 6113+-д суугаад SEARCHGAME-ээ бидэн рүү
+      // цацна → relay GAMEINFO-гоор хариулж LAN жагсаалтад тоглоом гарна.
+      // (Урьдын "WC3 эхэлж 6112-ыг эзэлнэ" дараалал нь relay-г EACCES-т оруулж,
+      //  санамсаргүй эх порттой пакет WC3-д гологддог байв.)
+      await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
+      bridgeOn = true;
+      // 2) Одоо WC3-ыг асаана
       reportJoin(await getWc3Name());
       await window.api.launchGame(currentRoom?.gameType || '');
       if (socket) socket.emit('room:game_started');
-      const isZt = /^10\.147\./.test(String(job.host_ip || ''));
-      appendSysMsg(isZt ? '✓ WC3 нээгдэж байна… Garena сүлжээгээр ботын тоглоом LAN-д гарна.' : '✓ WC3 нээгдэж байна… (LAN бэлдэж байна, түр хүлээнэ үү)');
-      // WC3 бүрэн асаж 6112-ыг эзэлтэл хүлээнэ
-      let ready = false;
-      for (let i = 0; i < 30; i++) {
-        if (await window.api.isWc3LanReady?.()) { ready = true; break; }
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-      if (ready) await new Promise((r) => setTimeout(r, 800));
-      else appendSysMsg('⚠ WC3-ийн LAN бэлэн болсон нь илрэхгүй байна — WC3 дотроо Local Area Network цэс рүү орно уу, тоглоом тэнд харагдана.');
-      // bridgeOn guard-гүй: startGameFinder/startBotBridge хоёулаа idempotent (хуучнаа зогсоож эхэлдэг)
-      // тул дахин дарахад ШИНЭЭР эхэлнэ — WC3 хаагдаад дахин оролдоход finder огт эхлэхгүй гацдаг байсныг засав.
-      if (isZt) {
-        // Garena сүлжээ хост: 6112-ыг WC3-д БҮРЭН үлдээнэ (bind хийхгүй), зөвхөн SEARCHGAME илгээж
-        // GHost++-ийг GAMEINFO-гоор хариулуулна (Tuguldur-ын ажилладаг зам).
-        await window.api.startGameFinder?.(job.host_ip);
-      } else {
-        await window.api.startBotBridge({ hostIp: job.host_ip, hostPort: job.host_port, gameInfoB64: job.gameinfo_b64 });
-      }
-      bridgeOn = true;
+      appendSysMsg('✓ WC3 нээгдэж байна…');
       appendSysMsg(`📡 Ботын тоглоом "${job.game_name}" → WC3 → Local Area Network → "${job.game_name}" → Join (2–5 сек). Харагдахгүй бол LAN цонхыг хаагаад дахин нээнэ.`);
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { btn.disabled = false; }
