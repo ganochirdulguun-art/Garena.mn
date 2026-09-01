@@ -4,6 +4,7 @@ const os = require('os');
 const fs = require('fs');
 const W3GReplay = require('w3gjs');
 const apiService = require('./api');
+const { decodeDotaStats } = require('./dotaStats');
 
 let watcher = null;
 let currentRoomId = null;
@@ -156,16 +157,34 @@ async function parseReplay(filePath) {
     const rawPlayers = (replay.players || []).filter((p) => p && p.name);
     const leaveById = new Map(leaves.map((l) => [l.playerId, l]));
 
+    // DotA K/D/A — replay.w3mmd (0x6B "dr.x" gamecache action)-аас задалж, тоглогчийн
+    // slot (WC3 color) → K/D/A/hero болгоно. w3gjs Player.color = slot тул тэргээр тааруулна.
+    // Буруу оноохоос сэргийлж ЗӨВХӨН найдвартай slot тааралтаар өгнө (таарахгүй бол 0).
+    let dota = null;
+    try { dota = decodeDotaStats(replay.w3mmd || []); } catch { dota = null; }
+    const kdaBySlot = new Map();
+    if (dota) for (const dp of dota.players) {
+      if (dp && dp.slot != null) kdaBySlot.set(Number(dp.slot), dp);
+    }
+    let kdaMatched = 0;
+
     const players = rawPlayers.map((p) => {
       const matched = matchPlayerToMember(p.name);
       const lv = leaveById.get(Number(p.id));
       const leftAtSec = lv ? Math.round(lv.at / 1000) : null;
+      const dp = kdaBySlot.get(Number(p.color)) || null;
+      if (dp) kdaMatched += 1;
       return {
         name: p.name,
         // w3gjs teamid 0-based (0 = Sentinel/баг 1, 1 = Scourge/баг 2) → сервер 1|2 шаарддаг
         team: Number(p.teamid) + 1,
         race: p.race || null,
         apm: p.apm || 0,
+        // DotA статистик (байхгүй бол 0 — сервер сөрөг/утгагүйг мөн шүүнэ)
+        kills: dp ? Number(dp.kills) || 0 : 0,
+        deaths: dp ? Number(dp.deaths) || 0 : 0,
+        assists: dp ? Number(dp.assists) || 0 : 0,
+        hero: dp && dp.hero ? String(dp.hero).slice(0, 64) : null,
         user_id: matched ? Number(matched.id) : null,
         discord_id: null,
         left_at_sec: leftAtSec,
@@ -173,9 +192,14 @@ async function parseReplay(filePath) {
         is_leaver: !!(lv && lv.outcome === 'left' && leftAtSec != null && leftAtSec < 600 && leftAtSec < durationMs / 1000 - 60),
       };
     });
+    if (dota && dota.players.length) {
+      console.log(`[Replay] DotA K/D/A: ${kdaMatched}/${players.length} тоглогч таарав (w3mmd ${dota.players.length})`);
+    }
 
-    // Хожсон багийг тодорхойлох
-    const winnerTeam = getWinnerTeam(rawPlayers, leaves);
+    // Хожсон багийг тодорхойлох — w3mmd Global "Winner" (1|2) хамгийн найдвартай тул тэргүүлнэ
+    let winnerTeam = getWinnerTeam(rawPlayers, leaves);
+    const mmdWinner = Number(dota?.meta?.Winner);
+    if (mmdWinner === 1 || mmdWinner === 2) winnerTeam = mmdWinner;
     if (winnerTeam === null) {
       console.warn('[Replay] Хожсон баг тодорхойлж чадсангүй, үр дүн илгээхгүй');
       if (resultCallback) resultCallback({ error: 'Хожсон баг тодорхойлж чадсангүй', players });
