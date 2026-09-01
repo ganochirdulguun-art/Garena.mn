@@ -388,7 +388,8 @@ function startBotBridge({ hostIp, hostPort, gameInfoB64, localPort }) {
     console.log(`[BotBridge] WC3 → ${state.hostIp}:${state.hostPort}`);
   });
   state.server.on('error', (e) => console.error('[BotBridge] tcp:', e.message));
-  state.server.listen(lp, '127.0.0.1');
+  // БҮХ интерфэйст сонсоно — WC3 join дарахад LAN IP:lp руу холбогддог (доор үз)
+  state.server.listen(lp, '0.0.0.0');
 
   // 2) GAMEINFO → локал WC3 (GProxy маяг). WC3 зөвхөн ЭХ ПОРТ 6112-оос ирсэн GAMEINFO-г LAN
   //    жагсаалтад хүлээж авдаг. Иймд 0.0.0.0:6112-т reuseAddr-ээр bind хийж (WC3-тай ЗЭРЭГЦЭН —
@@ -460,7 +461,10 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
     client.on('error', done); up.on('error', done); client.on('close', done); up.on('close', done);
   });
   state.server.on('error', (e) => bblog('lanjoin tcp: ' + e.message));
-  state.server.listen(lp, '127.0.0.1');
+  // БҮХ интерфэйст сонсоно (зөвхөн 127.0.0.1 биш). GAMEINFO нь LAN IP-ээс цацагддаг тул
+  // WC3 join дарахад LAN_IP:lp руу холбогддог — 127.0.0.1-д л сонсвол холболт татгалзаж
+  // "Unable to join" гардаг байв. 0.0.0.0-д сонсвол LAN IP ба 127.0.0.1 хоёуланг барина.
+  state.server.listen(lp, '0.0.0.0');
 
   _gameInfoInject(state);   // GAMEINFO-г WC3 LAN-д цацна
   _lanJoin = state;
