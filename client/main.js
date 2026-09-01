@@ -961,10 +961,23 @@ ipcMain.handle('relay:addHostPlayer', (_, ip) => {
 // Тоглоом эхлүүлэх (gameType нэрээр тохирох exe хайна)
 let _gameProc = null;
 
+// WC3-ийн автомат replay хадгалалтыг АСААНА (HKCU ...\Warcraft III\autosaveReplay=1).
+// Унтраалттай бол тоглолт дуусахад LastReplay.w3g хадгалагдахгүй → replay задлагдахгүй →
+// K/D/A / XP / wins / 💎 олгогдохгүй. WC3 асахаасаа өмнө уншдаг тул launch-аас өмнө тавина.
+function ensureAutosaveReplay() {
+  try {
+    spawn('reg', ['add', 'HKCU\\Software\\Blizzard Entertainment\\Warcraft III',
+      '/v', 'autosaveReplay', '/t', 'REG_DWORD', '/d', '1', '/f'],
+      { stdio: 'ignore', windowsHide: true });
+  } catch {}
+}
+
 ipcMain.handle('game:launch', (_, gameType) => {
   const s = migrateSettings(readSettings());
   const games = s.games;
   if (!games.length) throw new Error('Тоглоом тохируулагдаагүй байна (Тохируулга таб)');
+
+  ensureAutosaveReplay();   // тоглолт бүрийн replay хадгалагдахыг баталгаажуулна
 
   const game = games.find(g => g.name === gameType) || games[0];
   if (!fs.existsSync(game.path)) {
