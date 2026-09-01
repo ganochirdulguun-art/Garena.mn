@@ -102,7 +102,10 @@ function makeSearchPacket(product, version) {
   buf[0] = W3_HEADER;                  // 0xF7
   buf[1] = W3_SEARCHGAME;              // 0x2F
   buf.writeUInt16LE(16, 2);            // packet size
-  buf.write(product, 4, 4, 'ascii');   // "W3XP" эсвэл "WAR3"
+  // W3GS product ID нь ЛИТТЛ-ЭНДИАН (урвуу байт): "W3XP" → "PX3W", "WAR3" → "3RAW".
+  // Урагш бичвэл WC3 SEARCHGAME-г ТАНИХГҮЙ → GAMEINFO-гоор хариулахгүй (LAN барилт бүтдэггүй байсан гол алдаа).
+  const rev = String(product).split('').reverse().join('');
+  buf.write(rev, 4, 4, 'ascii');       // урвуу: "PX3W" / "3RAW"
   buf.writeUInt32LE(version, 8);       // хувилбарын дугаар
   buf.writeUInt32LE(0, 12);            // host counter (0 = бүгдийг хай)
   return buf;
@@ -226,7 +229,8 @@ function startFinder(hostIp) {
       // Хувилбар илрүүлэх (зөвхөн нэг удаа)
       if (msg.length >= 12) {
         try {
-          const product = msg.toString('ascii', 4, 8);
+          // GAMEINFO дахь product ID мөн урвуу байт ("PX3W") — урагш болгож харьцуулна
+          const product = msg.toString('ascii', 4, 8).split('').reverse().join('');
           const version = msg.readUInt32LE(8);
           if (SEARCH_VERSIONS.some(v => v.product === product && v.version === version)) {
             state.foundVersion = { product, version };
