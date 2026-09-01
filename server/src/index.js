@@ -256,10 +256,24 @@ async function setRoomWaitingIfNoPlayersInGame(roomId) {
 // roomId → Map<username, userId>
 const roomMembers = {};
 // Helper: Map-аас [{id, name, ready}] массив үүсгэх
+// Хэрэглэгчийн Tier кэш (userId → tierbot_tier) — өрөөний гишүүд/лоббид нэрийн урд
+// Tier ("3-1" гэх мэт) харуулахад. 5 мин тутам DB-ээс шинэчилнэ (TierSync-тэй нийцнэ).
+const userTierById = new Map();
+async function refreshTierCache() {
+  if (!dbForMigration) return;
+  try {
+    const r = await dbForMigration.query("SELECT id, tierbot_tier FROM users WHERE tierbot_tier IS NOT NULL AND tierbot_tier <> ''");
+    userTierById.clear();
+    for (const row of r.rows) userTierById.set(String(row.id), row.tierbot_tier);
+  } catch (e) { /* tier кэш алдаа — эмзэг биш */ }
+}
+
 function membersArray(roomId) {
   if (!roomMembers[roomId]) return [];
   const readySet = roomReady[roomId] || new Set();
-  return [...roomMembers[roomId].entries()].map(([name, id]) => ({ id, name, ready: readySet.has(id) }));
+  return [...roomMembers[roomId].entries()].map(([name, id]) => ({
+    id, name, ready: readySet.has(id), tier: userTierById.get(String(id)) || null,
+  }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)
 const onlineUsers = new Map();
@@ -790,6 +804,8 @@ if (typeof autoExpireInterval.unref === 'function') autoExpireInterval.unref();
 async function start(port = PORT) {
   if (server.listening) return server;
   await runStartupMigrations();
+  refreshTierCache();                                   // Tier кэш анхны ачаалалт
+  setInterval(refreshTierCache, 5 * 60 * 1000).unref?.(); // 5 мин тутам шинэчлэх
   return new Promise((resolve) => {
     server.listen(port, () => {
       console.log(`Server http://localhost:${port} дээр ажиллаж байна`);

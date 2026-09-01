@@ -689,13 +689,15 @@ function setUpdateMsg(msg, type) {
 }
 
 function userDisplayName(user) {
-  return String(
+  const base = String(
     user?.discord_username ||
     user?.discord_display_name ||
     user?.discord_global_name ||
     user?.username ||
     ''
   ).trim();
+  // Tier nickname — "3-1 Нэр" (Discord серверийн tier nickname шиг). Tier байхгүй бол зүгээр нэр.
+  return withTier(base, user?.tierbot_tier);
 }
 
 function setUserUI(user) {
@@ -1713,10 +1715,11 @@ function renderMembers(members) {
     const isRoomHost = id ? id === hostId : false;
     const safeName = escHtml(name);
     const safeId   = escHtml(id);
+    const displayName = escHtml(withTier(name, m.tier));   // харагдах нэр = "3-1 Нэр" (Tier nickname)
     const kickBtn = (isHost && !isMe)
       ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${safeId}" data-name="${safeName}">Kick</button>`
       : '';
-    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${safeName}</span>` : safeName;
+    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
         <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}</div>
@@ -3607,6 +3610,14 @@ function escHtml(t) {
   // Хашилтыг ч escape хийнэ — attr="${escHtml(x)}" контекстээс салж гарахаас сэргийлнэ
   return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Tier Nickname — Discord серверийн tier nickname шиг "3-1 Вито Корлеон" (tier prefix + нэр).
+// Tier байхгүй бол зүгээр нэр. Буцаах утга нь ТҮҮХИЙ мөр — дуудагч escHtml хийнэ.
+function withTier(name, tier) {
+  const t = tier ? String(tier).trim() : '';
+  const n = String(name == null ? '' : name);
+  return t ? `${t} ${n}` : n;
 }
 
 // @mention parse: escHtml() дараа дуудна — аюулгүй HTML оруулна
