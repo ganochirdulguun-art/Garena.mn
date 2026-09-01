@@ -83,6 +83,7 @@ module.exports = adminMiddleware;
 module.exports.isAdminDiscordId = isAdminDiscordId;
 module.exports.isAdminUser = isAdminUser;
 module.exports.isOwnerUser = isOwnerUser;
+module.exports.isOwnerUser = isOwnerUser;
 module.exports.isEnvAdmin = isEnvAdmin;
 module.exports.adminDiscordIds = adminDiscordIds;
 module.exports.ownerUserIds = ownerUserIds;

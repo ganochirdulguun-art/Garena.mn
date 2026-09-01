@@ -2451,8 +2451,15 @@ function renderFriendsTab() {
 
 function friendItemHTML(f, isOnline) {
   const dotClass = isOnline ? 'dm-status-dot' : 'dm-status-dot offline';
+  // Tier badge — Discord серверийн Tier ангилал шиг найзыг Tier-ээр нь ялгаж харуулна
+  const tier = f.tierbot_tier ? String(f.tierbot_tier).trim() : '';
+  const major = tier ? (tier.split('-')[0].replace(/[^0-9]/g, '') || '0') : '';
+  const tierBadge = tier
+    ? `<span class="friend-tier friend-tier-${escHtml(major)}" title="Tier ${escHtml(tier)}">${escHtml(tier)}</span>`
+    : '';
   return `<li data-id="${f.id}" data-username="${escHtml(f.username)}">
     <span class="${dotClass}"></span>
+    ${tierBadge}
     <span class="dm-username">${escHtml(f.username)}</span>
     ${isOnline ? `<button class="btn btn-sm dm-btn friend-dm-btn">DM</button>` : ''}
     <button class="btn btn-sm btn-danger-soft remove-btn friend-remove-btn" title="Найзаас хасах">✕</button>

@@ -19,9 +19,15 @@ async function dbOk() {
   }
 }
 
-// Гишүүнчлэлийн найзын хязгаар: Bronze 50 / Silver 100 / Gold 200
+// Гишүүнчлэлийн найзын хязгаар: Bronze 50 / Silver 100 / Gold 200. ЭЗЭН = ХЯЗГААРГҮЙ.
 async function friendLimitError(userId) {
   try {
+    // Эзэн (платформ эзэмшигч) бол найзын хязгааргүй — бүх хэрэглэгчийг найзаар нэмж болно
+    try {
+      const { isOwnerUser } = require('../middleware/admin');
+      const ur = await db.query('SELECT id, discord_id FROM users WHERE id = $1', [userId]);
+      if (ur.rows[0] && isOwnerUser(ur.rows[0])) return null;
+    } catch { /* эзэн шалгах алдаа — энгийн хязгаар руу шилжинэ */ }
     const { tierOf, perksOf } = require('./membership');
     const tier = await tierOf(userId);
     const limit = perksOf(tier).friends;
@@ -134,13 +140,13 @@ router.get('/friends', authMW, async (req, res) => {
   if (await dbOk()) {
     try {
       const result = await db.query(`
-        SELECT u.id, u.username, u.avatar_url
+        SELECT u.id, u.username, u.avatar_url, u.tierbot_tier, u.tierbot_rank, u.membership
         FROM friendships f
         JOIN users u ON (
           CASE WHEN f.requester_id = $1 THEN f.receiver_id ELSE f.requester_id END = u.id
         )
         WHERE (f.requester_id = $1 OR f.receiver_id = $1) AND f.status = 'accepted'
-        ORDER BY u.username
+        ORDER BY u.tierbot_rank ASC NULLS LAST, u.username
       `, [myId]);
       return res.json(result.rows);
     } catch (e) {
