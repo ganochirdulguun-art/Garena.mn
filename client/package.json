@@ -1,6 +1,6 @@
 {
   "name": "garena-mn-client",
-  "version": "2.6.4",
+  "version": "2.6.5",
   "description": "Garena.mn Desktop App",
   "author": "ganochirdulguun-art",
   "main": "main.js",
@@ -50,7 +50,7 @@
     "publish": {
       "provider": "github",
       "owner": "ganochirdulguun-art",
-      "repo": "Garena.mn",
+      "repo": "Garena.mn-releases",
       "releaseType": "release"
     }
   },

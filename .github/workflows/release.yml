@@ -1,5 +1,10 @@
 name: Release Garena.mn client
 
+# Эх код private repo (Garena.mn)-д, суулгац/release зөвхөн public Garena.mn-releases-д
+# нийтлэгдэнэ (Option A). Cross-repo publish тул GITHUB_TOKEN биш, RELEASE_TOKEN (PAT) хэрэгтэй:
+#   RELEASE_TOKEN = fine-grained PAT, "Contents: Read and write" эрх, зөвхөн Garena.mn-releases repo-д;
+#   энэ Garena.mn repo → Settings → Secrets and variables → Actions → New repository secret.
+
 on:
   push:
     tags: ["v*"]
@@ -7,6 +12,9 @@ on:
 
 permissions:
   contents: write
+
+env:
+  RELEASE_REPO: ganochirdulguun-art/Garena.mn-releases
 
 jobs:
   build-windows:
@@ -22,17 +30,17 @@ jobs:
           cache: npm
           cache-dependency-path: client/package-lock.json
       - run: npm ci
-      # Release-ийг УРЬДЧИЛАН үүсгэнэ: electron-builder exe + blockmap-ийг зэрэг upload хийхдээ
-      # release-ийг хоёр удаа үүсгэж (race) нэг tag дээр 2 release гарч, latest.yml 404 болдог байсан.
+      # Release-ийг УРЬДЧИЛАН үүсгэнэ (public releases repo-д): electron-builder exe + blockmap-ийг
+      # зэрэг upload хийхэд release-ийг 2 удаа үүсгэж race болж latest.yml 404 болдог байсныг хаав.
       - name: Create GitHub release (if missing)
         if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
-          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "Garena.mn $GITHUB_REF_NAME" --notes "Garena.mn client $GITHUB_REF_NAME — Setup (суулгац) болон portable exe. Апп дотроос автоматаар шинэчлэгдэнэ."
+          gh release view "$GITHUB_REF_NAME" --repo "$RELEASE_REPO" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --repo "$RELEASE_REPO" --title "Garena.mn $GITHUB_REF_NAME" --notes "Garena.mn client $GITHUB_REF_NAME — Setup (суулгац) болон portable exe. Апп дотроос автоматаар шинэчлэгдэнэ."
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
       - name: Build & publish Garena.mn installer + portable exe
         run: npx electron-builder --win --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
