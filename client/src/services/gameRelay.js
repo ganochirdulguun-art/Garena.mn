@@ -427,6 +427,36 @@ function stopBotBridge() {
   console.log('[BotBridge] Зогслоо');
 }
 
+// ── Relay зам чанарын probe: 15с тутам relay:port руу TCP холбогдож RTT (≈1 round-trip)
+// хэмжинэ. Session-ий сүүлд/дундаж/мин/макс/амжилтгүйг лог-д бичнэ → аль тоглогчийн зам
+// муу байгааг ТООГООР харуулна (lag/гацалтын шалтгааныг оношлоход). Хост талын RTT өндөр бол
+// бүх joiner-т нөлөөлнө; joiner талынх өндөр бол зөвхөн тухайн хүнд. ──
+function startRelayLatencyProbe(relayIp, relayPort, label) {
+  let n = 0, fail = 0, sum = 0, min = Infinity, max = 0;
+  const tick = () => {
+    const t0 = Date.now();
+    let done = false;
+    const s = net.connect({ host: relayIp, port: Number(relayPort) });
+    const finish = (ok) => {
+      if (done) return; done = true;
+      try { s.destroy(); } catch {}
+      if (ok) {
+        const rtt = Date.now() - t0; n += 1; sum += rtt;
+        if (rtt < min) min = rtt; if (rtt > max) max = rtt;
+        if (n % 4 === 0) bblog(`[LatCheck ${label}] relay RTT сүүлд=${rtt}ms дундаж=${Math.round(sum / n)}ms мин=${min} макс=${max} амжилтгүй=${fail}/${n + fail}`);
+      } else {
+        fail += 1;
+        bblog(`[LatCheck ${label}] relay-д холбогдож ЧАДСАНГҮЙ (нийт амжилтгүй=${fail}) — интернэт тасалдал/пакет алдагдал`);
+      }
+    };
+    s.setTimeout(4000, () => finish(false));
+    s.on('connect', () => finish(true));
+    s.on('error', () => finish(false));
+  };
+  tick();
+  return setInterval(tick, 15000);
+}
+
 // ═══════════════════════════════════════════════════════════
 // ТОГЛОГЧ-ХОСТ LAN — JOINER тал (2026-08-31)
 // WC3 → локал proxy(127.0.0.1:localPort) → relay(joiner handshake) → хост тоглогчийн WC3.
@@ -467,6 +497,7 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
   state.server.listen(lp, '0.0.0.0');
 
   _gameInfoInject(state);   // GAMEINFO-г WC3 LAN-д цацна
+  state.latTimer = startRelayLatencyProbe(relayIp, relayPort, 'join');   // зам чанарын оношилгоо
   _lanJoin = state;
   return { localPort: lp };
 }
@@ -486,6 +517,7 @@ function stopLanJoin() {
   const s = _lanJoin; _lanJoin = null;
   s.running = false;
   clearTimeout(s.timer);
+  clearInterval(s.latTimer);
   try { s.udp?.close(); } catch {}
   try { s.server?.close(); } catch {}
   s.conns.forEach((c) => { try { c.destroy(); } catch {} });
@@ -559,6 +591,7 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo 
   };
   connectControl();
 
+  state.latTimer = startRelayLatencyProbe(relayIp, relayPort, 'host');   // зам чанарын оношилгоо
   _lanHost = state;
 }
 
@@ -567,6 +600,7 @@ function stopLanHost() {
   const s = _lanHost; _lanHost = null;
   s.running = false;
   clearTimeout(s.timer);
+  clearInterval(s.latTimer);
   try { s.probe?.close(); } catch {}
   try { s.control?.destroy(); } catch {}
   s.conns.forEach((c) => { try { c.destroy(); } catch {} });
