@@ -4949,8 +4949,10 @@ init();
   function setHostState(txt, state) {
     const s = el('lan-host-state'); if (s) { s.textContent = state ? state.toUpperCase() : 'БЭЛЭН'; s.dataset.state = state || 'idle'; }
     const t = el('lan-host-text'); if (t && txt) t.textContent = txt;
-    el('btn-lan-host')?.classList.toggle('hidden', !!hosting);
-    el('btn-lan-stop')?.classList.toggle('hidden', !hosting);
+    // "LAN тоглоом нээх" зөвхөн ХОСТ-д (өрөө үүсгэсэн хүн) харагдана. Joiner зөвхөн "Нэгдэх" харна.
+    const amHost = !!currentRoom?.isHost;
+    el('btn-lan-host')?.classList.toggle('hidden', !amHost || !!hosting);
+    el('btn-lan-stop')?.classList.toggle('hidden', !amHost || !hosting);
   }
 
   function renderGames() {
@@ -5031,6 +5033,14 @@ init();
       const r = await api('get', `/rooms/${currentRoom.id}/lan-host`);
       if (!r?.relay_configured) { panel.classList.add('hidden'); return; }
       panel.classList.remove('hidden');
+      // Товч/зөвлөмжийг ролиор нь: зөвхөн хост "LAN тоглоом нээх" харна
+      const amHost = !!currentRoom?.isHost;
+      el('btn-lan-host')?.classList.toggle('hidden', !amHost);
+      el('btn-lan-stop')?.classList.add('hidden');
+      const hintEl = el('lan-host-text');
+      if (hintEl) hintEl.textContent = amHost
+        ? 'Өөрийн WC3 LAN тоглоом нээж, өрөөнийхнөө урина. Ямар ч интернэтээс холбогдоно.'
+        : 'Хост тоглоом нээхэд доор гарч ирнэ — "Нэгдэх" дарж WC3-даа ор.';
       (r.games || []).forEach((g) => games.set(g.game_token, g));
       renderGames();
     } catch { /* relay тохируулаагүй */ }
