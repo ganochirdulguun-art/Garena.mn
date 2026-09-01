@@ -2892,6 +2892,7 @@ async function openUserProfile(userId) {
   document.getElementById('popup-winrate').textContent  = '';
   document.getElementById('popup-history-body').innerHTML = '<tr><td colspan="3" class="empty-text">Ачааллаж байна...</td></tr>';
   document.getElementById('popup-friend-btn-wrap').innerHTML = '';
+  document.getElementById('popup-stats')?.classList.add('hidden');
 
   const avatarEl = document.getElementById('popup-avatar');
   avatarEl.src = ''; avatarEl.style.display = 'none';
@@ -2902,11 +2903,28 @@ async function openUserProfile(userId) {
       window.api.getGameHistory(userId, 1),
     ]);
 
-    document.getElementById('popup-username').textContent = stats.username;
+    document.getElementById('popup-username').textContent = withTier(stats.username, stats.tierbot_tier);
     document.getElementById('popup-wins').textContent     = `${stats.wins} хожил`;
     document.getElementById('popup-losses').textContent   = `${stats.losses} хожигдол`;
     document.getElementById('popup-winrate').textContent  = stats.winrate;
     if (stats.avatar_url) { avatarEl.src = stats.avatar_url; avatarEl.style.display = 'block'; }
+
+    // Дундаж DotA статистик (платформ дээр тоглосон тоглолтууд)
+    const st = stats.stats;
+    const statsBox = document.getElementById('popup-stats');
+    if (statsBox) {
+      if (st && st.games > 0) {
+        statsBox.classList.remove('hidden');
+        document.getElementById('popup-avg-kda').textContent      = `${st.avg_kills ?? 0} / ${st.avg_deaths ?? 0} / ${st.avg_assists ?? 0}`;
+        document.getElementById('popup-avg-creeps').textContent   = st.avg_creeps ?? 0;
+        document.getElementById('popup-avg-denies').textContent   = st.avg_denies ?? 0;
+        document.getElementById('popup-avg-neutrals').textContent = st.avg_neutrals ?? 0;
+        document.getElementById('popup-avg-gold').textContent     = st.avg_gold ?? 0;
+        document.getElementById('popup-games').textContent        = st.games;
+      } else {
+        statsBox.classList.add('hidden');
+      }
+    }
 
     const games = history?.games || [];
     const tbody = document.getElementById('popup-history-body');

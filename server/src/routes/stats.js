@@ -218,14 +218,28 @@ router.get('/player/id/:userId', async (req, res) => {
   if (await dbAvailable()) {
     try {
       const result = await db.query(
-        'SELECT id, username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at FROM users WHERE id = $1',
+        'SELECT id, username, avatar_url, tierbot_tier, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at FROM users WHERE id = $1',
         [userId]
       );
       if (!result.rows[0]) return res.status(404).json({ error: 'Тоглогч олдсонгүй' });
       const user = result.rows[0];
       const total = user.wins + user.losses;
       const winrate = total > 0 ? ((user.wins / total) * 100).toFixed(1) : 0;
-      return res.json({ ...user, total_games: total, winrate: `${winrate}%` });
+      // Платформ дээр тоглосон тоглолтуудын дундаж DotA статистик (game_players)
+      let stats = null;
+      try {
+        const agg = await db.query(
+          `SELECT COUNT(*)::int AS games,
+             ROUND(AVG(kills)::numeric,1) AS avg_kills, ROUND(AVG(deaths)::numeric,1) AS avg_deaths,
+             ROUND(AVG(assists)::numeric,1) AS avg_assists, ROUND(AVG(creep_kills)::numeric,1) AS avg_creeps,
+             ROUND(AVG(creep_denies)::numeric,1) AS avg_denies, ROUND(AVG(neutral_kills)::numeric,1) AS avg_neutrals,
+             ROUND(AVG(gold)::numeric,0) AS avg_gold
+           FROM game_players WHERE user_id = $1`, [userId]);
+        const a = agg.rows[0] || {};
+        stats = { games: a.games || 0, avg_kills: a.avg_kills, avg_deaths: a.avg_deaths, avg_assists: a.avg_assists,
+          avg_creeps: a.avg_creeps, avg_denies: a.avg_denies, avg_neutrals: a.avg_neutrals, avg_gold: a.avg_gold };
+      } catch (e) { /* aggregate алдаа — эмзэг биш */ }
+      return res.json({ ...user, total_games: total, winrate: `${winrate}%`, stats });
     } catch (err) { console.error(err); }
   }
   res.status(404).json({ error: 'Тоглогч олдсонгүй' });

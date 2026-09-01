@@ -58,7 +58,11 @@ async function runMigrations(db) {
       ADD COLUMN IF NOT EXISTS is_leaver BOOLEAN DEFAULT FALSE,
       ADD COLUMN IF NOT EXISTS xp_earned INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS diamonds_earned INTEGER DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS wc3_name VARCHAR(64);
+      ADD COLUMN IF NOT EXISTS wc3_name VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS creep_kills INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS creep_denies INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS neutral_kills INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS gold INTEGER DEFAULT 0;
 
     -- QPay нэхэмжлэх бүхий гишүүнчлэлийн захиалгууд
     CREATE TABLE IF NOT EXISTS payment_orders (

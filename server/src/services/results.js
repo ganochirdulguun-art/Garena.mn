@@ -74,6 +74,9 @@ async function recordGameResult({
       user_id: userId, wc3_name: p.name || null, team,
       kills: clampStat(p.kills), deaths: clampStat(p.deaths), assists: clampStat(p.assists),
       hero: p.hero ? String(p.hero).slice(0, 64) : null, left_at_sec: leftAt, is_leaver: isLeaver,
+      // DotA нэмэлт статистик (creep/denie/neutral/gold) — байхгүй бол 0
+      creep_kills: clampStat(p.creep_kills ?? p.creepKills), creep_denies: clampStat(p.creep_denies ?? p.creepDenies),
+      neutral_kills: clampStat(p.neutral_kills ?? p.neutralKills), gold: clampStat(p.gold),
     };
   });
 
@@ -117,9 +120,9 @@ async function recordGameResult({
           durationMinutes, ref: `game:${result.id}`,
         });
         await client.query(
-          `INSERT INTO game_players (game_result_id, user_id, team, is_winner, kills, deaths, assists, hero, left_at_sec, is_leaver, xp_earned, diamonds_earned, wc3_name)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT DO NOTHING`,
-          [result.id, p.user_id, p.team, isWinner, p.kills, p.deaths, p.assists, p.hero, p.left_at_sec, p.is_leaver, award.xp_earned || 0, award.diamonds_earned || 0, p.wc3_name]
+          `INSERT INTO game_players (game_result_id, user_id, team, is_winner, kills, deaths, assists, hero, left_at_sec, is_leaver, xp_earned, diamonds_earned, wc3_name, creep_kills, creep_denies, neutral_kills, gold)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT DO NOTHING`,
+          [result.id, p.user_id, p.team, isWinner, p.kills, p.deaths, p.assists, p.hero, p.left_at_sec, p.is_leaver, award.xp_earned || 0, award.diamonds_earned || 0, p.wc3_name, p.creep_kills, p.creep_denies, p.neutral_kills, p.gold]
         );
         // Дараагийн тоглолтод нэрээр шууд тааруулахын тулд WC3 нэрийг сурна
         if (p.wc3_name) {

@@ -185,6 +185,11 @@ async function parseReplay(filePath) {
         deaths: dp ? Number(dp.deaths) || 0 : 0,
         assists: dp ? Number(dp.assists) || 0 : 0,
         hero: dp && dp.hero ? String(dp.hero).slice(0, 64) : null,
+        // DotA нэмэлт статистик (профайлын дундаж)
+        creep_kills: dp ? Number(dp.creepKills) || 0 : 0,
+        creep_denies: dp ? Number(dp.creepDenies) || 0 : 0,
+        neutral_kills: dp ? Number(dp.neutralKills) || 0 : 0,
+        gold: dp ? Number(dp.gold) || 0 : 0,
         user_id: matched ? Number(matched.id) : null,
         discord_id: null,
         left_at_sec: leftAtSec,
