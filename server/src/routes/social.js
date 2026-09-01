@@ -106,6 +106,21 @@ async function initTables() {
       CREATE INDEX IF NOT EXISTS idx_messages_unread
       ON messages(receiver_id, is_read) WHERE is_read = FALSE
     `);
+    // Нийтийн лобби чат — БАЙНГА хадгална (сервер дахин ажиллахад ч түүх үлдэнэ)
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS lobby_messages (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+        username VARCHAR(120) NOT NULL,
+        text TEXT NOT NULL,
+        deleted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_lobby_messages_time
+      ON lobby_messages(created_at DESC)
+    `);
   } catch (e) {
     console.error('[Social] init:', e.message);
   }
@@ -528,7 +543,71 @@ async function saveMessage(senderId, receiverId, text) {
   }
 }
 
+// ─────────── Нийтийн лобби чат (байнга хадгална) ───────────
+// msg.time (ISO) → created_at болгож хадгална: in-memory болон DB-ийн time яг таарна
+// (устгал `time`-аар түлхүүрлэдэг тул reload хийсний дараа ч ажиллана).
+async function saveLobbyMessage(userId, username, text, timeISO) {
+  if (!await dbOk()) return null;
+  try {
+    const result = await db.query(
+      `INSERT INTO lobby_messages (user_id, username, text, created_at)
+       VALUES ($1, $2, $3, COALESCE($4::timestamptz, NOW()))
+       RETURNING id, created_at`,
+      [userId || null, username, text, timeISO || null]
+    );
+    return result.rows[0];
+  } catch (e) {
+    console.error('[saveLobbyMessage]', e.message);
+    return null;
+  }
+}
+
+// Хамгийн сүүлийн `limit` мессежийг хугацааны дарааллаар (хуучин→шинэ) буцаана
+async function getLobbyHistory(limit = 50) {
+  if (!await dbOk()) return [];
+  try {
+    const n = Math.max(1, Math.min(500, Number(limit) || 50));
+    const result = await db.query(
+      `SELECT * FROM (
+         SELECT user_id, username, text, deleted, created_at
+         FROM lobby_messages
+         ORDER BY created_at DESC, id DESC
+         LIMIT $1
+       ) t ORDER BY created_at ASC`,
+      [n]
+    );
+    return result.rows.map(r => ({
+      userId:   r.user_id,
+      username: r.username,
+      text:     r.deleted ? '[Устгагдсан мессеж]' : r.text,
+      time:     r.created_at instanceof Date ? r.created_at.toISOString() : new Date(r.created_at).toISOString(),
+    }));
+  } catch (e) {
+    console.error('[getLobbyHistory]', e.message);
+    return [];
+  }
+}
+
+// Зөвхөн эзэн нь өөрийн мессежийг устгана (created_at = time-аар түлхүүрлэнэ)
+async function deleteLobbyMessage(userId, timeISO) {
+  if (!await dbOk()) return false;
+  try {
+    const result = await db.query(
+      `UPDATE lobby_messages SET deleted = TRUE, text = '[Устгагдсан мессеж]'
+       WHERE user_id = $1 AND created_at = $2::timestamptz`,
+      [userId, timeISO]
+    );
+    return result.rowCount > 0;
+  } catch (e) {
+    console.error('[deleteLobbyMessage]', e.message);
+    return false;
+  }
+}
+
 module.exports = router;
 module.exports.setIO = setIO;
 module.exports.isUserBlocked = isUserBlocked;
 module.exports.saveMessage = saveMessage;
+module.exports.saveLobbyMessage = saveLobbyMessage;
+module.exports.getLobbyHistory = getLobbyHistory;
+module.exports.deleteLobbyMessage = deleteLobbyMessage;

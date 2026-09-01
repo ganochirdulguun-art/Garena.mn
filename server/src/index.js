@@ -384,10 +384,13 @@ io.on('connection', (socket) => {
       text: text.trim().slice(0, 500),
       time: new Date().toISOString(),
     };
-    // Түүхэнд хадгалах
+    // In-memory кэшэд хадгалах (хурдан history-д)
     lobbyHistory.push(msg);
     if (lobbyHistory.length > LOBBY_HISTORY_MAX) lobbyHistory.shift();
     io.emit('lobby:chat', msg);
+    // DB-д БАЙНГА хадгалах (сервер restart-д ч түүх үлдэнэ) — time=created_at таарна
+    socialRoutes.saveLobbyMessage(msg.userId, msg.username, msg.text, msg.time)
+      .catch(e => console.error('[Lobby] save:', e.message));
   });
 
   // Хувийн мессеж (private message)
@@ -547,6 +550,9 @@ io.on('connection', (socket) => {
     lobbyHistory[idx].text = '[Устгагдсан мессеж]';
     io.emit('lobby:deleted', { time });
     reply({ ok: true });
+    // DB-д ч устгалыг тэмдэглэх (restart-ын дараа буцаж гарч ирэхгүй)
+    socialRoutes.deleteLobbyMessage(userId, time)
+      .catch(e => console.error('[Lobby] delete:', e.message));
   });
 
   // Host-ын IP хаягийг өрөөний тоглогчдод дамжуулах
@@ -801,9 +807,24 @@ const autoExpireInterval = setInterval(async () => {
 }, 2 * 60 * 60 * 1000);
 if (typeof autoExpireInterval.unref === 'function') autoExpireInterval.unref();
 
+// Нийтийн лобби чатын түүхийг DB-с in-memory кэш рүү ачаалах (сервер асахад нэг удаа)
+async function hydrateLobbyHistory() {
+  try {
+    const rows = await socialRoutes.getLobbyHistory(LOBBY_HISTORY_MAX);
+    if (Array.isArray(rows) && rows.length) {
+      lobbyHistory.length = 0;
+      lobbyHistory.push(...rows);
+      console.log(`[Lobby] Чатын түүх сэргээв: ${lobbyHistory.length} мессеж`);
+    }
+  } catch (e) {
+    console.error('[Lobby] hydrate:', e.message);
+  }
+}
+
 async function start(port = PORT) {
   if (server.listening) return server;
   await runStartupMigrations();
+  await hydrateLobbyHistory();                           // Чатын түүхийг DB-с сэргээх
   refreshTierCache();                                   // Tier кэш анхны ачаалалт
   setInterval(refreshTierCache, 5 * 60 * 1000).unref?.(); // 5 мин тутам шинэчлэх
   return new Promise((resolve) => {

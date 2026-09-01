@@ -77,6 +77,17 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at  TIMESTAMP DEFAULT NOW()
 );
 
+-- Нийтийн лобби чат — БАЙНГА хадгална (сервер restart/deploy хийсэн ч түүх үлдэнэ)
+CREATE TABLE IF NOT EXISTS lobby_messages (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  username    VARCHAR(120) NOT NULL,
+  text        TEXT NOT NULL,
+  deleted     BOOLEAN DEFAULT FALSE,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_lobby_messages_time ON lobby_messages(created_at DESC);
+
 -- Indexes (query performance сайжруулах)
 CREATE INDEX IF NOT EXISTS idx_rooms_status         ON rooms(status);
 CREATE INDEX IF NOT EXISTS idx_room_players_user    ON room_players(user_id);
