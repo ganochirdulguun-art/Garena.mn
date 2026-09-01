@@ -12,10 +12,25 @@ const authMW = require('../middleware/auth');
 
 let roomRoutes = null;
 try { roomRoutes = require('./rooms'); } catch { roomRoutes = null; }
+let db = null;
+try { db = require('../config/db'); } catch { db = null; }
 
 let _io = null;
 function setIO(io) { _io = io; }
 function emitRoom(roomId, event, payload) { if (_io && roomId) _io.to(String(roomId)).emit(event, payload); }
+
+// Өрөөнд идэвхтэй LAN тоглоом байвал өрөөг 'playing' (тоглолт эхэлсэн) болгоно → гаднын хүн
+// нэгдэж чадахгүй. Тоглоом дуусаж/зогсоод хоосон болвол 'waiting' болгож дахин нээлттэй болгоно.
+async function syncRoomStatus(roomId) {
+  if (!db) return;
+  const m = roomGames.get(String(roomId));
+  const active = !!(m && m.size > 0);
+  try {
+    if (active) await db.query("UPDATE rooms SET status='playing' WHERE id=$1 AND status='waiting'", [roomId]);
+    else await db.query("UPDATE rooms SET status='waiting' WHERE id=$1 AND status='playing'", [roomId]);
+    if (_io) _io.emit('rooms:updated');
+  } catch (e) { /* статус синк алдаа — эмзэг биш */ }
+}
 
 // Relay сервер (public IP) — платформ хостод зааж өгнө. MVP: нэг relay (датаком).
 const RELAY_IP = process.env.LAN_RELAY_IP || '';
@@ -48,8 +63,9 @@ function removeUserGames(roomId, userId) {
     }
   }
   if (!m.size) roomGames.delete(String(roomId));
+  syncRoomStatus(roomId);   // хостын тоглоом устсан бол өрөөг 'waiting' болгоно (fire-and-forget)
 }
-function clearRoom(roomId) { roomGames.delete(String(roomId)); }
+function clearRoom(roomId) { roomGames.delete(String(roomId)); syncRoomStatus(roomId); }
 
 const router = express.Router();
 
@@ -79,6 +95,7 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
   m.set(g.token, g);
   emitRoom(roomId, 'room:lan_lobby', gamePublic(g));
+  await syncRoomStatus(roomId);   // LAN тоглоом нээгдлээ → өрөө 'playing' (гаднын хүн нэгдэхгүй)
   return res.json({ ok: true });
 });
 
@@ -92,6 +109,7 @@ router.delete('/:id/lan-host/:token', authMW, async (req, res) => {
     m.delete(token);
     if (!m.size) roomGames.delete(roomId);
     emitRoom(roomId, 'room:lan_lobby_gone', { game_token: token });
+    await syncRoomStatus(roomId);   // тоглоом зогслоо → хоосон бол өрөө 'waiting' (дахин нээлттэй)
   }
   return res.json({ ok: true });
 });

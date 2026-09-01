@@ -224,6 +224,13 @@ router.post('/:id/join', strictAuth, async (req, res) => {
 
   if (await dbOk()) {
     try {
+      // 1) Target өрөөг ЭХЛЭЭД шалгана — хуучин өрөөнөөс гаргахаас ӨМНӨ (эс бөгөөс
+      //    'playing' өрөөрүү нэгдэх гэсэн хүн хуучин өрөөгөө дэмий алдана).
+      const roomResult = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
+      const room = roomResult.rows[0];
+      if (!room) return res.status(404).json({ error: 'Room not found' });
+      if (room.status === 'done') return res.status(400).json({ error: 'Room is closed' });
+
       const already = await db.query(
         `SELECT r.id FROM rooms r
          JOIN room_players rp ON r.id = rp.room_id
@@ -232,12 +239,18 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         [userId]
       );
 
-      if (already.rows[0]) {
-        if (String(already.rows[0].id) === String(id)) {
-          const roomResult = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
-          return res.json({ message: 'Joined room', room: roomResult.rows[0] });
-        }
+      // Энэ өрөөнд аль хэдийн гишүүн бол (тоглолт эхэлсэн ч) зөвшөөрнө
+      if (already.rows[0] && String(already.rows[0].id) === String(id)) {
+        return res.json({ message: 'Joined room', room });
+      }
+      // Тоглолт эхэлсэн (LAN тоглоом нээгдсэн) өрөөнд ГАДНЫН/шинэ хүн нэгдэхийг хориглоно —
+      // хуучин өрөөг хөндөхөөс ӨМНӨ татгалзана.
+      if (room.status === 'playing') {
+        return res.status(409).json({ error: 'Тоглолт эхэлсэн тул энэ өрөөнд нэгдэх боломжгүй', code: 'GAME_STARTED' });
+      }
 
+      // Өөр өрөөнд байсан бол тэндээс гаргана
+      if (already.rows[0]) {
         const oldId = already.rows[0].id;
         await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [oldId, userId]);
         const oldRoom = await db.query('SELECT host_id FROM rooms WHERE id = $1', [oldId]);
@@ -250,11 +263,6 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         }
         emitRoomsUpdated();
       }
-
-      const roomResult = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
-      const room = roomResult.rows[0];
-      if (!room) return res.status(404).json({ error: 'Room not found' });
-      if (room.status === 'done') return res.status(400).json({ error: 'Room is closed' });
 
       if (room.has_password) {
         if (!password) return res.status(403).json({ error: 'Password required', need_password: true });
