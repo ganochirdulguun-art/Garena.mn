@@ -289,7 +289,8 @@ function onlineUsersList() {
       byUser.set(user.userId, user);
     }
   }
-  return [...byUser.values()];
+  // GarenaSystem Tier-ийг хавсаргана (client "Tier Nickname" болгож харуулна)
+  return [...byUser.values()].map(u => ({ ...u, tier: userTierById.get(String(u.userId)) || null }));
 }
 // String(userId) → socketId (private мессеж илгээхэд хэрэг)
 const userSockets = new Map();

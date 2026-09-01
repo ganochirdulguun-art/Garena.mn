@@ -2576,9 +2576,12 @@ function renderFriendsWindow() {
 
 function fwFriendItem(f, isOnline) {
   const dot = isOnline ? 'dm-status-dot' : 'dm-status-dot offline';
+  // GarenaSystem гишүүн бол харагдах нэр = "Tier Nickname" (жиш "3-1 Вито Корлеон").
+  // data-username нь DM/mention-д хэрэгтэй тул ТҮҮХИЙ username хэвээр үлдэнэ.
+  const displayName = escHtml(withTier(f.username, f.tierbot_tier));
   return `<li data-id="${f.id}" data-username="${escHtml(f.username)}">
     <span class="${dot}"></span>
-    <span class="dm-username clickable-name" data-user-id="${f.id}">${escHtml(f.username)}</span>
+    <span class="dm-username clickable-name" data-user-id="${f.id}">${displayName}</span>
     ${isOnline ? '<button class="btn btn-sm dm-btn fw-dm-btn">DM</button>' : ''}
     <button class="btn btn-sm fw-profile-btn" title="Профайл">👤</button>
     <button class="btn btn-sm btn-danger-soft fw-remove-btn" title="Хасах">✕</button>
@@ -2731,6 +2734,7 @@ function renderOnlineTab(others) {
   dmList.innerHTML = others.map(u => {
     const uid    = typeof u === 'object' ? String(u.userId) : '';
     const uname  = typeof u === 'object' ? u.username : u;
+    const utier  = typeof u === 'object' ? u.tier : null;
     const status = typeof u === 'object' ? (u.status || 'online') : 'online';
     const unread = dmConversations[uid]?.unread || 0;
     const badge  = `<span class="dm-unread" style="${unread > 0 ? '' : 'display:none'}">${unread}</span>`;
@@ -2766,7 +2770,7 @@ function renderOnlineTab(others) {
 
     return `<li data-user-id="${uid}" data-username="${escHtml(uname)}" class="online-user-item">
       <span class="dm-status-dot"></span>
-      <span class="dm-username">${escHtml(uname)}</span>
+      <span class="dm-username">${escHtml(withTier(uname, utier))}</span>
       ${statusBadge}
       ${badge}
       <div class="dm-action-btns">${actionBtns}</div>
