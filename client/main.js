@@ -61,10 +61,10 @@ function broadcastToWindows(channel, data) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1000,
-    height: 700,
-    minWidth: 800,
-    minHeight: 600,
+    width: 1180,
+    height: 730,
+    minWidth: 940,
+    minHeight: 640,
     title: 'Garena.mn',
     icon: path.join(__dirname, 'src/renderer/icon.ico'),
     webPreferences: {
@@ -750,7 +750,7 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
 // Профайл чип + чат/тохиргоо/гарах товчнууд энд байдаг тул дангаар нь хаагдахгүй (closable: false);
 // үндсэн цонх хаагдах / гарах үед main.js хаана.
 let friendsWindow = null;
-const FRIENDS_W = 400;
+const FRIENDS_W = 440;
 function dockFriendsWindow() {
   if (!mainWindow || mainWindow.isDestroyed() || !friendsWindow || friendsWindow.isDestroyed()) return;
   try {
@@ -764,8 +764,8 @@ function dockFriendsWindow() {
 function openFriendsWindow() {
   if (friendsWindow && !friendsWindow.isDestroyed()) { dockFriendsWindow(); return friendsWindow; }
   friendsWindow = new BrowserWindow({
-    width: FRIENDS_W, height: 700,
-    minWidth: 360, minHeight: 450,
+    width: FRIENDS_W, height: 730,
+    minWidth: 380, minHeight: 450,
     title: 'Найзууд — Garena.mn',
     icon: path.join(__dirname, 'src/renderer/icon.ico'),
     webPreferences: {
