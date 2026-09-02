@@ -677,6 +677,125 @@
     font-weight: 760;
   }
 
+  /* ── Давуу талууд (Why) ── */
+  .why-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+  .why-card {
+    padding: 22px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02)),
+      var(--panel);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 18px 46px rgba(0,0,0,.34);
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+  }
+  .why-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(83,164,255,.34);
+    box-shadow: 0 22px 54px rgba(0,0,0,.42), 0 0 26px rgba(83,164,255,.14);
+  }
+  .why-ico {
+    width: 46px;
+    height: 46px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    font-size: 23px;
+    margin-bottom: 14px;
+    background: rgba(83,164,255,.12);
+    border: 1px solid rgba(83,164,255,.22);
+    box-shadow: inset 0 0 20px rgba(83,164,255,.14);
+  }
+  .why-card.gold .why-ico { background: rgba(240,186,87,.14); border-color: rgba(240,186,87,.28); box-shadow: inset 0 0 20px rgba(240,186,87,.16); }
+  .why-card.red .why-ico  { background: rgba(223,69,63,.13);  border-color: rgba(223,69,63,.26);  box-shadow: inset 0 0 20px rgba(223,69,63,.16); }
+  .why-card.green .why-ico{ background: rgba(84,199,123,.13); border-color: rgba(84,199,123,.26); box-shadow: inset 0 0 20px rgba(84,199,123,.16); }
+  .why-card h3 { font-size: 17px; line-height: 1.25; margin-bottom: 7px; }
+  .why-card p { color: var(--dim); font-size: 14px; }
+
+  /* ── Заавар (Steps) ── */
+  .guide-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+  }
+  .guide-col .guide-title {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    font-size: 19px;
+    font-weight: 900;
+    margin-bottom: 20px;
+  }
+  .guide-col .guide-title span {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    background: rgba(240,186,87,.14);
+    border: 1px solid rgba(240,186,87,.28);
+  }
+  .steps { display: grid; gap: 0; counter-reset: step; }
+  .step {
+    position: relative;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 15px;
+    padding: 0 0 20px 0;
+  }
+  .step:last-child { padding-bottom: 0; }
+  .step::before {
+    counter-increment: step;
+    content: counter(step);
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 15px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--blue), var(--blue-deep));
+    box-shadow: 0 8px 22px rgba(31,101,200,.4);
+    z-index: 1;
+  }
+  .guide-col.gold .step::before {
+    color: #221704;
+    background: linear-gradient(135deg, #ffd37b, #d8912f);
+    box-shadow: 0 8px 22px rgba(216,145,47,.36);
+  }
+  .step:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: 16px;
+    top: 34px;
+    bottom: 4px;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(83,164,255,.5), rgba(255,255,255,.08));
+  }
+  .guide-col.gold .step:not(:last-child)::after {
+    background: linear-gradient(180deg, rgba(240,186,87,.5), rgba(255,255,255,.08));
+  }
+  .step h4 { font-size: 15px; line-height: 1.3; margin: 5px 0 3px; }
+  .step p { color: var(--dim); font-size: 13.5px; }
+  .step p b { color: #f2eee7; }
+  .note {
+    margin-top: 20px;
+    padding: 13px 15px;
+    border-radius: 9px;
+    font-size: 13px;
+    color: var(--dim);
+    background: rgba(240,186,87,.08);
+    border: 1px solid rgba(240,186,87,.22);
+  }
+  .note b { color: var(--gold); }
+
   .download-band {
     margin: 52px 0 74px;
     position: relative;
@@ -816,6 +935,8 @@
     .feature-grid.reverse .visual { order: -1; }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .download-actions { justify-content: flex-start; }
+    .why-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .guide-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 680px) {
     .wrap { width: min(100% - 28px, 1180px); }
@@ -832,6 +953,7 @@
     .panel { padding: 20px; }
     .stats { grid-template-columns: 1fr; }
     .download-band { margin-bottom: 46px; }
+    .why-grid { grid-template-columns: 1fr; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
@@ -887,8 +1009,10 @@
           <span class="brand-text">Garena.mn</span>
         </a>
         <div class="navlinks">
+          <a href="#why">Давуу тал</a>
           <a href="#platform">Platform</a>
           <a href="#warkey">WarKey</a>
+          <a href="#guide">Заавар</a>
           <a href="#download">Татах</a>
           <a class="admin" href="/admin">Админ самбар</a>
         </div>
@@ -916,7 +1040,7 @@
             <button class="weather-btn" type="button" data-weather="rain">Бороо</button>
           </div>
           <div class="cta">
-            <a class="btn primary" id="dlPlatform" href="https://github.com/ganochirdulguun-art/Garena.mn/releases/latest" target="_blank" rel="noopener">
+            <a class="btn primary" id="dlPlatform" href="https://github.com/ganochirdulguun-art/Garena.mn-releases/releases/latest" target="_blank" rel="noopener">
               <span>Платформ татах</span><small id="verPlatform"></small>
             </a>
             <a class="btn gold" id="dlWarkey" href="https://github.com/ganochirdulguun-art/GarenaWarKey/releases/latest" target="_blank" rel="noopener">
@@ -928,6 +1052,49 @@
         </div>
       </div>
     </header>
+
+    <section class="section" id="why">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="eyebrow">Яагаад Garena.mn?</div>
+          <h2>GameRanger биш — Монголд зориулж хийсэн платформ.</h2>
+          <p>Ижил Wi-Fi, ижил сүлжээ хэрэггүй. Монгол хэл, Монгол Tier, Монгол community — бүгд нэг апп дотор.</p>
+        </div>
+
+        <div class="why-grid">
+          <article class="why-card reveal">
+            <div class="why-ico" aria-hidden="true">🌐</div>
+            <h3>Аль ч сүлжээнээс LAN тоглоом</h3>
+            <p>DATACOM relay серверээр дамжуулан WC3 LAN тоглоомоо дэлхийн хаанаас ч холбоно. GameRanger шиг ижил сүлжээнд байх шаардлагагүй.</p>
+          </article>
+          <article class="why-card gold reveal">
+            <div class="why-ico" aria-hidden="true">🏆</div>
+            <h3>Tier чинь шууд харагдана</h3>
+            <p>GarenaSystem Discord серверийн Tier болон nickname чинь платформд автоматаар — жишээ нь <b>"3-1 Вито Корлеон"</b> нэртэйгээр орно.</p>
+          </article>
+          <article class="why-card red reveal">
+            <div class="why-ico" aria-hidden="true">💎</div>
+            <h3>Diamond · XP · Level</h3>
+            <p>Тоглох тусам туршлага цуглана, түвшин ахина. Тоглолт бүрийн K/D/A задарч Diamond, XP автоматаар нэмэгдэнэ.</p>
+          </article>
+          <article class="why-card green reveal">
+            <div class="why-ico" aria-hidden="true">👥</div>
+            <h3>Найзууд · Чат · Discord</h3>
+            <p>Найзаа урих, онлайн төлөв харах, DM бичих, нийтийн чатлах, Discord серверүүдтэйгээ холбогдох — бүгд нэг цонхонд.</p>
+          </article>
+          <article class="why-card reveal">
+            <div class="why-ico" aria-hidden="true">🔄</div>
+            <h3>Авто-шинэчлэлт</h3>
+            <p>Нэг л удаа суулгачихвал болоо. Шинэ хувилбар гармагц апп өөрөө татаж шинэчилнэ — дахин суулгах хэрэггүй.</p>
+          </article>
+          <article class="why-card gold reveal">
+            <div class="why-ico" aria-hidden="true">⌨️</div>
+            <h3>WarKey дагалдана</h3>
+            <p>Skill, inventory, QuickChat hotkey-гээ тоглолтын дундуур ч тааруулах Garena.mn WarKey хэрэгсэл багцад орсон. Үнэ төлбөргүй.</p>
+          </article>
+        </div>
+      </div>
+    </section>
 
     <section class="section" id="platform">
       <div class="wrap">
@@ -1022,6 +1189,80 @@
       </div>
     </section>
 
+    <section class="section" id="guide">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <div class="eyebrow">Эхлэх заавар</div>
+          <h2>3 минутад суулгаад тоглож эхэл.</h2>
+          <p>Repo clone, тохиргоо юу ч хэрэггүй. Татаад, суулгаад, Discord-оороо нэвтрэхэд л боллоо.</p>
+        </div>
+
+        <div class="guide-grid">
+          <div class="guide-col gold panel reveal">
+            <div class="guide-title"><span aria-hidden="true">⬇️</span>Суулгах заавар</div>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <h4>Installer татах</h4>
+                  <p>Дээрх <b>"Платформ татах"</b> товч эсвэл доорх Татах хэсгээс <b>Garena.mn Setup</b> файлыг татна.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Windows анхааруулбал</h4>
+                  <p>"Windows protected your PC" (SmartScreen) гарвал → <b>More info</b> → <b>Run anyway</b> дарна. Энэ нь шинэ апп бүрт гардаг хэвийн зүйл, вирус биш.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Суулгах</h4>
+                  <p><b>Next → Install</b> дарж дуустал хүлээнэ. Desktop дээр Garena.mn icon үүснэ.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Discord-оороо нэвтрэх</h4>
+                  <p>Апп нээгдэхэд <b>Discord-оороо нэвтэрнэ</b>. GarenaSystem серверийн гишүүн бол Tier чинь шууд орж ирнэ.</p>
+                </div>
+              </div>
+            </div>
+            <div class="note"><b>Санамж:</b> Хэрэв SmartScreen "Run anyway" сонголт харагдахгүй бол файл дээр баруун товч → <b>Properties → Unblock</b> тэмдэглээд OK дарна.</div>
+          </div>
+
+          <div class="guide-col panel reveal">
+            <div class="guide-title"><span aria-hidden="true">🎮</span>Хэрэглэх заавар</div>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <h4>Өрөө үүсгэх / нэгдэх</h4>
+                  <p><b>Өрөө</b> хэсгээс шинэ өрөө үүсгэ, эсвэл байгаа өрөөнд нэгд. Найзаа жагсаалтаас урьж болно.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>LAN тоглоом нээх (хост)</h4>
+                  <p>Өрөө үүсгэсэн хүн <b>"LAN тоглоом нээх"</b> дарж Warcraft III-аа нээнэ. Тоглоомоо үүсгэхэд бусдад автоматаар харагдана.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Тоглоомд нэгдэх (бусад)</h4>
+                  <p>Өрөөнийхөн <b>"…-ийн тоглоомд нэгдэх"</b> дарж WC3-даа ижил тоглоомд шууд орно. IP, порт тохируулах хэрэггүй.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Тогло — үр дүн бүртгэгдэнэ</h4>
+                  <p>Relay бүх тоглогчийг холбоно. Тоглолт дуусахад <b>K/D/A, XP, Diamond</b> автоматаар профайлд бүртгэгдэнэ.</p>
+                </div>
+              </div>
+            </div>
+            <div class="note"><b>Зөвлөгөө:</b> Warcraft III <b>1.26a (Frozen Throne)</b> хувилбар нийтлэг ажиллана. Тоглоом нээхдээ бүгд ижил хувилбар зааж өгвөл асуудалгүй холбогдоно.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="wrap" id="download">
       <div class="download-band">
         <div class="download-content">
@@ -1031,7 +1272,7 @@
             <p>Хэрэглэгч repo clone хийх шаардлагагүй. Latest release-ээс desktop installer болон WarKey exe-г татаж ашиглана.</p>
           </div>
           <div class="download-actions">
-            <a class="btn primary" id="dlPlatform2" href="https://github.com/ganochirdulguun-art/Garena.mn/releases/latest" target="_blank" rel="noopener">
+            <a class="btn primary" id="dlPlatform2" href="https://github.com/ganochirdulguun-art/Garena.mn-releases/releases/latest" target="_blank" rel="noopener">
               <span>Platform</span><small id="verPlatform2"></small>
             </a>
             <a class="btn gold" id="dlWarkey2" href="https://github.com/ganochirdulguun-art/GarenaWarKey/releases/latest" target="_blank" rel="noopener">
@@ -1091,7 +1332,7 @@
   );
 
   wireDownload(
-    "ganochirdulguun-art/Garena.mn",
+    "ganochirdulguun-art/Garena.mn-releases",
     (a) => /\.exe$/i.test(a.name) && /(setup|installer|platform)/i.test(a.name),
     { buttons: ["dlPlatform", "dlPlatform2"], versions: ["verPlatform", "verPlatform2"] }
   );
