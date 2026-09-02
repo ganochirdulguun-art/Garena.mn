@@ -33,6 +33,63 @@ let joinerCount = 0;
 
 function log(...a) { console.log(new Date().toISOString(), '[relay]', ...a); }
 
+// ════════════════════════════════════════════════════════════════════════════
+// ТОГЛООМ CAPTURE (2026-09-02) — тоглогч-хостын тоглоомын урсгалыг сервер тал бичнэ.
+// Зорилго: бот-хост БОЛОН клиент replay-гүйгээр бодит K/D/A/creep/denie/ward-ыг гаргах
+// (DotA w3mmd host→joiner action урсгалд байдаг). ⚠️ splice-ыг ОГТ хөндөхгүй — зөвхөн
+// PASSIVE 'data' сонсогч файлд хуулна. Бүх үйлдэл try/catch-д — capture унасан ч тоглоом
+// 100% хэвийн үргэлжилнэ. RELAY_CAPTURE=1 env-ээр л асна (default УНТРААЛТТАЙ — эхлээд
+// туршиж баталгаажуулна, дараа нь асаана).
+const fs = require('fs');
+const path = require('path');
+const CAP_ON = process.env.RELAY_CAPTURE === '1';
+const CAP_DIR = process.env.RELAY_CAPTURE_DIR || '/tmp/garena-capture';
+const CAP_MAX_BYTES = Number(process.env.RELAY_CAPTURE_MAX || 60 * 1024 * 1024); // тоглоом бүрт дээд 60MB хамгаалалт
+if (CAP_ON) { try { fs.mkdirSync(CAP_DIR, { recursive: true }); } catch (e) { log('capture dir алдаа: ' + e.message); } }
+const captures = new Map(); // gameId -> { ws, bytes, primary, socks:Set, onData, capped }
+
+function capAttach(gameId, hostSock) {
+  if (!CAP_ON) return;
+  try {
+    let cap = captures.get(gameId);
+    if (!cap) {
+      const ws = fs.createWriteStream(path.join(CAP_DIR, `${gameId}-${Date.now()}.w3gs`));
+      ws.on('error', () => {});   // диск алдаа splice-д нөлөөлөхгүй
+      cap = { ws, bytes: 0, primary: null, socks: new Set(), onData: null, capped: false };
+      captures.set(gameId, cap);
+    }
+    cap.socks.add(hostSock);
+    hostSock.on('close', () => { try { cap.socks.delete(hostSock); if (cap.primary === hostSock) capPromote(gameId); } catch {} });
+    hostSock.on('error', () => { try { cap.socks.delete(hostSock); } catch {} });
+    if (!cap.primary) capSetPrimary(gameId, hostSock);
+  } catch (e) { /* capture хэзээ ч splice-ыг эвдэхгүй */ }
+}
+function capSetPrimary(gameId, hostSock) {
+  const cap = captures.get(gameId); if (!cap) return;
+  cap.primary = hostSock;
+  cap.onData = (d) => {
+    try {
+      if (cap.capped) return;
+      cap.bytes += d.length;
+      if (cap.bytes > CAP_MAX_BYTES) { cap.capped = true; return; }
+      cap.ws.write(d);   // fire-and-forget; backpressure-ыг үл тоомсорлоно (санах ойд буферлэнэ)
+    } catch {}
+  };
+  try { hostSock.on('data', cap.onData); } catch {}
+}
+function capPromote(gameId) {
+  const cap = captures.get(gameId); if (!cap) return;
+  cap.primary = null;
+  const next = cap.socks.values().next().value;   // өөр амьд session байвал үргэлжлүүлнэ
+  if (next) capSetPrimary(gameId, next);
+}
+function capFinalize(gameId) {
+  const cap = captures.get(gameId); if (!cap) return;
+  captures.delete(gameId);
+  try { cap.ws.end(); } catch {}
+  log(`capture дуусав game=${gameId.slice(0, 12)} bytes=${cap.bytes}${cap.capped ? ' (дээд хязгаарт хүрсэн)' : ''}`);
+}
+
 // Socket-оос эхний newline хүртэлх JSON-ыг уншаад {msg, leftover}-ыг буцаана.
 function readHandshake(sock, cb) {
   let buf = Buffer.alloc(0);
@@ -89,6 +146,7 @@ const server = net.createServer((sock) => {
         if (hosts.get(game) === h) {
           hosts.delete(game);
           for (const s of h.sessions.values()) { clearTimeout(s.timer); try { s.joiner.destroy(); } catch {} }
+          capFinalize(game);   // тоглоом дуусав — capture файлыг хаана
           log('host салав game=' + game.slice(0, 12));
         }
       });
@@ -119,6 +177,7 @@ const server = net.createServer((sock) => {
       clearTimeout(s.timer); h.sessions.delete(sid);
       try { s.joiner.resume(); } catch {}
       splice(sock, s.joiner, leftover, s.leftover);
+      capAttach(game, sock);   // PASSIVE tee — splice-ыг хөндөхгүй
       log('splice хийв game=' + game.slice(0, 12) + ' sid=' + sid);
 
     } else {
