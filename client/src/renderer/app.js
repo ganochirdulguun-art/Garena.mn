@@ -1078,10 +1078,11 @@ let _netQuality = {};
 function pingBadge(mid) {
   const q = _netQuality[mid];
   if (!q) return `<span class="rp-ping" data-ping-user="${mid}"></span>`;
-  if (q.rtt == null || q.loss >= 30) {
+  if (q.rtt == null || q.loss >= 20) {
     return `<span class="rp-ping bad" data-ping-user="${mid}" title="Пакет алдагдал/тасалдал ${q.loss}%">⚠ ${q.loss}%</span>`;
   }
-  const cls = q.rtt < 60 ? 'good' : q.rtt < 130 ? 'ok' : 'bad';
+  // Платформын baseline ~6мс (DATACOM UB relay). Ногоон = үнэхээр хурдан.
+  const cls = q.rtt < 25 ? 'good' : q.rtt < 70 ? 'ok' : 'bad';
   return `<span class="rp-ping ${cls}" data-ping-user="${mid}" title="Relay RTT (сүлжээний саатал)">${q.rtt}ms</span>`;
 }
 
