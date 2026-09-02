@@ -1255,6 +1255,70 @@ body.light .room-grid-row {
 .room-detail-actions {
   justify-content: flex-end;
 }
+
+/* ── GameRanger-style тоглогчийн жагсаалт (Game Info) ── */
+.room-detail-players {
+  margin: 12px 0;
+  padding: 10px 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.rp-list {
+  margin-top: 8px;
+  max-height: 230px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rp-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .15s ease;
+}
+.rp-row:hover { background: rgba(255, 255, 255, .06); }
+.rp-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #6b6b72;
+}
+.rp-dot.on {
+  background: #54c77b;
+  box-shadow: 0 0 8px rgba(84, 199, 123, .7);
+}
+.rp-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+  font-size: 0.86rem;
+}
+.rp-row:hover .rp-name { text-decoration: underline; }
+.rp-host {
+  flex: 0 0 auto;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #f0ba57;
+  background: rgba(240, 186, 87, .14);
+  border: 1px solid rgba(240, 186, 87, .3);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+.rp-empty {
+  margin-top: 8px;
+  color: var(--text2);
+  font-size: 0.8rem;
+}
 @keyframes rowIn {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: none; }

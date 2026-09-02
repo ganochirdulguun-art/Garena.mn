@@ -84,7 +84,7 @@ router.get('/', optAuth, async (req, res) => {
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp.user_id) AS player_count,
-          JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username)
+          JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
         FROM rooms r
         JOIN users u ON r.host_id = u.id
@@ -114,7 +114,7 @@ router.get('/mine', optAuth, async (req, res) => {
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp2.user_id) AS player_count,
-          JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username)
+          JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp2.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
         FROM rooms r
         JOIN users u ON r.host_id = u.id
@@ -589,7 +589,7 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
           SELECT r.id, r.name, r.host_id, u.username AS host_name,
             r.max_players, r.game_type, r.status, r.has_password, r.zerotier_network_id,
             COUNT(rp.user_id) AS player_count,
-            JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username)
+            JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
               ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
           FROM rooms r
           JOIN users u ON r.host_id=u.id

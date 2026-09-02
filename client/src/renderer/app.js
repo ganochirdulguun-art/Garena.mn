@@ -1038,6 +1038,25 @@ function roomMemberLinks(r) {
   }).join(', ');
 }
 
+// GameRanger "Game Info" маягийн босоо тоглогчийн жагсаалт — онлайн цэг + Tier нэр,
+// мөр дээр дархад rank/профайл гарна.
+function roomPlayerList(r) {
+  const members = r.members || [];
+  if (!members.length) return '<div class="rp-empty">Одоогоор тоглогч алга</div>';
+  const hostId = String(r.host_id);
+  return members.map(m => {
+    const mid = m.id ? String(m.id) : '';
+    const online = mid && onlineUserIds.has(mid);
+    const isHost = mid && mid === hostId;
+    const label = withTier(m.name || m, m.tier);
+    return `<div class="rp-row" data-user-id="${mid}" title="Дэлгэрэнгүй харах">
+      <span class="rp-dot ${online ? 'on' : 'off'}"></span>
+      <span class="clickable-name rp-name" data-user-id="${mid}">${escHtml(label)}</span>
+      ${isHost ? '<span class="rp-host">Host</span>' : ''}
+    </div>`;
+  }).join('');
+}
+
 function roomStatusMeta(r, inProgress, isMyRoom) {
   if (isMyRoom) return { label: 'Миний', className: 'mine' };
   if (inProgress) return { label: 'Live', className: 'playing' };
@@ -1118,7 +1137,6 @@ function renderRoomDetail(r) {
   const isMyRoom = String(r.host_id) === myId ||
                    (r.members || []).some(m => String(m.id) === myId);
   const status = roomStatusMeta(r, inProgress, isMyRoom);
-  const members = roomMemberLinks(r);
   const networkLabel = 'LAN bridge';
 
   return `
@@ -1139,9 +1157,9 @@ function renderRoomDetail(r) {
         <div><span>Players</span><strong>${r.player_count || 0}/${r.max_players || '-'}</strong></div>
         <div><span>Network</span><strong>${networkLabel}</strong></div>
       </div>
-      <div class="room-members room-detail-members">
-        <span class="room-detail-label">Гишүүд</span>
-        <div>${members || '<span class="muted">Одоогоор гишүүн харагдахгүй байна</span>'}</div>
+      <div class="room-members room-detail-players">
+        <span class="room-detail-label">Тоглогчид · ${r.player_count || 0}/${r.max_players || '-'}</span>
+        <div class="rp-list">${roomPlayerList(r)}</div>
       </div>
       <div class="room-detail-actions">
         ${roomActionButton(r, inProgress, isMyRoom, myId)}
@@ -1166,8 +1184,14 @@ async function joinPlayingRoom(id, name, gameType, hostId) {
 
 document.getElementById('btn-refresh').onclick = loadRooms;
 
-// Room card дотор нэр дарахад profile нээх
+// Room detail дотор тоглогчийн мөр/нэр дарахад профайл (rank) нээх
 document.addEventListener('click', e => {
+  const row = e.target.closest('.rp-row');
+  if (row && row.dataset.userId) {
+    e.stopPropagation();
+    openUserProfile(row.dataset.userId);
+    return;
+  }
   const nameEl = e.target.closest('.room-members .clickable-name');
   if (nameEl && nameEl.dataset.userId) {
     e.stopPropagation();
