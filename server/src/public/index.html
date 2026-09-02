@@ -796,6 +796,69 @@
   }
   .note b { color: var(--gold); }
 
+  /* ── WarKey overlay highlight (маркетингийн гол зэвсэг) ── */
+  .overlay-hero {
+    margin-top: 30px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 22px;
+    align-items: center;
+    padding: 26px 28px;
+    border-radius: 12px;
+    border: 1px solid rgba(240,186,87,.36);
+    background:
+      linear-gradient(118deg, rgba(240,186,87,.15), rgba(83,164,255,.10) 58%, transparent),
+      var(--panel);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 22px 54px rgba(0,0,0,.42), inset 0 0 44px rgba(240,186,87,.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .overlay-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(240,186,87,.14), transparent 46%, rgba(83,164,255,.12));
+    animation: sheen 8s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  .overlay-hero > * { position: relative; z-index: 1; }
+  .kbd-combo {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: rgba(5,7,12,.6);
+    border: 1px solid rgba(83,164,255,.4);
+    box-shadow: inset 0 0 24px rgba(83,164,255,.14);
+  }
+  .kbd {
+    font-family: Consolas, monospace;
+    font-weight: 900;
+    font-size: 17px;
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 7px;
+    background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.04));
+    border: 1px solid rgba(255,255,255,.24);
+    box-shadow: 0 3px 0 rgba(0,0,0,.4);
+  }
+  .kbd-plus { color: var(--dim); font-weight: 900; }
+  .overlay-badge {
+    display: inline-block;
+    color: var(--gold);
+    font-weight: 900;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 8px;
+    text-shadow: 0 0 18px rgba(240,186,87,.4);
+  }
+  .overlay-hero h3 { font-size: clamp(19px, 2.5vw, 25px); line-height: 1.15; margin-bottom: 8px; }
+  .overlay-hero p { color: #ded8cc; font-size: 14.5px; max-width: 640px; }
+  .overlay-hero p b { color: #fff; }
+
   .download-band {
     margin: 52px 0 74px;
     position: relative;
@@ -937,6 +1000,8 @@
     .download-actions { justify-content: flex-start; }
     .why-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .guide-grid { grid-template-columns: 1fr; }
+    .overlay-hero { grid-template-columns: 1fr; text-align: left; }
+    .kbd-combo { justify-self: start; }
   }
   @media (max-width: 680px) {
     .wrap { width: min(100% - 28px, 1180px); }
@@ -1150,8 +1215,8 @@
       <div class="wrap">
         <div class="section-head reveal">
           <div class="eyebrow">Garena.mn WarKey</div>
-          <h2>Hotkey-гээ тоглолтын дундуур ч хурдан тааруул.</h2>
-          <p>Skill, inventory, QuickChat-аа өөрийн гарын байрлалд тааруулж, жижиг overlay-р тоглоомоос гарахгүйгээр тохируулна.</p>
+          <h2>Цонхоо хаахгүйгээр, тоглолтынхоо дундуур skill-ийн үсгээ тааруул.</h2>
+          <p>Ердийн WarKey тоглоомоо хаагаад тохируулдаг. Garena.mn WarKey бол тоглоомоосоо гаралгүйгээр, яг тоглож байхдаа skill болон item-ийн hotkey-гээ шинэчилдэг шинэ төрлийн хэрэгсэл.</p>
         </div>
 
         <div class="feature-grid reverse">
@@ -1185,6 +1250,79 @@
             <img src="assets/warkey-keys.png" alt="Garena.mn WarKey — QWER hotkey keycaps">
             <figcaption class="visual-label"><i></i>WarKey hotkey</figcaption>
           </figure>
+        </div>
+
+        <div class="overlay-hero reveal">
+          <div class="kbd-combo" aria-label="Ctrl нэмэх F6">
+            <span class="kbd">Ctrl</span><span class="kbd-plus">+</span><span class="kbd">F6</span>
+          </div>
+          <div>
+            <span class="overlay-badge">★ Хамгийн том онцлог</span>
+            <h3>Тоглоомоо хаахгүйгээр, яг тоглож байхдаа skill-ийн үсгээ солино.</h3>
+            <p>Hero-гоо буруу үсэгтэй эхлүүлчихсэн үү? <b>Ctrl + F6</b> дарахад тоглолтынхоо яг дээр overlay гарч ирнэ. Skill болон item-ийн hotkey-гээ шууд өөрчлөөд, дахин <b>Ctrl + F6</b> дарж хаагаад тоглоомоо үргэлжлүүлнэ — alt-tab, restart юу ч хэрэггүй.</p>
+          </div>
+        </div>
+
+        <div class="guide-grid" style="margin-top:24px">
+          <div class="guide-col gold panel reveal">
+            <div class="guide-title"><span aria-hidden="true">⬇️</span>WarKey суулгах</div>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <h4>WarKey татах</h4>
+                  <p>Дээрх <b>"WarKey татах"</b> товчоор <b>GarenaWarKey.exe</b> файлыг татна. Суулгац шаардлагагүй — шууд нээгддэг.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Windows анхааруулбал</h4>
+                  <p>SmartScreen гарвал → <b>More info</b> → <b>Run anyway</b>. (Платформтой ижил хэвийн зүйл.)</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Discord-оороо нэвтрэх</h4>
+                  <p>WarKey нээгдэхэд <b>Discord-оороо нэвтэрнэ</b> — эрх шалгаад бэлэн болно.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Warcraft III нээх</h4>
+                  <p>WC3-аа нээхэд WarKey ард ажиллаж эхэлнэ. Дээд талд <b>Вито Корлеон</b> шиг нэр чинь гарч ирвэл холбогдсон гэсэн үг.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="guide-col panel reveal">
+            <div class="guide-title"><span aria-hidden="true">⌨️</span>WarKey хэрэглэх</div>
+            <div class="steps">
+              <div class="step">
+                <div>
+                  <h4>Үсгээ урьдчилан тааруул</h4>
+                  <p><b>Warkey</b> таб дээр Skill, Inventory (1–6) hotkey-гээ өөрийн гарын байрлалд тохируулна. <b>QuickChat</b> таб-д давтагддаг чатаа тавина.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Hero-гоо сонго</h4>
+                  <p>Тоглолт эхлүүлж hero-гоо сонгоход тухайн баатрын <b>skill-үүд автоматаар</b> Skills самбарт гарч ирнэ.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Тоглож байхдаа Ctrl + F6</h4>
+                  <p>Тоглоомынхоо яг дундуур <b>Ctrl + F6</b> дарж overlay нээнэ. Тоглоомоо хаах, alt-tab хийх шаардлагагүй.</p>
+                </div>
+              </div>
+              <div class="step">
+                <div>
+                  <h4>Үсгээ солиод үргэлжлүүл</h4>
+                  <p>Overlay дээр skill/item-ийн үсгээ шинэчилнэ. Дахин <b>Ctrl + F6</b> дарж хаагаад тоглоомоо шууд үргэлжлүүлнэ.</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
