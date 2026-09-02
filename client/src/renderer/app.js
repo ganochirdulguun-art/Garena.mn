@@ -1962,21 +1962,21 @@ async function loadUnreadDMCounts() {
 // ── Private мессеж (DM) — Floating Popup систем ──────────
 function openDM(userId, username) {
   const uid = String(userId);
-
-  // Popup аль хэдийн нээлттэй бол focus хийх
+  const uname = username || dmConversations[uid]?.username || 'DM';
+  // Yahoo Messenger маягийн ТУСДАА цонхоор нээнэ (доторх popup биш).
+  // dm:openWindow нь аль хэдийн нээлттэй бол зөвхөн focus хийдэг (давхардлахгүй).
+  if (window.api?.openDMWindow) {
+    window.api.openDMWindow({ userId: uid, username: uname });
+    return;
+  }
+  // Fallback (хэрэв тусдаа цонх боломжгүй бол): хуучин popup
   if (activePopups.has(uid)) {
     const popup = activePopups.get(uid);
     if (popup.minimized) togglePopupMinimize(uid);
-    popup.element.querySelector('.dm-popup-input').focus();
+    popup.element.querySelector('.dm-popup-input')?.focus();
     return;
   }
-
-  // Хамгийн ихдээ MAX_DM_POPUPS popup нээх
-  if (activePopups.size >= MAX_DM_POPUPS) {
-    const oldestKey = activePopups.keys().next().value;
-    closeDMPopup(oldestKey);
-  }
-
+  if (activePopups.size >= MAX_DM_POPUPS) closeDMPopup(activePopups.keys().next().value);
   createDMPopup(uid, username);
 }
 

@@ -77,6 +77,16 @@ function createWindow() {
     backgroundColor: '#0c0b0f',
   });
 
+  // Найзууд цонх БАРУУН талд багтахаар: гол цонх + найзууд-ыг нэг блок болгож дэлгэц голлоно
+  try {
+    const b = mainWindow.getBounds();
+    const area = screen.getDisplayMatching(b).workArea;
+    const combinedW = b.width + FRIENDS_W;
+    const x = area.x + Math.max(0, Math.round((area.width - combinedW) / 2));
+    const y = area.y + Math.max(0, Math.round((area.height - b.height) / 2));
+    mainWindow.setPosition(x, y);
+  } catch {}
+
   mainWindow.loadFile('src/renderer/index.html');
   hardenWindow(mainWindow);
   // Найзууд цонх үндсэн цонхны хажууд наалдаж явна; үндсэн цонх хаагдахад хамт хаагдана
