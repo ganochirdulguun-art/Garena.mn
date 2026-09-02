@@ -127,6 +127,20 @@ async function testSmokeFlow() {
     assert.equal(meJson.username, 'Tester');
     assert.equal(meJson.email, email);
 
+    // 🏆 Ranked өрөө: create → ranked:true буцаана, жагсаалтад ч харагдана (v2.7.8 / Алхам 3)
+    const rankedRes = await fetch(`${server.baseUrl}/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginJson.token}` },
+      body: JSON.stringify({ name: 'Ranked test', game_type: 'DotA', max_players: 10, ranked: true }),
+    });
+    assert.ok([200, 201].includes(rankedRes.status), `rooms create ${rankedRes.status}`);
+    const rankedJson = await rankedRes.json();
+    assert.equal(rankedJson.ranked, true, 'create хариунд ranked=true байх ёстой');
+    const listRes = await fetch(`${server.baseUrl}/rooms`, { headers: { Authorization: `Bearer ${loginJson.token}` } });
+    const listJson = await listRes.json();
+    const listed = (Array.isArray(listJson) ? listJson : []).find((r) => String(r.id) === String(rankedJson.id));
+    assert.ok(listed && listed.ranked === true, 'жагсаалтад ranked=true байх ёстой');
+
     const forgotRes = await fetch(`${server.baseUrl}/auth/forgot-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
