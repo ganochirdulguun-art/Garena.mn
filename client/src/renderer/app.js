@@ -383,6 +383,9 @@ async function connectSocket() {
   socket.on('private:message', (msg) => handleIncomingDM(msg));
   socket.on('private:sent',    (msg) => handleSentDM(msg));
 
+  // Тоглогч бүрийн relay сүлжээний чанар (ping/loss) — өрөөнд харуулна
+  socket.on('net:quality', ({ userId, rtt, avg, loss }) => applyNetQuality(userId, { rtt, avg, loss }));
+
   // Өрөөний эзэн өрөөг хаасан
   socket.on('room:closed', ({ reason }) => {
     if (!currentRoom) return;
@@ -557,6 +560,8 @@ function showMaphackModal(data) {
 async function init() {
   // MapHack анхааруулгыг бүх цонхонд сонсоно (тоглолт эхлүүлэхэд илэрвэл)
   window.api.onMaphack?.(showMaphackModal);
+  // Relay сүлжээний саатал (RTT/loss)-ыг серверт мэдэгдэнэ → өрөөнд тоглогч бүрийн ping
+  window.api.onNetLatency?.((d) => { try { socket?.emit('net:report', d); } catch {} });
 
   // Найзуудын тусдаа цонх горим
   if (isFriendsMode()) {
@@ -1068,7 +1073,19 @@ function roomMemberLinks(r) {
   }).join(', ');
 }
 
-// GameRanger "Game Info" маягийн босоо тоглогчийн жагсаалт — онлайн цэг + Tier нэр,
+// Тоглогч бүрийн relay сүлжээний чанар (net:quality-аас): userId → {rtt, avg, loss}
+let _netQuality = {};
+function pingBadge(mid) {
+  const q = _netQuality[mid];
+  if (!q) return `<span class="rp-ping" data-ping-user="${mid}"></span>`;
+  if (q.rtt == null || q.loss >= 30) {
+    return `<span class="rp-ping bad" data-ping-user="${mid}" title="Пакет алдагдал/тасалдал ${q.loss}%">⚠ ${q.loss}%</span>`;
+  }
+  const cls = q.rtt < 60 ? 'good' : q.rtt < 130 ? 'ok' : 'bad';
+  return `<span class="rp-ping ${cls}" data-ping-user="${mid}" title="Relay RTT (сүлжээний саатал)">${q.rtt}ms</span>`;
+}
+
+// GameRanger "Game Info" маягийн босоо тоглогчийн жагсаалт — онлайн цэг + Tier нэр + ping,
 // мөр дээр дархад rank/профайл гарна.
 function roomPlayerList(r) {
   const members = r.members || [];
@@ -1083,8 +1100,20 @@ function roomPlayerList(r) {
       <span class="rp-dot ${online ? 'on' : 'off'}"></span>
       <span class="clickable-name rp-name" data-user-id="${mid}">${escHtml(label)}</span>
       ${isHost ? '<span class="rp-host">Host</span>' : ''}
+      ${pingBadge(mid)}
     </div>`;
   }).join('');
+}
+
+// net:quality ирэхэд тухайн тоглогчийн ping-ийг ШУУД шинэчилнэ (бүх жагсаалт дахин зурахгүй)
+function applyNetQuality(userId, q) {
+  _netQuality[String(userId)] = q;
+  document.querySelectorAll(`.rp-ping[data-ping-user="${CSS.escape(String(userId))}"]`).forEach(el => {
+    const nb = pingBadge(String(userId));
+    const tmp = document.createElement('div'); tmp.innerHTML = nb;
+    const fresh = tmp.firstElementChild;
+    if (fresh) el.replaceWith(fresh);
+  });
 }
 
 function roomStatusMeta(r, inProgress, isMyRoom) {

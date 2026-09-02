@@ -1319,6 +1319,19 @@ body.light .room-grid-row {
   color: var(--text2);
   font-size: 0.8rem;
 }
+/* Тоглогчийн relay сүлжээний ping (аль тоглогч гацааж байгааг харах) */
+.rp-ping {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-size: 0.68rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text2);
+}
+.rp-ping.good { color: #54c77b; }
+.rp-ping.ok   { color: #f0ba57; }
+.rp-ping.bad  { color: #ff6b63; }
 
 /* ── MapHack анхааруулгын overlay ── */
 .maphack-overlay {

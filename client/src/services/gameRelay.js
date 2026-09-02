@@ -431,8 +431,13 @@ function stopBotBridge() {
 // хэмжинэ. Session-ий сүүлд/дундаж/мин/макс/амжилтгүйг лог-д бичнэ → аль тоглогчийн зам
 // муу байгааг ТООГООР харуулна (lag/гацалтын шалтгааныг оношлоход). Хост талын RTT өндөр бол
 // бүх joiner-т нөлөөлнө; joiner талынх өндөр бол зөвхөн тухайн хүнд. ──
+let _onLatencySample = null;
+// Тоглогч бүрийн relay RTT/пакет алдагдлыг өрөөнд харуулахад — main.js энд listener тавьж,
+// renderer рүү дамжуулаад socket-оор серверт мэдэгдэнэ (net:report).
+function setLatencyListener(fn) { _onLatencySample = typeof fn === 'function' ? fn : null; }
+
 function startRelayLatencyProbe(relayIp, relayPort, label) {
-  let n = 0, fail = 0, sum = 0, min = Infinity, max = 0;
+  let n = 0, fail = 0, sum = 0, min = Infinity, max = 0, recent = [];
   const tick = () => {
     const t0 = Date.now();
     let done = false;
@@ -443,10 +448,17 @@ function startRelayLatencyProbe(relayIp, relayPort, label) {
       if (ok) {
         const rtt = Date.now() - t0; n += 1; sum += rtt;
         if (rtt < min) min = rtt; if (rtt > max) max = rtt;
+        recent.push(1); if (recent.length > 10) recent.shift();
         if (n % 4 === 0) bblog(`[LatCheck ${label}] relay RTT сүүлд=${rtt}ms дундаж=${Math.round(sum / n)}ms мин=${min} макс=${max} амжилтгүй=${fail}/${n + fail}`);
+        // Сүүлийн ~10 дээж дэх алдагдлын хувь (jitter/loss-ийн ойролцоо хэмжүүр)
+        const lossPct = Math.round((recent.filter((x) => x === 0).length / recent.length) * 100);
+        try { _onLatencySample?.({ label, rtt, avg: Math.round(sum / n), loss: lossPct }); } catch {}
       } else {
         fail += 1;
+        recent.push(0); if (recent.length > 10) recent.shift();
         bblog(`[LatCheck ${label}] relay-д холбогдож ЧАДСАНГҮЙ (нийт амжилтгүй=${fail}) — интернэт тасалдал/пакет алдагдал`);
+        const lossPct = Math.round((recent.filter((x) => x === 0).length / recent.length) * 100);
+        try { _onLatencySample?.({ label, rtt: null, avg: n ? Math.round(sum / n) : null, loss: lossPct }); } catch {}
       }
     };
     s.setTimeout(4000, () => finish(false));
@@ -454,7 +466,7 @@ function startRelayLatencyProbe(relayIp, relayPort, label) {
     s.on('error', () => finish(false));
   };
   tick();
-  return setInterval(tick, 15000);
+  return setInterval(tick, 8000);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -624,6 +636,7 @@ module.exports = {
   stopBotBridge,
   updateBotBridge,
   setBotJoinListener,
+  setLatencyListener,
   parseReqJoinName,
   startHost, stopHost, addHostPlayerIp,
   startFinder, stopFinder,

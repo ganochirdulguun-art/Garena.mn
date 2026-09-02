@@ -999,6 +999,8 @@ function readWc3LocalName() {
 ipcMain.handle('wc3:name', () => readWc3LocalName());
 // WC3 ботын lobby руу REQJOIN явуулахад бодит нэрийг бүх цонх руу (өрөөний цонх тусдаа)
 gameRelayService.setBotJoinListener((name) => broadcastToWindows('bot:wc3-join', { name }));
+// Relay сүлжээний чанар (RTT/loss) → renderer → сервер → өрөөнд тоглогч бүрийн ping
+gameRelayService.setLatencyListener((d) => broadcastToWindows('net:latency', d));
 ipcMain.handle('relay:addHostPlayer', (_, ip) => {
   gameRelayService.addHostPlayerIp(ip);
   return true;

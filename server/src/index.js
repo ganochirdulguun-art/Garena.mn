@@ -583,6 +583,19 @@ io.on('connection', (socket) => {
   // (zt:authorize, room:zt_ip хэсгүүд хасагдсан — ZeroTier 2026-08-30-нд бүрэн хасагдав.
   //  Хуучин клиентийн эдгээр event-үүд хариугүй үлдэнэ — гэмтэл учруулахгүй.)
 
+  // Тоглогчийн relay сүлжээний чанар (RTT/loss) — өрөөнийхөнд broadcast (аль тоглогч
+  // гацааж байгааг харах). WC3 lockstep тул нэг муу холболт бүгдийг гацаадаг.
+  socket.on('net:report', ({ rtt, avg, loss } = {}) => {
+    const roomId = socket.data.roomId;
+    if (!roomId) return;
+    io.to(String(roomId)).emit('net:quality', {
+      userId: String(socket.user.id),
+      rtt: (rtt == null ? null : Math.max(0, Math.min(9999, Number(rtt) || 0))),
+      avg: (avg == null ? null : Math.max(0, Math.min(9999, Number(avg) || 0))),
+      loss: Math.max(0, Math.min(100, Number(loss) || 0)),
+    });
+  });
+
   // Тоглогчийн бэлэн/бэлэн биш төлөв
   socket.on('room:ready', async ({ roomId, ready }) => {
     if (!roomId || String(socket.data.roomId) !== String(roomId)) return;
