@@ -17,6 +17,7 @@ function clampStat(v) { return Math.max(0, Math.min(10000, toInt(v, 0))); }
 async function recordGameResult({
   roomId, winnerTeam, durationMinutes = 0, replayPath = null, players = [],
   source = 'replay', botJobId = null, mapName = null, gameName = null,
+  fogclick = [],
 }) {
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
@@ -135,6 +136,26 @@ async function recordGameResult({
     // ('done' болговол /rooms жагсаалтаас алга болж, isUserInRoom false → өрөөний чат хаагддаг байсан.)
     await client.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status <> 'done'`, [roomId]);
     await client.query('COMMIT');
+
+    // FOGCLICK (maphack) илэрсэн тоглогчид — w3mhdet DLL replay чатад бичсэнийг клиент задалж
+    // WC3 нэрээр дамжуулна. Нэрийг тоглолтын resolved тоглогчтой таарч, сануулга/бан + эзэнд DM.
+    // Давхардсан replay энд ирэхгүй (дээр duplicate=true болж эргэсэн) тул нэг тоглолтод нэг удаа.
+    if (Array.isArray(fogclick) && fogclick.length) {
+      try {
+        const { recordMaphackWarning } = require('../routes/anticheat');
+        const seen = new Set();
+        for (const fc of fogclick) {
+          const nm = norm(fc && typeof fc === 'object' ? fc.name : fc);
+          if (!nm) continue;
+          const hit = resolved.find((p) => p.user_id && norm(p.wc3_name) === nm);
+          if (hit && !seen.has(String(hit.user_id))) {
+            seen.add(String(hit.user_id));
+            recordMaphackWarning(hit.user_id, 'MapHack (FOGCLICK)').catch(() => {});
+          }
+        }
+      } catch (e) { console.error('[Results] fogclick:', e.message); }
+    }
+
     return { duplicate: false, result, players: awards };
   } catch (e) {
     try { await client.query('ROLLBACK'); } catch {}

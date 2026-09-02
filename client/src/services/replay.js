@@ -137,6 +137,21 @@ function leaveOutcome(block) {
   return 'left';
 }
 
+// w3mhdet DLL-ийн "FOGCLICK DETECTED : Player <нэр> selected ..." мессежийг replay чатнаас
+// задалж, maphack ашигласан тоглогчийн WC3 нэрсийг буцаана. WC3 өнгөний код (|cXXXXXXXX ... |r)
+// цэвэрлэнэ. Ямар ч мессеж таарахгүй бол хоосон массив.
+function extractFogclick(chat) {
+  const names = new Set();
+  for (const c of (chat || [])) {
+    const raw = String(c?.message || '');
+    if (!/FOGCLICK\s*DETECTED/i.test(raw)) continue;
+    const clean = raw.replace(/\|c[0-9a-fA-F]{8}/g, '').replace(/\|r/gi, '').trim();
+    const m = clean.match(/Player\s+(.+?)\s+selected/i);
+    if (m && m[1]) names.add(m[1].trim().slice(0, 64));
+  }
+  return [...names];
+}
+
 // Replay файл parse хийх
 async function parseReplay(filePath) {
   try {
@@ -214,12 +229,19 @@ async function parseReplay(filePath) {
     const matchedCount = players.filter(p => p.user_id).length;
     console.log(`[Replay] ${players.length} тоглогчдоос ${matchedCount} тааруулсан`);
 
+    // FOGCLICK анти-чит: w3mhdet DLL (WC3-д inject) maphack илэрвэл "FOGCLICK DETECTED :
+    // Player <нэр> selected ..." гэж game чатад бичдэг. Үүнийг replay чатнаас задалж,
+    // сервер тухайн тоглогчид сануулга/бан + эзэнд DM өгнө. (DLL ажиллаж байвал л ирнэ.)
+    const fogclick = extractFogclick(replay.chat);
+    if (fogclick.length) console.log('[Replay] ⚠️ FOGCLICK илрэв:', fogclick.join(', '));
+
     const result = {
       room_id: currentRoomId,
       winner_team: winnerTeam,
       duration_minutes: duration,
       replay_path: filePath,
       players,
+      fogclick,
     };
 
     console.log('[Replay] Тоглоомын үр дүн:', JSON.stringify(result, null, 2));

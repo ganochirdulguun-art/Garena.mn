@@ -416,7 +416,7 @@ router.post('/tierbot/sync', admin, async (req, res) => {
 
 // Replay parse хийсний дараа үр дүн хадгалах (өрөөний гишүүн)
 router.post('/result', auth, perUser('result', 30, 60 * 60 * 1000), async (req, res) => {
-  const { room_id, winner_team, duration_minutes, replay_path, players } = req.body;
+  const { room_id, winner_team, duration_minutes, replay_path, players, fogclick } = req.body;
 
   if (!await dbAvailable()) {
     return res.status(503).json({ error: 'Service temporarily unavailable' });
@@ -497,6 +497,7 @@ router.post('/result', auth, perUser('result', 30, 60 * 60 * 1000), async (req, 
     const saved = await recordGameResult({
       roomId: room_id, winnerTeam: Number(winner_team), durationMinutes: duration_minutes, replayPath: replay_path,
       players: resolvedPlayers, source: 'replay',
+      fogclick: Array.isArray(fogclick) ? fogclick.slice(0, 24) : [],
     });
     if (saved.duplicate) {
       return res.json({ message: 'Үр дүн аль хэдийн бүртгэгдсэн', result: saved.result, duplicate: true });

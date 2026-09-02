@@ -47,40 +47,45 @@ router.get('/blocklist', authMW, (req, res) => {
   res.json({ processes: blocklist(), warn_limit: WARN_LIMIT });
 });
 
-// MapHack илрэлт мэдэгдэх: сануулга +1, 3 болоход бан, эзэнд DM.
-router.post('/report', authMW, async (req, res) => {
-  if (!req.user?.id) return res.status(400).json({ error: 'auth required' });
-  const tool = String(req.body?.tool || 'unknown').slice(0, 64);
-  if (!(await dbOk())) return res.status(503).json({ error: 'db unavailable' });
+// Нэг хэрэглэгчийн MapHack сануулгыг +1 хийж, 3-т бан, эзэнд DM. Бусад модуль ч дуудна
+// (replay-с FOGCLICK илрэлт — results.js). Буцаана: { warnings, banned } эсвэл null.
+async function recordMaphackWarning(userId, tool) {
+  if (!userId || !(await dbOk())) return null;
+  const t = String(tool || 'unknown').slice(0, 64);
   try {
     const upd = await db.query(
       `UPDATE users SET maphack_warnings = COALESCE(maphack_warnings, 0) + 1
        WHERE id = $1
        RETURNING maphack_warnings, discord_id, username, COALESCE(banned, FALSE) AS banned`,
-      [req.user.id]
+      [userId]
     );
     const row = upd.rows[0] || {};
     const warnings = row.maphack_warnings || 1;
     let banned = !!row.banned;
-
     if (warnings >= WARN_LIMIT && !banned) {
       await db.query(
         `UPDATE users SET banned = TRUE, ban_reason = $2, banned_at = NOW() WHERE id = $1`,
-        [req.user.id, `MapHack: ${tool}`]
+        [userId, `MapHack: ${t}`]
       );
       banned = true;
     }
-
-    // Оролдлого бүрт эзэнд мэдэгдэнэ (fire-and-forget)
-    alertGarenaSystem({ discord_id: row.discord_id, username: row.username, tool, warnings, banned })
-      .catch(() => {});
-
-    console.log(`[AntiCheat] MapHack "${tool}" — user #${req.user.id} (${row.username}) сануулга ${warnings}/${WARN_LIMIT}${banned ? ' → БАН' : ''}`);
-    return res.json({ warnings, banned, max: WARN_LIMIT });
+    alertGarenaSystem({ discord_id: row.discord_id, username: row.username, tool: t, warnings, banned }).catch(() => {});
+    console.log(`[AntiCheat] MapHack "${t}" — user #${userId} (${row.username}) сануулга ${warnings}/${WARN_LIMIT}${banned ? ' → БАН' : ''}`);
+    return { warnings, banned };
   } catch (e) {
-    console.error('[AntiCheat] report:', e.message);
-    return res.status(500).json({ error: 'report failed' });
+    console.error('[AntiCheat] recordMaphackWarning:', e.message);
+    return null;
   }
+}
+
+// MapHack илрэлт мэдэгдэх: сануулга +1, 3 болоход бан, эзэнд DM.
+router.post('/report', authMW, async (req, res) => {
+  if (!req.user?.id) return res.status(400).json({ error: 'auth required' });
+  const tool = String(req.body?.tool || 'unknown').slice(0, 64);
+  const r = await recordMaphackWarning(req.user.id, tool);
+  if (!r) return res.status(503).json({ error: 'db unavailable' });
+  return res.json({ warnings: r.warnings, banned: r.banned, max: WARN_LIMIT });
 });
 
 module.exports = router;
+module.exports.recordMaphackWarning = recordMaphackWarning;
