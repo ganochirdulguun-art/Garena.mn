@@ -148,6 +148,32 @@ async function runMigrations(db) {
       ADD COLUMN IF NOT EXISTS ban_reason TEXT,
       ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
   `);
+  // Алхам 3 (2026-09-02): Ranked өрөө, LAN тоглоомын токен↔өрөө/joiner нэр (relay-ийн дүн буцаж ирэхэд
+  // нэрээр яг тааруулна), ranked хүчинтэй эсэх + lineup hash (хуйвалдааны хамгаалалт), сүлжээний тайлан, ward
+  await db.query(`
+    ALTER TABLE rooms ADD COLUMN IF NOT EXISTS ranked BOOLEAN DEFAULT FALSE;
+    ALTER TABLE game_results
+      ADD COLUMN IF NOT EXISTS ranked BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS ranked_valid BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS lineup_hash VARCHAR(64),
+      ADD COLUMN IF NOT EXISTS net_report JSONB;
+    CREATE INDEX IF NOT EXISTS idx_game_results_lineup ON game_results(lineup_hash, played_at DESC);
+    ALTER TABLE game_players ADD COLUMN IF NOT EXISTS wards INTEGER DEFAULT 0;
+    CREATE TABLE IF NOT EXISTS lan_games (
+      token         VARCHAR(64) PRIMARY KEY,
+      room_id       INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      host_user_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      host_wc3_name VARCHAR(64),
+      created_at    TIMESTAMP DEFAULT NOW()
+    );
+    CREATE TABLE IF NOT EXISTS lan_game_players (
+      token     VARCHAR(64) REFERENCES lan_games(token) ON DELETE CASCADE,
+      user_id   INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      wc3_name  VARCHAR(64),
+      joined_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (token, user_id)
+    );
+  `);
 }
 
 module.exports = { runMigrations };

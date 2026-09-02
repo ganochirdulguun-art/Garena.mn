@@ -23,6 +23,13 @@ function loadActionParser() {
     path.join(__dirname, '..', 'client', 'node_modules', 'w3gjs', 'dist', 'lib', 'parsers', 'ActionParser.js'),
   ];
   for (const c of cands) { try { const m = require(c); return m.default || m; } catch {} }
+  // Шинэ w3gjs "exports"-оор гүн замыг хаадаг → package-ийн main-ийг олоод АБСОЛЮТ замаар require (exports тойрно)
+  try {
+    const main = require.resolve('w3gjs');
+    const root = main.slice(0, main.lastIndexOf(`${path.sep}dist${path.sep}`) + 1);
+    const m = require(path.join(root, 'dist', 'lib', 'parsers', 'ActionParser.js'));
+    return m.default || m;
+  } catch {}
   throw new Error('w3gjs ActionParser олдсонгүй — hostbot дотор `npm i w3gjs` хийнэ үү');
 }
 

@@ -1,6 +1,8 @@
 // ── Тоглолтын дүн бүртгэх (replay болон бот хоёулаа энд ирнэ) ──
 // game_results + game_players бичиж, wins/losses, XP/Level, Diamond бонус олгоно. Нэг тоглолтод нэг л дүн (10 минутын цонх, idempotent).
 const { awardGameOutcome, RULES } = require('./progression');
+const crypto = require('crypto');
+const RANKED_MAX_SAME_LINEUP_PER_DAY = 3;   // ижил бүрэлдэхүүн өдөрт 3-аас олон ranked тоглолт → 💎 үгүй (фермлэлт)
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
@@ -18,6 +20,8 @@ async function recordGameResult({
   roomId, winnerTeam, durationMinutes = 0, replayPath = null, players = [],
   source = 'replay', botJobId = null, mapName = null, gameName = null,
   fogclick = [],
+  // Алхам 3: ranked өрөө (💎 зөвхөн энд), relay-ийн хүчинтэй байдлын дүгнэлт, сүлжээний тайлан
+  ranked = false, rankedValid = true, rankedReason = null, netReport = null,
 }) {
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
@@ -78,8 +82,12 @@ async function recordGameResult({
       // DotA нэмэлт статистик (creep/denie/neutral/gold) — байхгүй бол 0
       creep_kills: clampStat(p.creep_kills ?? p.creepKills), creep_denies: clampStat(p.creep_denies ?? p.creepDenies),
       neutral_kills: clampStat(p.neutral_kills ?? p.neutralKills), gold: clampStat(p.gold),
+      wards: clampStat(p.wards),
     };
   });
+  // Lineup hash — ижил бүрэлдэхүүн өдөрт олон удаа тоглож 💎 фермлэхээс хамгаална (ranked)
+  const lineupIds = resolved.map((p) => p.user_id).filter(Boolean).map(String).sort();
+  const lineupHash = lineupIds.length ? crypto.createHash('sha1').update(lineupIds.join(',')).digest('hex') : null;
 
   const client = await db.connect();
   try {
@@ -99,10 +107,19 @@ async function recordGameResult({
         return { duplicate: true, result: existing.rows[0] };
       }
     }
+    let rankedOk = !!ranked && rankedValid !== false;
+    let reason = rankedOk ? null : (rankedReason || (ranked ? 'invalid' : 'not-ranked'));
+    if (rankedOk && lineupHash) {
+      const same = await client.query(
+        `SELECT COUNT(*)::int AS n FROM game_results WHERE lineup_hash = $1 AND ranked AND played_at > NOW() - INTERVAL '24 hours'`,
+        [lineupHash]
+      );
+      if ((same.rows[0]?.n || 0) >= RANKED_MAX_SAME_LINEUP_PER_DAY) { rankedOk = false; reason = 'same-lineup'; }
+    }
     const rr = await client.query(
-      `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path, source, bot_job_id, map_name, game_name)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [roomId, winnerTeam, toInt(durationMinutes), replayPath, source, botJobId, mapName, gameName]
+      `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path, source, bot_job_id, map_name, game_name, ranked, ranked_valid, lineup_hash, net_report)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+      [roomId, winnerTeam, toInt(durationMinutes), replayPath, source, botJobId, mapName, gameName, !!ranked, rankedOk, lineupHash, netReport ? JSON.stringify(netReport) : null]
     );
     const result = rr.rows[0];
     const awards = [];
@@ -118,12 +135,12 @@ async function recordGameResult({
         }
         award = await awardGameOutcome(client, {
           userId: p.user_id, isWinner, isLeaver: p.is_leaver, kills: p.kills, assists: p.assists,
-          durationMinutes, ref: `game:${result.id}`,
+          durationMinutes, ref: `game:${result.id}`, ranked: rankedOk,
         });
         await client.query(
-          `INSERT INTO game_players (game_result_id, user_id, team, is_winner, kills, deaths, assists, hero, left_at_sec, is_leaver, xp_earned, diamonds_earned, wc3_name, creep_kills, creep_denies, neutral_kills, gold)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) ON CONFLICT DO NOTHING`,
-          [result.id, p.user_id, p.team, isWinner, p.kills, p.deaths, p.assists, p.hero, p.left_at_sec, p.is_leaver, award.xp_earned || 0, award.diamonds_earned || 0, p.wc3_name, p.creep_kills, p.creep_denies, p.neutral_kills, p.gold]
+          `INSERT INTO game_players (game_result_id, user_id, team, is_winner, kills, deaths, assists, hero, left_at_sec, is_leaver, xp_earned, diamonds_earned, wc3_name, creep_kills, creep_denies, neutral_kills, gold, wards)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) ON CONFLICT DO NOTHING`,
+          [result.id, p.user_id, p.team, isWinner, p.kills, p.deaths, p.assists, p.hero, p.left_at_sec, p.is_leaver, award.xp_earned || 0, award.diamonds_earned || 0, p.wc3_name, p.creep_kills, p.creep_denies, p.neutral_kills, p.gold, p.wards]
         );
         // Дараагийн тоглолтод нэрээр шууд тааруулахын тулд WC3 нэрийг сурна
         if (p.wc3_name) {
@@ -156,7 +173,7 @@ async function recordGameResult({
       } catch (e) { console.error('[Results] fogclick:', e.message); }
     }
 
-    return { duplicate: false, result, players: awards };
+    return { duplicate: false, result, players: awards, ranked: !!ranked, ranked_valid: rankedOk, reason };
   } catch (e) {
     try { await client.query('ROLLBACK'); } catch {}
     throw e;

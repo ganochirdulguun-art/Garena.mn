@@ -16,6 +16,10 @@
  * w3gjs нь 0x6B action-уудыг replay.w3mmd-д цуглуулдаг тул үүнийг шууд дамжуулна.
  */
 
+// DotA-ийн ward item кодууд (Observer/Sentry). Хувилбар бүрт өөр байж болох тул DOTA_WARD_CODES env-ээр
+// тохируулна; хоосон бол wards=0, харин itemPurchases-д бүх код хадгалагдах тул бодит тоглоомоос тодруулна.
+const WARD_CODES = String(process.env.DOTA_WARD_CODES || '').split(',').map((s) => s.trim()).filter(Boolean);
+
 const STAT_KEY = {
   '1': 'kills', '2': 'deaths', '3': 'creepKills', '4': 'creepDenies',
   '5': 'assists', '6': 'gold', '7': 'neutralKills',
@@ -37,6 +41,7 @@ function decodeDotaStats(w3mmdActions) {
   const get = (colour) => (players[colour] || (players[colour] = {
     colour, dotaId: null, kills: 0, deaths: 0, assists: 0, creepKills: 0, creepDenies: 0,
     neutralKills: 0, gold: 0, hero: null, items: [null, null, null, null, null, null],
+    itemPurchases: {}, wards: 0,   // PUI_<өнгө> event-ээс: item код → хэдэн удаа авсан; ward = WARD_CODES-ийн нийлбэр
   }));
 
   for (const a of (w3mmdActions || [])) {
@@ -50,8 +55,13 @@ function decodeDotaStats(w3mmdActions) {
       else if (key === '9') p.hero = valueToCode(val);
       else if (/^8_[0-5]$/.test(key)) p.items[parseInt(key.slice(2), 10)] = valueToCode(val);
       else if (key === 'id') p.dotaId = val;
-    } else if (data === 'Data') {             // тоглоомын үйл явдал (kill, tower гэх мэт)
+    } else if (data === 'Data') {             // тоглоомын үйл явдал (kill, tower, item гэх мэт)
       events.push({ key, value: val });
+      const pui = /^PUI_(\d+)$/.exec(key);    // тоглогч item авав (худалдан авалт/өргөлт) — observer ward тоолоход
+      if (pui) {
+        const code = valueToCode(val);
+        if (code) { const ip = get(parseInt(pui[1], 10)).itemPurchases; ip[code] = (ip[code] || 0) + 1; }
+      }
     } else if (data === 'Global') {           // тоглоомын метадата
       meta[key] = val;
     }
@@ -64,6 +74,7 @@ function decodeDotaStats(w3mmdActions) {
   for (const p of list) {
     p.team = p.colour <= 5 ? 'sentinel' : 'scourge';
     p.active = !!p.hero;
+    p.wards = WARD_CODES.reduce((n, c) => n + (p.itemPurchases[c] || 0), 0);
   }
   return {
     players: list,
@@ -74,4 +85,4 @@ function decodeDotaStats(w3mmdActions) {
   };
 }
 
-module.exports = { decodeDotaStats, valueToCode, STAT_KEY };
+module.exports = { decodeDotaStats, valueToCode, STAT_KEY, WARD_CODES };

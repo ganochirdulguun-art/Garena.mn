@@ -15,6 +15,9 @@ const RULES = {
   BLOCK_MIN_WINS: 5,
   BLOCK_BONUS_DIAMONDS: 30,
   LEAVER_BEFORE_SEC: 10 * 60,   // 10 минутаас өмнө гарсан = leaver (W3MMD/ботын leaver туг байхгүй үед)
+  // Эзний шийдвэр (2026-09-02): 💎 зөвхөн RANKED өрөөний ХҮЧИНТЭЙ тоглолтоос — 1 хожил = 2💎 (бүх хэрэглэгчид);
+  // энгийн өрөө XP л өгнө, 💎 олборлохгүй. 10 тоглолтын блок бонус ч зөвхөн ranked-д тоологдоно.
+  RANKED_DIAMONDS_PER_WIN: 2,
 };
 
 function xpForLevel(n) {
@@ -48,7 +51,7 @@ function xpFor({ isWinner, isLeaver, kills = 0, assists = 0 }) {
  * client = pg client/pool. counted=false бол (remake) зөвхөн бичлэг үлдээнэ.
  * Буцаана: { xp_earned, diamonds_earned, level, xp, block_games, block_wins }
  */
-async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, kills = 0, assists = 0, durationMinutes = 0, ref = null }) {
+async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, kills = 0, assists = 0, durationMinutes = 0, ref = null, ranked = false }) {
   const counted = Number(durationMinutes || 0) >= RULES.MIN_GAME_MINUTES;
   if (!counted) {
     const r = await client.query('SELECT xp, level, block_games, block_wins FROM users WHERE id = $1', [userId]);
@@ -56,14 +59,15 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   }
   const xpEarned = xpFor({ isWinner, isLeaver, kills, assists });
   // XP + блокын тоолуур (leaver хожил биш)
+  // Блокын тоолуур зөвхөн ranked тоглолтод ($4=1) — энгийн өрөө 💎 олборлохгүй
   const upd = await client.query(
     `UPDATE users
        SET xp = GREATEST(0, COALESCE(xp, 0) + $1),
-           block_games = COALESCE(block_games, 0) + 1,
+           block_games = COALESCE(block_games, 0) + $4,
            block_wins  = COALESCE(block_wins, 0) + $2
      WHERE id = $3
      RETURNING xp, block_games, block_wins, diamonds`,
-    [xpEarned, isWinner && !isLeaver ? 1 : 0, userId]
+    [xpEarned, ranked && isWinner && !isLeaver ? 1 : 0, userId, ranked ? 1 : 0]
   );
   const row = upd.rows[0];
   if (!row) return { xp_earned: 0, diamonds_earned: 0, counted: false };
@@ -71,9 +75,18 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   let diamondsEarned = 0;
   let blockGames = row.block_games;
   let blockWins = row.block_wins;
-  if (blockGames >= RULES.BLOCK_SIZE) {
+  // Ranked хожил = 2💎 (дэвтэрт 'ranked_win')
+  if (ranked && isWinner && !isLeaver && RULES.RANKED_DIAMONDS_PER_WIN > 0) {
+    diamondsEarned += RULES.RANKED_DIAMONDS_PER_WIN;
+    await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [RULES.RANKED_DIAMONDS_PER_WIN, userId]);
+    await client.query(
+      `INSERT INTO diamond_transactions (user_id, amount, type, ref, note) VALUES ($1, $2, 'ranked_win', $3, $4)`,
+      [userId, RULES.RANKED_DIAMONDS_PER_WIN, ref, 'Ranked хожил']
+    );
+  }
+  if (ranked && blockGames >= RULES.BLOCK_SIZE) {
     if (blockWins >= RULES.BLOCK_MIN_WINS) {
-      diamondsEarned = RULES.BLOCK_BONUS_DIAMONDS;
+      diamondsEarned += RULES.BLOCK_BONUS_DIAMONDS;
       await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [diamondsEarned, userId]);
       await client.query(
         `INSERT INTO diamond_transactions (user_id, amount, type, ref, note) VALUES ($1, $2, 'block_bonus', $3, $4)`,

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node tests/server.test.js && node tests/lanhost.test.js",
+    "test": "node tests/server.test.js && node tests/lanhost.test.js && node tests/relaystats.test.js",
     "test:lan": "node tests/lanhost.test.js"
   },
   "dependencies": {

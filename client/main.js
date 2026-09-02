@@ -468,10 +468,10 @@ ipcMain.handle('api:request', async (_event, { method, path: urlPath, body } = {
   try { return await apiService.request(method, urlPath, body); } catch (err) { throw apiError(err); }
 });
 
-ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, password, description, game_mode, background_url }) => {
+ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, password, description, game_mode, background_url, ranked }) => {
   let room;
   try {
-    room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode, background_url });
+    room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked: !!ranked });
   } catch (err) { throw apiError(err); }
   try { replayService.startWatcher(room.id); } catch {}
   return room;

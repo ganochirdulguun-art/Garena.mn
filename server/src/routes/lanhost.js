@@ -94,6 +94,14 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   g.host_username = req.user.username || req.user.name || '';
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
   m.set(g.token, g);
+  // Токен↔өрөө/хостыг DB-д ч хадгална: relay-ийн дүн (Алхам 3) сервер restart-ын дараа ч өрөөгөө олно
+  if (db) {
+    db.query(
+      `INSERT INTO lan_games (token, room_id, host_user_id, host_wc3_name) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (token) DO UPDATE SET host_wc3_name = EXCLUDED.host_wc3_name, host_user_id = EXCLUDED.host_user_id`,
+      [g.token, Number(roomId), req.user.id, g.host_wc3_name]
+    ).catch((e) => console.warn('[LAN] lan_games save:', e.message));
+  }
   emitRoom(roomId, 'room:lan_lobby', gamePublic(g));
   await syncRoomStatus(roomId);   // LAN тоглоом нээгдлээ → өрөө 'playing' (гаднын хүн нэгдэхгүй)
   return res.json({ ok: true });
@@ -114,6 +122,40 @@ router.delete('/:id/lan-host/:token', authMW, async (req, res) => {
   return res.json({ ok: true });
 });
 
+// Joiner "Нэгдэх" дарахад WC3 нэрээ бүртгүүлнэ → relay-ийн дүн буцаж ирэхэд нэрээр ЯГ таарна (v2.7.8 клиент)
+router.post('/:id/lan-host/:token/join', authMW, async (req, res) => {
+  const roomId = String(req.params.id);
+  const token = String(req.params.token || '').slice(0, 64);
+  if (!token) return res.status(400).json({ error: 'token дутуу' });
+  if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
+  const wc3 = sanitizeWc3Name((req.body || {}).wc3_name);
+  if (db) {
+    try {
+      await db.query('INSERT INTO lan_games (token, room_id) VALUES ($1,$2) ON CONFLICT (token) DO NOTHING', [token, Number(roomId)]);
+      await db.query(
+        `INSERT INTO lan_game_players (token, user_id, wc3_name) VALUES ($1,$2,$3)
+         ON CONFLICT (token, user_id) DO UPDATE SET wc3_name = EXCLUDED.wc3_name, joined_at = NOW()`,
+        [token, req.user.id, wc3]
+      );
+    } catch (e) { console.warn('[LAN] join save:', e.message); }
+  }
+  return res.json({ ok: true });
+});
+
+// Токеноор тоглоомыг олно: санах ой (идэвхтэй) → DB (lan_games). Relay-ийн дүн (routes/relayStats.js) дуудна.
+async function findGameByToken(token) {
+  const t = String(token || '');
+  for (const [roomId, m] of roomGames.entries()) {
+    const g = m.get(t);
+    if (g) return { room_id: Number(roomId), host_user_id: g.host_user_id, host_wc3_name: g.host_wc3_name };
+  }
+  if (!db) return null;
+  try {
+    const r = await db.query('SELECT room_id, host_user_id, host_wc3_name FROM lan_games WHERE token = $1', [t]);
+    return r.rows[0] || null;
+  } catch { return null; }
+}
+
 // Өрөөний идэвхтэй тоглоомууд (шинэ гишүүн орж ирэхэд харагдах)
 router.get('/:id/lan-host', authMW, async (req, res) => {
   const roomId = String(req.params.id);
@@ -122,4 +164,4 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
-module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured };
+module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken };

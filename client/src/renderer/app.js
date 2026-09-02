@@ -1170,7 +1170,7 @@ function roomGridRow(r, inProgress, idx = 0) {
         <div class="room-grid-subline">${desc ? escHtml(desc) : `${memberCount} тоглогчийн мэдээлэл`}</div>
       </div>
       <div class="room-cell" role="cell"><span class="badge game-badge" style="background:${gameTypeColor(r.game_type)}">${escHtml(r.game_type || '-')}</span></div>
-      <div class="room-cell muted" role="cell">${r.game_mode ? escHtml(r.game_mode) : '-'}</div>
+      <div class="room-cell muted" role="cell">${r.ranked ? '🏆 ' : ''}${r.game_mode ? escHtml(r.game_mode) : '-'}</div>
       <div class="room-cell" role="cell">${escHtml(r.host_name || '-')}</div>
       <div class="room-cell room-cell-players" role="cell">
         <span>${r.player_count || 0}/${r.max_players || '-'}</span>
@@ -1208,6 +1208,7 @@ function renderRoomDetail(r) {
       <h3>${escHtml(r.name)}</h3>
       <div class="room-detail-badges">
         <span class="badge game-badge" style="background:${gameTypeColor(r.game_type)}">${escHtml(r.game_type || '-')}</span>
+        ${r.ranked ? '<span class="badge ranked-badge" title="Ranked: хүчинтэй хожил бүр 2💎">🏆 Ranked</span>' : ''}
         ${r.game_mode ? `<span class="badge mode-badge">${escHtml(r.game_mode)}</span>` : ''}
         ${isMyRoom ? '<span class="my-room-tag">Миний өрөө</span>' : ''}
       </div>
@@ -1335,17 +1336,19 @@ document.getElementById('btn-submit-room').onclick = async () => {
   const max_players = parseInt(document.getElementById('room-max').value);
   const description = document.getElementById('room-desc')?.value?.trim() || '';
   const hasPass     = document.getElementById('room-has-password').checked;
+  const ranked      = !!document.getElementById('room-ranked')?.checked;   // 🏆 Ranked: хүчинтэй хожил 2💎
   const password    = hasPass ? document.getElementById('room-password').value : null;
   if (!name)             { showToast('Өрөөний нэр оруулна уу', 'warning'); return; }
   if (!game_type)        { showToast('Тоглоом сонгоно уу (Тохируулга таб-д тоглоом нэмнэ үү)', 'warning'); return; }
   if (hasPass && !password) { showToast('Нууц үг оруулна уу', 'warning'); return; }
   async function _doCreateRoom() {
     const background_url = (document.getElementById('room-bg')?.value || '').trim();
-    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode, background_url });
+    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked });
     document.getElementById('create-room-form').style.display = 'none';
     document.getElementById('room-name').value = '';
     document.getElementById('room-desc').value = '';
     document.getElementById('room-mode').value = '';
+    const rkEl = document.getElementById('room-ranked'); if (rkEl) rkEl.checked = false;
     document.getElementById('room-has-password').checked = false;
     document.getElementById('room-password').value = '';
     document.getElementById('room-password').style.display = 'none';
@@ -4824,7 +4827,7 @@ init();
     <div class="room-grid-row room-list-row ${inProgress ? 'room-playing' : ''} ${isMyRoom ? 'room-mine' : ''} ${selected ? 'selected' : ''}" role="row" tabindex="0" data-room-id="${r.id}" style="animation-delay:${Math.min(idx, 40) * 0.012}s">
       <div class="room-cell rl-game" role="cell" title="${escHtml(r.game_type || '')}"><i class="rl-gt" style="background:${gameTypeColor(r.game_type)}">${gameAbbr(r.game_type)}</i><span>${escHtml(r.game_type || '-')}</span></div>
       <div class="room-cell rl-host" role="cell"><span class="clickable-name" data-user-id="${escHtml(String(r.host_id || ''))}">${escHtml(r.host_name || '-')}</span></div>
-      <div class="room-cell rl-name" role="cell" title="${escHtml(r.name)}${desc ? ' — ' + escHtml(desc) : ''}"><b>${escHtml(r.name)}</b>${desc ? `<span class="rl-desc"> — ${escHtml(desc)}</span>` : ''}${isMyRoom ? '<span class="my-room-tag">Миний</span>' : ''}${r.game_mode ? `<span class="rl-mode">${escHtml(r.game_mode)}</span>` : ''}</div>
+      <div class="room-cell rl-name" role="cell" title="${escHtml(r.name)}${desc ? ' — ' + escHtml(desc) : ''}">${r.ranked ? '<span class="ranked-badge" title="Ranked: хүчинтэй хожил бүр 2💎">🏆</span> ' : ''}<b>${escHtml(r.name)}</b>${desc ? `<span class="rl-desc"> — ${escHtml(desc)}</span>` : ''}${isMyRoom ? '<span class="my-room-tag">Миний</span>' : ''}${r.game_mode ? `<span class="rl-mode">${escHtml(r.game_mode)}</span>` : ''}</div>
       <div class="room-cell rl-net" role="cell">LAN</div>
       <div class="room-cell rl-players" role="cell">${r.player_count || 0}/${r.max_players || '-'}</div>
       <div class="room-cell rl-state" role="cell" title="${stateTitle}"><span class="room-state-dot ${state}"></span></div>
@@ -5195,6 +5198,8 @@ init();
       await window.api.launchGame(currentRoom?.gameType || '');
       await window.api.startLanJoin({ relayIp: g.relay_ip, relayPort: g.relay_port, game: g.game_token, gameInfoB64: g.gameinfo_b64 });
       joinedToken = token; renderGames();
+      // Алхам 3: WC3 нэрээ серверт бүртгүүлнэ → relay-ийн дүн (K/D/A, 💎) нэрээр ЯГ таарна
+      try { const wc3Name = await getWc3Name(); await api('post', `/rooms/${currentRoom.id}/lan-host/${token}/join`, { wc3_name: wc3Name || '' }); } catch {}
       appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}»-ийн тоглоомд нэгдэж байна — WC3 → Local Area Network → тоглоомоо сонгож ор.`);
     } catch (e) { showToast(errMsg(e), 'error'); }
   }

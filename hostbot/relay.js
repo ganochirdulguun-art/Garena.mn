@@ -42,27 +42,54 @@ function log(...a) { console.log(new Date().toISOString(), '[relay]', ...a); }
 // туршиж баталгаажуулна, дараа нь асаана).
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const CAP_ON = process.env.RELAY_CAPTURE === '1';
 const CAP_DIR = process.env.RELAY_CAPTURE_DIR || '/tmp/garena-capture';
 const CAP_MAX_BYTES = Number(process.env.RELAY_CAPTURE_MAX || 60 * 1024 * 1024); // тоглоом бүрт дээд 60MB хамгаалалт
 if (CAP_ON) { try { fs.mkdirSync(CAP_DIR, { recursive: true }); } catch (e) { log('capture dir алдаа: ' + e.message); } }
-const captures = new Map(); // gameId -> { ws, bytes, primary, socks:Set, onData, capped }
+const captures = new Map(); // gameId -> { file, ws, bytes, primary, primarySid, sidOf:Map, joiners:{sid:name}, socks:Set, onData, capped, startedAt }
 
-function capAttach(gameId, hostSock) {
+function capAttach(gameId, hostSock, sid, joinerSock, joinerLeftover) {
   if (!CAP_ON) return;
   try {
     let cap = captures.get(gameId);
     if (!cap) {
-      const ws = fs.createWriteStream(path.join(CAP_DIR, `${gameId}-${Date.now()}.w3gs`));
+      const file = path.join(CAP_DIR, `${gameId}-${Date.now()}.w3gs`);
+      const ws = fs.createWriteStream(file);
       ws.on('error', () => {});   // диск алдаа splice-д нөлөөлөхгүй
-      cap = { ws, bytes: 0, primary: null, socks: new Set(), onData: null, capped: false };
+      cap = { file, ws, bytes: 0, primary: null, primarySid: null, sidOf: new Map(), joiners: {}, socks: new Set(), onData: null, capped: false, startedAt: Date.now() };
       captures.set(gameId, cap);
     }
     cap.socks.add(hostSock);
-    hostSock.on('close', () => { try { cap.socks.delete(hostSock); if (cap.primary === hostSock) capPromote(gameId); } catch {} });
+    cap.sidOf.set(hostSock, sid);
+    hostSock.on('close', () => { try { cap.socks.delete(hostSock); cap.sidOf.delete(hostSock); if (cap.primary === hostSock) capPromote(gameId); } catch {} });
     hostSock.on('error', () => { try { cap.socks.delete(hostSock); } catch {} });
-    if (!cap.primary) capSetPrimary(gameId, hostSock);
+    if (!cap.primary) { capSetPrimary(gameId, hostSock); cap.primarySid = sid; }
+    capJoinerName(cap, sid, joinerSock, joinerLeftover);   // joiner-ийн WC3 нэр (REQJOIN) — дүнд нэр тааруулахад
   } catch (e) { /* capture хэзээ ч splice-ыг эвдэхгүй */ }
+}
+// Joiner→host урсгалын ЭХНИЙ пакет = W3GS_REQJOIN (F7 1E len hostCounter[4] entryKey[4] ?[1] port[2] peerKey[4] name\0 …).
+// Capture нь host→joiner чиглэл тул joiner-ийн ӨӨРИЙН нэр тэнд байдаггүй — энд passive уншиж хадгална.
+function capJoinerName(cap, sid, sock, leftover) {
+  try {
+    let buf = Buffer.from(leftover || []);
+    const tryParse = () => {
+      const i = buf.indexOf(Buffer.from([0xF7, 0x1E]));
+      if (i < 0 || buf.length < i + 20) return false;
+      const end = buf.indexOf(0, i + 19);
+      if (end < 0) return buf.length > i + 64;   // 64 байтад \0 алга → нэр биш, болино
+      const name = buf.subarray(i + 19, end).toString('utf8').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 31);
+      if (name) { cap.joiners[String(sid)] = name; log(`joiner нэр sid=${sid} name=${name}`); }
+      return true;
+    };
+    if (tryParse()) return;
+    const onData = (d) => {
+      try { buf = Buffer.concat([buf, d]); if (tryParse() || buf.length > 2048) sock.removeListener('data', onData); }
+      catch { try { sock.removeListener('data', onData); } catch {} }
+    };
+    sock.on('data', onData);
+    sock.once('close', () => { try { sock.removeListener('data', onData); } catch {} });
+  } catch {}
 }
 function capSetPrimary(gameId, hostSock) {
   const cap = captures.get(gameId); if (!cap) return;
@@ -81,13 +108,27 @@ function capPromote(gameId) {
   const cap = captures.get(gameId); if (!cap) return;
   cap.primary = null;
   const next = cap.socks.values().next().value;   // өөр амьд session байвал үргэлжлүүлнэ
-  if (next) capSetPrimary(gameId, next);
+  if (next) { capSetPrimary(gameId, next); cap.primarySid = cap.sidOf.get(next) ?? cap.primarySid; }
 }
 function capFinalize(gameId) {
   const cap = captures.get(gameId); if (!cap) return;
   captures.delete(gameId);
-  try { cap.ws.end(); } catch {}
-  log(`capture дуусав game=${gameId.slice(0, 12)} bytes=${cap.bytes}${cap.capped ? ' (дээд хязгаарт хүрсэн)' : ''}`);
+  log(`capture дуусав game=${gameId.slice(0, 12)} bytes=${cap.bytes}${cap.capped ? ' (дээд хязгаарт хүрсэн)' : ''} joiners=${JSON.stringify(cap.joiners)}`);
+  try { cap.ws.end(() => capReport(gameId, cap)); } catch { capReport(gameId, cap); }
+}
+// Тоглоом дуусмагц meta бичээд ТУСДАА процессоор (relay-ийн event loop-ийг блоклохгүй!) w3gsStats задлал +
+// платформ сервер рүү дүн илгээнэ (reportGame.js). RELAY_REPORT_URL тохируулаагүй бол зөвхөн meta үлдээнэ.
+function capReport(gameId, cap) {
+  try {
+    if (!cap.bytes) return;
+    const meta = { game: gameId, primarySid: cap.primarySid, joiners: cap.joiners, startedAt: cap.startedAt, endedAt: Date.now(), bytes: cap.bytes, capped: cap.capped };
+    fs.writeFileSync(cap.file + '.meta.json', JSON.stringify(meta));
+    if (!process.env.RELAY_REPORT_URL) return;
+    const child = spawn(process.execPath, [path.join(__dirname, 'reportGame.js'), cap.file], { detached: true, stdio: 'ignore', env: process.env });
+    child.on('error', (e) => log('report процесс алдаа: ' + e.message));
+    child.unref();
+    log(`report илгээгч эхлүүлэв game=${gameId.slice(0, 12)} pid=${child.pid}`);
+  } catch (e) { log('capReport алдаа: ' + e.message); }
 }
 
 // Socket-оос эхний newline хүртэлх JSON-ыг уншаад {msg, leftover}-ыг буцаана.
@@ -177,7 +218,7 @@ const server = net.createServer((sock) => {
       clearTimeout(s.timer); h.sessions.delete(sid);
       try { s.joiner.resume(); } catch {}
       splice(sock, s.joiner, leftover, s.leftover);
-      capAttach(game, sock);   // PASSIVE tee — splice-ыг хөндөхгүй
+      capAttach(game, sock, sid, s.joiner, s.leftover);   // PASSIVE tee — splice-ыг хөндөхгүй
       log('splice хийв game=' + game.slice(0, 12) + ' sid=' + sid);
 
     } else {

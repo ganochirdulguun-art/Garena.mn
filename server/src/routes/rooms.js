@@ -59,6 +59,7 @@ function roomToPublic(room) {
     game_type: room.game_type,
     description: room.description || '',
     game_mode: room.game_mode || '',
+    ranked: !!room.ranked,   // 🏆 Ranked өрөө: хүчинтэй хожил бүр 2💎 (relay дүн), энгийн өрөө 💎 үгүй
     background_url: room.background_url || '',
     status: room.status,
     has_password: room.has_password,
@@ -81,7 +82,7 @@ router.get('/', optAuth, async (req, res) => {
     try {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
-          r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
+          r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
@@ -111,7 +112,7 @@ router.get('/mine', optAuth, async (req, res) => {
     try {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
-          r.max_players, r.game_type, r.description, r.game_mode, r.background_url,
+          r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
           r.status, r.has_password, r.zerotier_network_id,
           COUNT(rp2.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
@@ -137,7 +138,7 @@ router.get('/mine', optAuth, async (req, res) => {
 });
 
 router.post('/', strictAuth, async (req, res) => {
-  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '' } = req.body;
+  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '', ranked = false } = req.body;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
   if (!game_type) return res.status(400).json({ error: 'Game type is required' });
 
@@ -171,10 +172,10 @@ router.post('/', strictAuth, async (req, res) => {
       }
 
       const result = await db.query(
-        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url, ranked)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
          RETURNING *`,
-        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl]
+        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl, ranked === true || ranked === 'true' || ranked === 1]
       );
 
       const room = result.rows[0];
@@ -209,6 +210,7 @@ router.post('/', strictAuth, async (req, res) => {
     zerotier_network_id: null,
     description: descTrimmed,
     game_mode: game_mode || '',
+    ranked: ranked === true || ranked === 'true' || ranked === 1,
     background_url: bgUrl,
     players: new Map([[userId, hostName]]),
   };
