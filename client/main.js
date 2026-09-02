@@ -103,8 +103,39 @@ if (!gotLock) {
 
 // (ZeroTier бүрэн хасагдсан 2026-08-30 — бот-хост public IP тунел ашигладаг)
 
+// ── Garena.mn WarKey-д зориулсан "платформ идэвхтэй" локал дохио ──
+// Garena.mn WarKey (тусдаа апп) энэ файлын шинэлэг байдлаар платформ энэ PC дээр
+// ажиллаж байгааг мэдэрнэ. GarenaSystem тэмцээний түүхгүй энгийн хэрэглэгч WarKey-г
+// зөвхөн платформ нээлттэй (нэвтэрсэн) үед л ашиглаж чадна. Хоёр апп нэг ижил
+// %LOCALAPPDATA%\Garena.mn\platform-session.json замыг мэднэ.
+const PLATFORM_SESSION_FILE = path.join(
+  process.env.LOCALAPPDATA || path.join(app.getPath('home'), 'AppData', 'Local'),
+  'Garena.mn', 'platform-session.json'
+);
+let _presenceTimer = null;
+function writePlatformPresence() {
+  try {
+    if (!authService.getToken()) return;   // зөвхөн платформд нэвтэрсэн үед дохио өгнө
+    const user = (authService.getUser && authService.getUser()) || {};
+    fs.mkdirSync(path.dirname(PLATFORM_SESSION_FILE), { recursive: true });
+    fs.writeFileSync(PLATFORM_SESSION_FILE, JSON.stringify({
+      ts: Date.now(),
+      userId: user && user.id != null ? user.id : null,
+      discord_id: user && user.discord_id != null ? user.discord_id : null,
+    }));
+  } catch { /* дохио эмзэг биш */ }
+}
+function stopPlatformPresence() {
+  if (_presenceTimer) { clearInterval(_presenceTimer); _presenceTimer = null; }
+  try { fs.unlinkSync(PLATFORM_SESSION_FILE); } catch {}
+}
+
 app.whenReady().then(() => {
   createWindow();
+
+  // WarKey-д "платформ идэвхтэй" дохиог 5 сек тутам бичнэ
+  writePlatformPresence();
+  _presenceTimer = setInterval(writePlatformPresence, 5000);
 
   // Апп эхлэхдээ argv-д deep link байгаа эсэх шалгах (Windows)
   const deepLinkUrl = process.argv.find(a => a.startsWith('garenamn://'));
@@ -143,6 +174,7 @@ app.on('before-quit', async (e) => {
   } catch {}
   gameRelayService.stopAll();
   replayService.stopWatcher();
+  stopPlatformPresence();
   app.quit();
 });
 

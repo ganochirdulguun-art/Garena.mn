@@ -1,5 +1,6 @@
 const express = require('express');
 const authMW = require('../middleware/auth');
+const { isOwnerUser } = require('../middleware/admin');
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
@@ -9,6 +10,28 @@ const router = express.Router();
 async function dbOk() {
   if (!db) return false;
   try { await db.query('SELECT 1'); return true; } catch { return false; }
+}
+
+// WarKey бүрэн эрх (entitled): GarenaSystem тэмцээний ТҮҮХ-тэй хүн WarKey-г хаана ч
+// (GameRanger, PC төв, LAN) чөлөөтэй ашиглана. Түүхгүй энгийн хэрэглэгч зөвхөн
+// Garena.mn платформтой хослуулж ашиглана (платформ клиент нь локал дохио бичдэг).
+// "Тэмцээний түүх" = GarenaSystem-с sync хийсэн бичлэг = wins + losses > 0.
+// (Эзэн/админ үргэлж эрхтэй.)
+async function isEntitled(reqUser) {
+  try {
+    if (isOwnerUser(reqUser)) return true;
+  } catch { /* owner шалгалт эмзэг биш */ }
+  if (!reqUser?.id || !(await dbOk())) return false;
+  try {
+    const r = await db.query(
+      'SELECT (COALESCE(wins,0) + COALESCE(losses,0)) AS games FROM users WHERE id = $1',
+      [reqUser.id]
+    );
+    return (r.rows[0]?.games || 0) > 0;
+  } catch (e) {
+    console.error('[WarKey] entitled:', e.message);
+    return false;
+  }
 }
 
 // WarKey desktop апп нээлттэй байх хугацаанд тогтмол дуудна. Токеныг баталгаажуулж,
@@ -43,7 +66,8 @@ router.post('/heartbeat', authMW, async (req, res) => {
          last_seen = NOW()`,
       [String(req.user.discord_id), req.user.username || null, version]
     );
-    res.json({ ok: true });
+    const entitled = await isEntitled(req.user);
+    res.json({ ok: true, entitled });
   } catch (e) {
     console.error('[WarKey] heartbeat:', e.message);
     res.status(500).json({ error: 'Failed to record heartbeat' });
@@ -51,11 +75,12 @@ router.post('/heartbeat', authMW, async (req, res) => {
 });
 
 // Апп эхлэхэд токен хүчинтэй эсэхийг шалгах хөнгөн endpoint.
-router.get('/me', authMW, (req, res) => {
+router.get('/me', authMW, async (req, res) => {
   if (!req.user?.discord_id) {
     return res.status(400).json({ error: 'Discord login required' });
   }
-  res.json({ discord_id: req.user.discord_id, username: req.user.username });
+  const entitled = await isEntitled(req.user);
+  res.json({ discord_id: req.user.discord_id, username: req.user.username, entitled });
 });
 
 module.exports = router;
