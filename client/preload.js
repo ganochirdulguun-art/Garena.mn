@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('api', {
   // хуучин handler-ыг эхлээд устгана (үгүй бол давхарлаж game-end 2 удаа боловсрогдоно)
   onGameResult: (cb) => { ipcRenderer.removeAllListeners('game:result'); ipcRenderer.on('game:result', (_, data) => cb(data)); },
   onGameExited: (cb) => { ipcRenderer.removeAllListeners('game:exited'); ipcRenderer.on('game:exited', () => cb()); },
+  onMaphack:    (cb) => { ipcRenderer.removeAllListeners('game:maphack'); ipcRenderer.on('game:maphack', (_, d) => cb(d)); },
   killGame:     ()   => ipcRenderer.invoke('game:kill'),
   setReplayMembers: (members) => ipcRenderer.invoke('replay:setMembers', members),
 

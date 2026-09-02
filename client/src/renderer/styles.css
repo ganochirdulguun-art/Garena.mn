@@ -1319,6 +1319,42 @@ body.light .room-grid-row {
   color: var(--text2);
   font-size: 0.8rem;
 }
+
+/* ── MapHack анхааруулгын overlay ── */
+.maphack-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 4, 8, .72);
+  backdrop-filter: blur(6px);
+  -webkit-app-region: no-drag;
+}
+.maphack-card {
+  width: min(440px, calc(100vw - 40px));
+  padding: 28px 26px 24px;
+  border-radius: 14px;
+  text-align: center;
+  background: linear-gradient(180deg, #1a1013, #120b0e);
+  border: 1px solid rgba(223, 69, 63, .5);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, .6), 0 0 50px rgba(223, 69, 63, .18);
+  animation: rowIn .2s ease both;
+}
+.maphack-card .mh-icon { font-size: 42px; margin-bottom: 6px; }
+.maphack-card h2 { font-size: 1.4rem; margin-bottom: 12px; color: #ff8079; }
+.maphack-card .mh-tool { font-size: 0.9rem; color: var(--text2); margin-bottom: 12px; }
+.maphack-card .mh-tool code {
+  color: #ffd37b; background: rgba(240, 186, 87, .12);
+  padding: 2px 8px; border-radius: 6px; font-weight: 700;
+}
+.maphack-card .mh-warn { font-size: 0.95rem; line-height: 1.6; margin-bottom: 12px; }
+.maphack-card .mh-ban {
+  font-size: 1rem; line-height: 1.6; margin-bottom: 12px;
+  color: #ff8079; font-weight: 700;
+}
+.maphack-card .mh-note { font-size: 0.8rem; color: var(--text2); margin-bottom: 20px; }
+.maphack-card .btn { min-width: 140px; }
 @keyframes rowIn {
   from { opacity: 0; transform: translateY(5px); }
   to   { opacity: 1; transform: none; }

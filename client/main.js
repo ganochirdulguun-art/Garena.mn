@@ -137,6 +137,10 @@ app.whenReady().then(() => {
   writePlatformPresence();
   _presenceTimer = setInterval(writePlatformPresence, 5000);
 
+  // MapHack хориотой процессын жагсаалтыг серверээс татаж, 10 мин тутам шинэчилнэ
+  refreshMaphackList();
+  setInterval(refreshMaphackList, 10 * 60 * 1000).unref?.();
+
   // Апп эхлэхдээ argv-д deep link байгаа эсэх шалгах (Windows)
   const deepLinkUrl = process.argv.find(a => a.startsWith('garenamn://'));
   if (deepLinkUrl) handleDeepLink(deepLinkUrl);
@@ -1004,7 +1008,66 @@ function ensureAutosaveReplay() {
   } catch {}
 }
 
-ipcMain.handle('game:launch', (_, gameType) => {
+// ── MapHack анти-чит ────────────────────────────────────────────────
+// Тоглолт эхлэхээс өмнө ажиллаж буй процессуудыг скан хийж, maphack хэрэгсэл
+// (xenon, zodcraft, …) илэрвэл WC3-г НЭЭХГҮЙ, серверт мэдэгдэж сануулга авна.
+// 3 сануулгын дараа сервер платформоос бандана. Жагсаалт серверээс шинэчлэгдэнэ.
+const DEFAULT_MAPHACK = ['xenon', 'zodcraft'];
+let _maphackList = DEFAULT_MAPHACK.slice();
+async function refreshMaphackList() {
+  try {
+    const r = await apiService.request('get', '/anticheat/blocklist');
+    if (Array.isArray(r?.processes) && r.processes.length) {
+      _maphackList = r.processes.map((x) => String(x).toLowerCase()).filter(Boolean);
+    }
+  } catch { /* серверт холбогдоогүй — сүүлийн жагсаалт хэвээр */ }
+}
+// tasklist /V — процессын нэр + цонхны гарчгийг шалгана (нэр сольсныг ч барих гэж оролдоно)
+function scanForMaphack() {
+  try {
+    const out = execFileSync('tasklist', ['/V', '/FO', 'CSV', '/NH'],
+      { encoding: 'utf8', timeout: 6000, windowsHide: true }).toLowerCase();
+    for (const sig of _maphackList) {
+      if (sig && out.includes(sig)) return sig;
+    }
+  } catch { /* tasklist алдаа — блоклохгүй (false negative) */ }
+  return null;
+}
+async function reportMaphack(tool) {
+  try { return await apiService.request('post', '/anticheat/report', { tool }); }
+  catch { return null; }
+}
+// WC3 ажиллаж байх хугацаанд үе үе скан (тоглолтын дундуур асаасныг барих)
+let _maphackWatch = null;
+let _maphackReported = null;
+function startMaphackWatch() {
+  if (_maphackWatch) return;
+  _maphackReported = null;
+  _maphackWatch = setInterval(async () => {
+    if (isWar3Running() !== true) { stopMaphackWatch(); return; }
+    const tool = scanForMaphack();
+    if (tool && tool !== _maphackReported) {
+      _maphackReported = tool;
+      const rep = await reportMaphack(tool);
+      broadcastToWindows('game:maphack', { tool, warnings: rep?.warnings ?? null, banned: !!rep?.banned, max: rep?.max ?? 3, midgame: true });
+    }
+  }, 25000);
+  if (_maphackWatch.unref) _maphackWatch.unref();
+}
+function stopMaphackWatch() {
+  if (_maphackWatch) { clearInterval(_maphackWatch); _maphackWatch = null; }
+  _maphackReported = null;
+}
+
+ipcMain.handle('game:launch', async (_, gameType) => {
+  // MapHack скан — тоглолт эхлэхээс ӨМНӨ. Илэрвэл WC3 нээхгүй, сануулга авна.
+  const mh = scanForMaphack();
+  if (mh) {
+    const rep = await reportMaphack(mh);
+    broadcastToWindows('game:maphack', { tool: mh, warnings: rep?.warnings ?? null, banned: !!rep?.banned, max: rep?.max ?? 3, midgame: false });
+    return { blocked: true, tool: mh, banned: !!rep?.banned };
+  }
+
   const s = migrateSettings(readSettings());
   const games = s.games;
   if (!games.length) throw new Error('Тоглоом тохируулагдаагүй байна (Тохируулга таб)');
@@ -1017,11 +1080,12 @@ ipcMain.handle('game:launch', (_, gameType) => {
   }
   // WC3 аль хэдийн ажиллаж байвал 2 дахь instance нээхгүй — эхнийх нь UDP 6112-ыг барьсан тул
   // 2 дахь цонхны LAN жагсаалт үүрд хоосон харагддаг. Байгаа WC3-ийг ашиглаж exit хяналтыг залгана.
-  if (isWar3Running() === true) { watchWar3Exit(); return true; }
+  if (isWar3Running() === true) { watchWar3Exit(); startMaphackWatch(); return true; }
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
   const launchedAt = Date.now();
+  startMaphackWatch();   // тоглолтын дундуур maphack асаасныг барих
 
   // WC3 хаагдахад renderer-т мэдэгдэнэ (өрөөний цонх currentRoom-той тул бүх цонх руу).
   // "Frozen Throne.exe"/"Warcraft III.exe" нь launcher — war3.exe-г асаагаад өөрөө шууд гардаг тул

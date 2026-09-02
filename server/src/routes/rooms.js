@@ -224,6 +224,11 @@ router.post('/:id/join', strictAuth, async (req, res) => {
 
   if (await dbOk()) {
     try {
+      // 0) MapHack-аар бандуулсан хэрэглэгч өрөөнд нэгдэхийг хориглоно
+      const banChk = await db.query('SELECT COALESCE(banned,FALSE) AS banned, ban_reason FROM users WHERE id = $1', [userId]);
+      if (banChk.rows[0]?.banned) {
+        return res.status(403).json({ error: 'banned', reason: banChk.rows[0].ban_reason || 'MapHack' });
+      }
       // 1) Target өрөөг ЭХЛЭЭД шалгана — хуучин өрөөнөөс гаргахаас ӨМНӨ (эс бөгөөс
       //    'playing' өрөөрүү нэгдэх гэсэн хүн хуучин өрөөгөө дэмий алдана).
       const roomResult = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);

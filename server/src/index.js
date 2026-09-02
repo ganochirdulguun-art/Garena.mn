@@ -88,6 +88,7 @@ app.use('/admin/api/bot', botRoutes.adminRouter);     // админ: бот хо
 app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
+app.use('/anticheat', require('./routes/anticheat')); // MapHack илрэлт → сануулга/бан + эзэнд DM
 app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэрийн эффект
 app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP / шилжүүлэг / худалдан авалт
 app.post('/qpay/webhook', membershipRoutes.qpayWebhook); // QPay dashboard → payment.paid

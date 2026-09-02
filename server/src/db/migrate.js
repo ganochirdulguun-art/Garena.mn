@@ -140,6 +140,14 @@ async function runMigrations(db) {
       PRIMARY KEY (job_id, user_id)
     );
   `);
+  // Anti-cheat (MapHack) — сануулгын тоо + платформ бан
+  await db.query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS maphack_warnings INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS ban_reason TEXT,
+      ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;
+  `);
 }
 
 module.exports = { runMigrations };

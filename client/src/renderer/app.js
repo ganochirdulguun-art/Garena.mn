@@ -527,7 +527,34 @@ document.querySelectorAll('.auth-tab').forEach(btn => {
 });
 
 // ── Эхлүүлэх ─────────────────────────────────────────────
+// MapHack илрэхэд гарах анхааруулга — main процессоос game:maphack event-ээр ирнэ.
+function showMaphackModal(data) {
+  const d = data || {};
+  const max = d.max ?? 3;
+  document.getElementById('maphack-overlay')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'maphack-overlay';
+  ov.className = 'maphack-overlay';
+  const body = d.banned
+    ? `<p class="mh-ban">🚫 Та MapHack ${max} удаа ашигласан тул платформоос <b>ХОРИГЛОГДЛОО</b>.</p>`
+    : `<p class="mh-warn">Сануулга <b>${d.warnings ?? '?'}/${max}</b> — MapHack-аа <b>унтраагаад</b> дахин оролдоно уу.<br>Нийт <b>${max}</b> удаа бол платформоос <b>бан</b> авна.</p>`;
+  ov.innerHTML = `
+    <div class="maphack-card">
+      <div class="mh-icon">🛡️</div>
+      <h2>MapHack илрэв</h2>
+      <p class="mh-tool">Илрсэн хэрэгсэл: <code>${escHtml(d.tool || '?')}</code></p>
+      ${body}
+      <p class="mh-note">Шударга тоглоомын төлөө MapHack хатуу хориотой. Хэрэгслээ бүрэн хаагаад (гарах) дахин тогло.</p>
+      <button class="btn btn-primary" id="mh-close">Ойлголоо</button>
+    </div>`;
+  document.body.appendChild(ov);
+  document.getElementById('mh-close').onclick = () => ov.remove();
+}
+
 async function init() {
+  // MapHack анхааруулгыг бүх цонхонд сонсоно (тоглолт эхлүүлэхэд илэрвэл)
+  window.api.onMaphack?.(showMaphackModal);
+
   // Найзуудын тусдаа цонх горим
   if (isFriendsMode()) {
     document.getElementById('page-login').classList.remove('active');
