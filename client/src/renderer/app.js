@@ -1806,7 +1806,7 @@ function renderMembers(members) {
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
-        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}</div>
+        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''} ${id ? pingBadge(String(id)) : ''}</div>
       </div>
       ${kickBtn}
     </li>`;

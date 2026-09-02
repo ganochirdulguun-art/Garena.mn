@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain, shell, protocol, dialog, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn, execFileSync } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
 const QRCode = require('qrcode');
 const { autoUpdater } = require('electron-updater');
 
@@ -1034,15 +1034,33 @@ async function refreshMaphackList() {
     }
   } catch { /* серверт холбогдоогүй — сүүлийн жагсаалт хэвээр */ }
 }
-// tasklist /V — процессын нэр + цонхны гарчгийг шалгана (нэр сольсныг ч барих гэж оролдоно)
-function scanForMaphack() {
+// Main process-ыг ХЭЗЭЭ Ч блоклохгүй async exec. LAN proxy (gameRelay) яг энэ process дээр
+// ажилладаг тул синхрон tasklist нь WC3-ийн пакетийг зогсоож "Waiting for players" гацалт
+// үүсгэдэг байв (v2.7.7: tasklist /V нь WC3 ажиллаж байхад 20с+ үргэлжилдэг → 6с timeout
+// бүрт main process царцаж, 25с тутам ~6с lag өгч байсныг relay capture-аас баталсан).
+function execFileAsync(cmd, args, opts = {}) {
+  return new Promise((resolve) => {
+    try {
+      execFile(cmd, args, { encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024, ...opts },
+        (err, stdout) => resolve(err ? null : String(stdout || '')));
+    } catch { resolve(null); }
+  });
+}
+// tasklist /V — процессын нэр + цонхны гарчгийг шалгана (нэр сольсныг ч барих гэж оролдоно).
+// Удаан (20с+) тул async + давхар скан хамгаалалт — тоглоомын урсгалд огт нөлөөлөхгүй.
+let _mhScanBusy = false;
+async function scanForMaphack() {
+  if (_mhScanBusy) return null;
+  _mhScanBusy = true;
   try {
-    const out = execFileSync('tasklist', ['/V', '/FO', 'CSV', '/NH'],
-      { encoding: 'utf8', timeout: 6000, windowsHide: true }).toLowerCase();
+    const out = await execFileAsync('tasklist', ['/V', '/FO', 'CSV', '/NH'], { timeout: 45000 });
+    if (out == null) return null;   // tasklist алдаа/timeout — блоклохгүй (false negative)
+    const low = out.toLowerCase();
     for (const sig of _maphackList) {
-      if (sig && out.includes(sig)) return sig;
+      if (sig && low.includes(sig)) return sig;
     }
-  } catch { /* tasklist алдаа — блоклохгүй (false negative) */ }
+  } catch { /* блоклохгүй */ }
+  finally { _mhScanBusy = false; }
   return null;
 }
 async function reportMaphack(tool) {
@@ -1056,14 +1074,14 @@ function startMaphackWatch() {
   if (_maphackWatch) return;
   _maphackReported = null;
   _maphackWatch = setInterval(async () => {
-    if (isWar3Running() !== true) { stopMaphackWatch(); return; }
-    const tool = scanForMaphack();
+    if ((await isWar3Running()) !== true) { stopMaphackWatch(); return; }
+    const tool = await scanForMaphack();   // async — LAN proxy-г блоклохгүй
     if (tool && tool !== _maphackReported) {
       _maphackReported = tool;
       const rep = await reportMaphack(tool);
       broadcastToWindows('game:maphack', { tool, warnings: rep?.warnings ?? null, banned: !!rep?.banned, max: rep?.max ?? 3, midgame: true });
     }
-  }, 25000);
+  }, 40000);
   if (_maphackWatch.unref) _maphackWatch.unref();
 }
 function stopMaphackWatch() {
@@ -1073,7 +1091,7 @@ function stopMaphackWatch() {
 
 ipcMain.handle('game:launch', async (_, gameType) => {
   // MapHack скан — тоглолт эхлэхээс ӨМНӨ. Илэрвэл WC3 нээхгүй, сануулга авна.
-  const mh = scanForMaphack();
+  const mh = await scanForMaphack();
   if (mh) {
     const rep = await reportMaphack(mh);
     broadcastToWindows('game:maphack', { tool: mh, warnings: rep?.warnings ?? null, banned: !!rep?.banned, max: rep?.max ?? 3, midgame: false });
@@ -1092,7 +1110,7 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   }
   // WC3 аль хэдийн ажиллаж байвал 2 дахь instance нээхгүй — эхнийх нь UDP 6112-ыг барьсан тул
   // 2 дахь цонхны LAN жагсаалт үүрд хоосон харагддаг. Байгаа WC3-ийг ашиглаж exit хяналтыг залгана.
-  if (isWar3Running() === true) { watchWar3Exit(); startMaphackWatch(); return true; }
+  if ((await isWar3Running()) === true) { watchWar3Exit(); startMaphackWatch(); return true; }
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
@@ -1112,12 +1130,12 @@ ipcMain.handle('game:launch', async (_, gameType) => {
 });
 
 let _war3Watch = null;
-// true/false/null — null = tasklist алдаа/timeout ("мэдэгдэхгүй", exited гэж тооцохгүй)
-function isWar3Running() {
-  try {
-    const out = execFileSync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
-    return /war3\.exe/i.test(out);
-  } catch { return null; }
+// true/false/null — null = tasklist алдаа/timeout ("мэдэгдэхгүй", exited гэж тооцохгүй).
+// Async (v2.7.7) — 3с тутам дуудагддаг тул синхрон байхад LAN proxy-г ~150мс тутам зогсоож байв.
+async function isWar3Running() {
+  const out = await execFileAsync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH'], { timeout: 5000 });
+  if (out == null) return null;
+  return /war3\.exe/i.test(out);
 }
 // WC3 UDP 6112-г эзэлсэн эсэх — ботын bridge 6112-т bind хийхээсээ ӨМНӨ WC3 эзэлсэн байх ёстой,
 // эс бөгөөс WC3 өөрөө 6112-т bind хийж чадахгүй LAN алдаа гаргадаг (v1.8.8-ийн гаж нөлөө).
@@ -1137,22 +1155,27 @@ function isUdp6112InUse() {
   } catch { return false; }
 }
 ipcMain.handle('wc3:lanReady', () => isUdp6112InUse());
-ipcMain.handle('wc3:running', () => isWar3Running() === true);
+ipcMain.handle('wc3:running', async () => (await isWar3Running()) === true);
 function watchWar3Exit() {
   if (_war3Watch) return;
   const startedAt = Date.now();
   let seen = false;
   let misses = 0;   // дараалсан false тоолуур — tasklist нэг удаа гацахад худал exited гаргахгүй
-  _war3Watch = setInterval(() => {
-    const running = isWar3Running();
-    if (running === true) { seen = true; misses = 0; return; }
-    if (running === null) return;   // tasklist алдаа/timeout — exited гэж тооцохгүй, дараагийн шалгалтыг хүлээнэ
-    // 15 сек дотор war3.exe огт гарч ирээгүй бол launcher өөрөө хаагдсан гэж үзнэ
-    if (!seen && Date.now() - startedAt < 15000) return;
-    misses += 1;
-    if (misses < 2) return;   // 2 дараалсан false (~6с) = жинхэнэ exit
-    clearInterval(_war3Watch); _war3Watch = null;
-    broadcastToWindows('game:exited');
+  let busy = false;   // tasklist удаан бол давхар tick үүсгэхгүй
+  _war3Watch = setInterval(async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const running = await isWar3Running();   // async — LAN proxy-г блоклохгүй
+      if (running === true) { seen = true; misses = 0; return; }
+      if (running === null) return;   // tasklist алдаа/timeout — exited гэж тооцохгүй, дараагийн шалгалтыг хүлээнэ
+      // 15 сек дотор war3.exe огт гарч ирээгүй бол launcher өөрөө хаагдсан гэж үзнэ
+      if (!seen && Date.now() - startedAt < 15000) return;
+      misses += 1;
+      if (misses < 2) return;   // 2 дараалсан false (~6с) = жинхэнэ exit
+      clearInterval(_war3Watch); _war3Watch = null;
+      broadcastToWindows('game:exited');
+    } finally { busy = false; }
   }, 3000);
 }
 
