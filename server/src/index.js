@@ -32,6 +32,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
+  maxHttpBufferSize: 8e6, // DM зураг/файл (base64) дамжуулахад — default 1MB бага
 });
 
 const PORT = process.env.PORT || 3000;
@@ -396,7 +397,7 @@ io.on('connection', (socket) => {
   });
 
   // Хувийн мессеж (private message)
-  socket.on('private:message', async ({ toUserId, text }) => {
+  socket.on('private:message', async ({ toUserId, text, image, file }) => {
     if (!text?.trim()) return;
     if (checkRateLimit(socket)) return;
     const userId   = String(socket.user.id);
@@ -404,7 +405,7 @@ io.on('connection', (socket) => {
     // Хүлээн авагч илгээгчийг хаасан эсэх шалгах
     if (await socialRoutes.isUserBlocked(String(toUserId), userId)) return;
     const safeText = text.trim().slice(0, 1000);
-    // DB-д хадгалах
+    // DB-д зөвхөн текст маркер хадгална (зураг/файл нь live-only — base64-аар DB бөөрөнхийлөхгүй)
     const saved = await socialRoutes.saveMessage(socket.user.id, toUserId, safeText);
     const msg = {
       fromUsername: username,
@@ -413,6 +414,14 @@ io.on('connection', (socket) => {
       time:         saved?.created_at?.toISOString() || new Date().toISOString(),
       id:           saved?.id || null,
     };
+    // Зураг (data:image/… — шахсан JPEG) live дамжуулна
+    if (typeof image === 'string' && image.startsWith('data:image/') && image.length < 8_000_000) {
+      msg.image = image;
+    }
+    // Файл (data:… base64) live дамжуулна
+    if (file && typeof file.data === 'string' && file.data.startsWith('data:') && file.data.length < 8_000_000) {
+      msg.file = { name: String(file.name || 'file').slice(0, 120), size: Number(file.size) || 0, data: file.data };
+    }
     // user:<id> room-оор бүх цонх руу илгээнэ (main, DM, өрөөний цонх өөр socket-той)
     io.to(`user:${String(toUserId)}`).emit('private:message', msg);
     // Илгээгчид баталгаа буцаах

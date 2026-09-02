@@ -1076,21 +1076,47 @@
     </div>
   </div>
 
-  <!-- DM тусдаа цонх горим (full page) -->
+  <!-- DM тусдаа цонх горим — Yahoo Messenger маягийн бүтэц -->
   <div id="dm-fullpage" class="page dm-fullpage">
-    <div class="dm-window-container">
-      <div class="dm-window-header">
-        <span class="dm-window-icon">💬</span>
-        <h3 id="dm-window-title">DM</h3>
+    <div class="ymdm">
+      <div class="ymdm-menubar">
+        <span class="ymdm-menu" id="ymdm-menu-chat">Харилцан яриа</span>
+        <span class="ymdm-menu" id="ymdm-menu-edit">Засвар</span>
+        <span class="ymdm-menu" id="ymdm-menu-action">Үйлдэл</span>
+        <span class="ymdm-menu" id="ymdm-menu-help">Тусламж</span>
       </div>
-      <div id="dm-window-messages" class="dm-messages"></div>
-      <div id="dm-window-typing" class="typing-indicator"></div>
-      <div class="chat-input-row dm-input-row">
-        <input id="dm-window-input" type="text" placeholder="Мессеж бичих..." class="input" />
-        <button type="button" id="dm-window-send" class="btn btn-primary btn-icon-only" title="Илгээх">
-          <svg class="btn-icon-svg"><use href="#ico-send"/></svg>
+      <div class="ymdm-toolbar">
+        <button class="ymdm-tool" id="ymdm-call"><span class="ymdm-tool-ico">📞</span><span>Дуудлага</span></button>
+        <button class="ymdm-tool" id="ymdm-voice"><span class="ymdm-tool-ico">🎙️</span><span>Дуу</span></button>
+        <button class="ymdm-tool" id="ymdm-invite"><span class="ymdm-tool-ico">🎮</span><span>Тоглолтод урих</span></button>
+        <button class="ymdm-tool" id="ymdm-image"><span class="ymdm-tool-ico">🖼️</span><span>Зураг</span></button>
+        <button class="ymdm-tool" id="ymdm-file"><span class="ymdm-tool-ico">📎</span><span>Файл</span></button>
+      </div>
+      <div class="ymdm-main">
+        <div class="ymdm-chatcol">
+          <div id="dm-window-messages" class="dm-messages ymdm-messages"></div>
+          <div id="dm-window-typing" class="typing-indicator"></div>
+        </div>
+        <div class="ymdm-avatars">
+          <div class="ymdm-av" id="ymdm-av-other"></div>
+          <div class="ymdm-av" id="ymdm-av-me"></div>
+        </div>
+      </div>
+      <div class="ymdm-minibar">
+        <button class="ymdm-mini" id="ymdm-emoji" title="Emoji">😊</button>
+        <button class="ymdm-mini" id="ymdm-image2" title="Зураг">🖼️</button>
+        <button class="ymdm-mini" id="ymdm-file2" title="Файл">📎</button>
+        <div class="ymdm-emoji-pop hidden" id="ymdm-emoji-pop"></div>
+      </div>
+      <div class="ymdm-inputrow">
+        <textarea id="dm-window-input" placeholder="Мессеж бичих..." class="ymdm-input" rows="2"></textarea>
+        <button type="button" id="dm-window-send" class="ymdm-send" title="Илгээх">
+          <svg class="btn-icon-svg"><use href="#ico-send"/></svg><span>Илгээх</span>
         </button>
       </div>
+      <input type="file" id="ymdm-image-input" accept="image/*" style="display:none">
+      <input type="file" id="ymdm-file-input" style="display:none">
+      <h3 id="dm-window-title" style="display:none">DM</h3>
     </div>
   </div>
 

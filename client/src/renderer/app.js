@@ -1,5 +1,8 @@
 const SERVER = 'https://garenamn-production.up.railway.app';
 
+// Богино туслах (локал const el-ууд үүнийг өөрсдийн scope-д shadow хийнэ)
+function el(id) { return document.getElementById(id); }
+
 // ── Socket.io ─────────────────────────────────────────────
 let socket = null;
 let currentRoom = null;
@@ -2285,20 +2288,107 @@ async function initDMWindowMode(userId, username) {
   } catch {}
   renderDMWindowMessages();
   window.api.markDMRead(userId).catch(() => {});
+  setDMAvatars(username);
 
-  document.getElementById('dm-window-send').onclick = sendDMFromWindow;
-  document.getElementById('dm-window-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') sendDMFromWindow();
+  const input = document.getElementById('dm-window-input');
+  el('dm-window-send').onclick = sendDMFromWindow;
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendDMFromWindow(); }
   });
+  // Зураг тавих (Ctrl+V paste)
+  input.addEventListener('paste', e => {
+    const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+    if (item) { e.preventDefault(); const f = item.getAsFile(); if (f) sendDMImageFile(f); }
+  });
+  // Toolbar + mini toolbar
+  const pick = (id) => el(id)?.click();
+  el('ymdm-call')?.addEventListener('click', () => showToast('📞 Дуудлага тун удахгүй нэмэгдэнэ', 'info'));
+  el('ymdm-voice')?.addEventListener('click', () => showToast('🎙️ Дуут дуудлага тун удахгүй нэмэгдэнэ', 'info'));
+  el('ymdm-invite')?.addEventListener('click', dmInviteToGame);
+  el('ymdm-image')?.addEventListener('click', () => pick('ymdm-image-input'));
+  el('ymdm-file')?.addEventListener('click', () => pick('ymdm-file-input'));
+  el('ymdm-image2')?.addEventListener('click', () => pick('ymdm-image-input'));
+  el('ymdm-file2')?.addEventListener('click', () => pick('ymdm-file-input'));
+  el('ymdm-emoji')?.addEventListener('click', toggleDMEmoji);
+  el('ymdm-image-input')?.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) sendDMImageFile(f); e.target.value = ''; });
+  el('ymdm-file-input')?.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) sendDMFileAny(f); e.target.value = ''; });
+  el('ymdm-menu-action')?.addEventListener('click', () => { if (confirm('Чатын түүхийг цэвэрлэх үү? (зөвхөн энэ цонхонд)')) { dmConversations[activeDmUserId].messages = []; renderDMWindowMessages(); } });
+  el('ymdm-menu-help')?.addEventListener('click', () => showToast('Yahoo Messenger маягийн DM — зураг(paste), файл, тоглолтын урилга. Дуудлага удахгүй.', 'info'));
+
   // Typing indicator
   let _dmWinTyping = false, _dmWinTimer = null;
-  document.getElementById('dm-window-input').addEventListener('input', () => {
+  input.addEventListener('input', () => {
     if (!activeDmUserId || !socket) return;
     if (!_dmWinTyping) { _dmWinTyping = true; socket.emit('typing:start', { toUserId: activeDmUserId }); }
     clearTimeout(_dmWinTimer);
     _dmWinTimer = setTimeout(() => { _dmWinTyping = false; socket.emit('typing:stop', { toUserId: activeDmUserId }); }, 2000);
   });
-  setTimeout(() => document.getElementById('dm-window-input').focus(), 100);
+  setTimeout(() => input.focus(), 100);
+}
+
+// ── DM Yahoo-style туслах функцууд ──
+function dmInitials(name) {
+  const s = String(name || '?').replace(/^[\d-]+\s*/, '').trim();
+  const parts = s.split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || '?') + (parts[1]?.[0] || '')).toUpperCase();
+}
+async function setDMAvatars(otherName) {
+  const meEl = el('ymdm-av-me'), otEl = el('ymdm-av-other');
+  if (meEl) meEl.innerHTML = currentUser?.avatar_url ? `<img src="${escHtml(currentUser.avatar_url)}" alt="">` : escHtml(dmInitials(currentUser?.username));
+  if (otEl) otEl.innerHTML = escHtml(dmInitials(otherName));
+  // Нөгөө хүний аватарыг татах (боломжтой бол)
+  try {
+    const st = await window.api.getPlayerStatsById(activeDmUserId);
+    if (st?.avatar_url && otEl) otEl.innerHTML = `<img src="${escHtml(st.avatar_url)}" alt="">`;
+  } catch {}
+}
+function dmInviteToGame() {
+  if (!currentRoom?.id) { showToast('Эхлээд өрөө үүсгээд урина уу', 'info'); return; }
+  socket?.emit('room:invite', { toUserId: activeDmUserId, roomId: currentRoom.id, roomName: currentRoom.name });
+  showToast('🎮 Тоглолтын урилга илгээлээ', 'success');
+}
+function toggleDMEmoji() {
+  const pop = el('ymdm-emoji-pop'); if (!pop) return;
+  if (!pop.dataset.filled) {
+    const emo = '😀 😂 😍 😎 😭 😡 👍 🙏 🔥 💀 🎮 ❤️ 😅 🤝 👌 🥳 😤 😬 🤔 💪 ⚡ 🏆 😴 🤣'.split(' ');
+    pop.innerHTML = emo.map(e => `<span>${e}</span>`).join('');
+    pop.querySelectorAll('span').forEach(s => s.addEventListener('click', () => {
+      const inp = el('dm-window-input'); inp.value += s.textContent; inp.focus(); pop.classList.add('hidden');
+    }));
+    pop.dataset.filled = '1';
+  }
+  pop.classList.toggle('hidden');
+}
+// Зургийг canvas-аар шахаж (max 1280px, JPEG) data URL болгоно — socket-д тохирно
+function compressImageFile(file, maxSide = 1280, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width: w, height: h } = img;
+      if (Math.max(w, h) > maxSide) { const r = maxSide / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+      const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(cv.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    const fr = new FileReader(); fr.onload = () => { img.src = fr.result; }; fr.onerror = reject; fr.readAsDataURL(file);
+  });
+}
+async function sendDMImageFile(file) {
+  if (!activeDmUserId || !socket) return;
+  if (!file.type.startsWith('image/')) return sendDMFileAny(file);
+  try {
+    const dataUrl = await compressImageFile(file);
+    socket.emit('private:message', { toUserId: activeDmUserId, text: '[📷 Зураг]', image: dataUrl });
+  } catch { showToast('Зураг илгээхэд алдаа гарлаа', 'error'); }
+}
+function sendDMFileAny(file) {
+  if (!activeDmUserId || !socket) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('Файл хэт том (5MB-аас бага байх ёстой)', 'error'); return; }
+  const fr = new FileReader();
+  fr.onload = () => socket.emit('private:message', { toUserId: activeDmUserId, text: `[📎 ${file.name}]`, file: { name: file.name, size: file.size, data: fr.result } });
+  fr.onerror = () => showToast('Файл уншихад алдаа гарлаа', 'error');
+  fr.readAsDataURL(file);
 }
 
 function sendDMFromWindow() {
@@ -2323,21 +2413,34 @@ function renderDMWindowMessages() {
     const t = formatChatTime(msg.time);
     const div = document.createElement('div');
     div.className = `msg ${isMe ? 'me' : 'other'}`;
+    let body;
+    if (msg.image) {
+      body = `<img class="msg-img" src="${escHtml(msg.image)}" alt="зураг">`;
+    } else if (msg.file) {
+      const kb = Math.max(1, Math.round((msg.file.size || 0) / 1024));
+      body = `<a class="msg-file" href="${escHtml(msg.file.data)}" download="${escHtml(msg.file.name)}"><span class="mf-ico">📎</span><span>${escHtml(msg.file.name)} · ${kb}KB</span></a>`;
+    } else {
+      body = `<div class="msg-bubble">${escHtml(msg.text)}</div>`;
+    }
     div.innerHTML = `
       <div class="msg-name">${isMe ? 'Та' : escHtml(msg.fromUsername)}</div>
-      <div class="msg-bubble">${escHtml(msg.text)}</div>
+      ${body}
       <div class="msg-time">${t}</div>`;
     box.appendChild(div);
   });
   box.scrollTop = box.scrollHeight;
+  // Зураг дээр дарвал шинэ цонхонд томоор
+  box.querySelectorAll('.msg-img').forEach(img => img.addEventListener('click', () => {
+    try { window.open(img.src, '_blank'); } catch {}
+  }));
 }
 
-function handleIncomingDM({ fromUsername, fromUserId, text, time }) {
+function handleIncomingDM({ fromUsername, fromUserId, text, time, image, file }) {
   const uid = String(fromUserId);
   if (!dmConversations[uid]) {
     dmConversations[uid] = { username: fromUsername, messages: [], unread: 0 };
   }
-  dmConversations[uid].messages.push({ fromUsername, text, time });
+  dmConversations[uid].messages.push({ fromUsername, text, time, image, file });
 
   // Sound + desktop notification
   playSound('dm');
@@ -2368,10 +2471,10 @@ function handleIncomingDM({ fromUsername, fromUserId, text, time }) {
   openDM(uid, fromUsername);
 }
 
-function handleSentDM({ fromUsername, toUserId, text, time }) {
+function handleSentDM({ fromUsername, toUserId, text, time, image, file }) {
   const uid = String(toUserId);
   if (!dmConversations[uid]) return;
-  dmConversations[uid].messages.push({ fromUsername, text, time });
+  dmConversations[uid].messages.push({ fromUsername, text, time, image, file });
 
   if (isDMMode()) {
     if (activeDmUserId === uid) renderDMWindowMessages();

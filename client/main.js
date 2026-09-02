@@ -723,8 +723,8 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
     dmWindows.delete(uid);
   }
   const dmWin = new BrowserWindow({
-    width: 480, height: 560,
-    minWidth: 380, minHeight: 400,
+    width: 540, height: 600,
+    minWidth: 470, minHeight: 460,
     title: `${username} — DM`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
