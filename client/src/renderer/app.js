@@ -4974,8 +4974,8 @@ init();
     const blockText = el('diamond-block-text');
     if (blockText) {
       blockText.textContent = bg === 0
-        ? 'Шинэ 10 тоглолтын блок эхэлж байна — 5 хожвол +30 💎'
-        : `Энэ блок: ${bw} хожил / ${bg} тоглолт · ${need === 0 ? '+30 💎 баталгаажсан ✓' : `+30 💎-д ${need} хожил дутуу`} · ${left} тоглолт үлдлээ`;
+        ? 'Ranked блок (10 тоглолт): ≥5 хожвол +30 💎 · хожил бүр +2 💎'
+        : `Ranked блок: ${bw} хожил / ${bg} тоглолт · ${need === 0 ? '+30 💎 баталгаажсан ✓' : `+30 💎-д ${need} хожил дутуу`} · ${left} тоглолт үлдлээ`;
     }
     const bar = el('diamond-block-bar');
     if (bar) bar.style.width = `${Math.round((bg / 10) * 100)}%`;

@@ -603,7 +603,7 @@
           <h3>Diamond 💎 · XP</h3>
           <div class="diamond-row">
             <span class="diamond-amount" data-diamonds>💎 0</span>
-            <span class="hint hint-no-margin">10 тоглолт тутамд <b>5-аас олон хожвол +30 💎</b>. Silver = 800 💎 · Gold = 1500 💎 (эсвэл QPay).</span>
+            <span class="hint hint-no-margin">🏆 <b>Ranked өрөө</b>: хүчинтэй хожил бүр <b>+2 💎</b>, 10 ranked тоглолтын блокт ≥5 хожвол <b>+30 💎</b>. Энгийн өрөө XP л өгнө. Silver = 800 💎 · Gold = 1500 💎 (эсвэл QPay).</span>
           </div>
           <div class="diamond-progress">
             <div class="row"><span id="diamond-block-text">Энэ блок: 0/0</span></div>
@@ -611,7 +611,8 @@
             <div class="row"><span id="diamond-level-text">LV 1 · 0 XP</span></div>
             <div class="bar xp"><i id="diamond-xp-bar"></i></div>
           </div>
-          <p class="bank-note">XP: хожил +40 · хожигдол +10 · leaver −30 · kill +1, assist +0.5 (хамгийн ихдээ +30). Дүнг replay эсвэл бот хост автоматаар бүртгэнэ; 8 минутаас богино тоглолт тоологдохгүй.</p>
+          <p class="bank-note">XP: хожил +40 · хожигдол +10 · leaver −30 · kill +1, assist +0.5 (хамгийн ихдээ +30); 8 минутаас богино тоглолт тоологдохгүй. Дүнг (K/D/A, creep, denie, neutral, gold, hero, item) relay сервер тоглоом дуусмагц <b>автоматаар</b> бүртгэнэ — replay, бот хост хэрэггүй.</p>
+          <p class="bank-note">💎 олборлолт зөвхөн <b>🏆 Ranked өрөөнд</b>: хоёр багт тус бүр ≥3 платформоор нэгдсэн тоглогч (3v3+), ≥12 минут, тоглоом -ff/throne-оор ялагчтай дууссан, ижил бүрэлдэхүүн өдөрт 3 хүртэл; 10 минутын өмнө гарсан хүн хожил авахгүй. Хожсон баг тус бүр +2 💎.</p>
           <div class="diamond-actions">
             <button type="button" id="btn-diamond-transfer" class="btn btn-primary">💎 Шилжүүлэх</button>
             <button type="button" id="btn-diamond-buy" class="btn">💎 Багц авах (QPay)</button>
@@ -619,7 +620,7 @@
             <span id="diamond-owner-badge" class="owner-badge hidden" title="Платформын эзэн — Diamond хязгааргүй">👑 Эзэн · unlimited 💎</span>
             <button type="button" id="btn-admin-dashboard" class="btn hidden" title="Вэб админ самбар — 💎 олгох, гишүүнчлэл өгөх, дэвтэр">🛡️ Админ самбар</button>
           </div>
-          <p class="bank-note">Diamond-оо найздаа шилжүүлж болно (цагт 30 хүртэл шилжүүлэг, 1–50,000 💎). Diamond бол платформын доторх оноо — мөнгөөр буцаан авахгүй.</p>
+          <p class="bank-note">Diamond-оо найздаа бэлэглэж шилжүүлж болно (цагт 30 хүртэл, 1–50,000 💎); Silver/Gold гишүүнчлэлээ 💎-оор авна. Diamond бол платформын доторх оноо — платформ мөнгөөр буцаан авахгүй, бэлэн мөнгөөр наймаалцахыг дэмжихгүй.</p>
         </section>
 
         <!-- Гишүүнчлэл -->
@@ -802,8 +803,8 @@
               </div>
               <p class="hint mt-4" style="font-size:0.72rem">12 алхам — Өмнөх / Дараах товчоор удирдана</p>
               <ul class="hint mt-4" style="font-size:0.74rem; line-height:1.5; padding-left:18px">
-                <li><strong>Diamond 💎</strong> — 10 тоглолт тутамд 5-аас олон хожвол +30 💎. Silver = 800 💎 (эсвэл 20,000₮), Gold = 1500 💎 (эсвэл 40,000₮), 30 хоног. Профайл хэсгээс харна; найздаа шилжүүлж, QPay-аар багц авч болно.</li>
-                <li><strong>Тоглолт (бот хост — үндсэн зам)</strong> — өрөөний host "Тоглоом" картаас map сонгоод "Тоглолт эхлүүлэх" дарна; бусад нь "WC3 нээж нэгдэх" → LAN жагсаалтаас орно. Garena сүлжээ хэрэггүй. Өөрөө хостлох (Garena сүлжээ) нь "Нэмэлт" хэсэгт. Host lobby-д <code>!start</code> бичнэ (ажиллахгүй бол эхлээд <code>!owner</code>, дараа нь <code>!start</code>); дүн, K/D/A, XP, 💎 автоматаар бүртгэгдэнэ. WC3-ийн LAN нэр тань автоматаар бүртгэгдэнэ.</li>
+                <li><strong>Diamond 💎</strong> — 🏆 Ranked өрөөний хүчинтэй хожил бүр +2 💎 (≥3v3, ≥12 мин), 10 ranked тоглолтын блокт ≥5 хожвол +30 💎; энгийн өрөө XP л өгнө. Silver = 800 💎 (эсвэл 20,000₮), Gold = 1500 💎 (эсвэл 40,000₮), 30 хоног. Профайл хэсгээс харна; найздаа шилжүүлж, QPay-аар багц авч болно.</li>
+                <li><strong>Тоглолт (LAN relay — үндсэн зам)</strong> — өрөө үүсгэхдээ 🏆 Ranked сонгож болно. Host "LAN тоглоом нээх" дараад WC3-доо LAN → Create Game хийнэ; бусад нь "Нэгдэх" дараад WC3-ийн LAN жагсаалтаас орно. Garena сүлжээ ч, бот хост ч хэрэггүй. Дүн, K/D/A, XP, 💎 тоглоом дуусмагц relay серверээс автоматаар бүртгэгдэнэ; WC3-ийн LAN нэр тань нэгдэхэд бүртгэгдэнэ.</li>
               </ul>
             </div>
           </section>
