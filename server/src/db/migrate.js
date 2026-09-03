@@ -173,6 +173,16 @@ async function runMigrations(db) {
       joined_at TIMESTAMP DEFAULT NOW(),
       PRIMARY KEY (token, user_id)
     );
+    -- MapHack илрэлт бүрийн түүх (!maphack тайлан: хэзээ, ямар хэрэгсэл, хэд дэх сануулга)
+    CREATE TABLE IF NOT EXISTS maphack_events (
+      id         SERIAL PRIMARY KEY,
+      user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      tool       VARCHAR(64),
+      warnings   INTEGER,
+      banned     BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_maphack_events_user ON maphack_events(user_id, created_at DESC);
   `);
 }
 
