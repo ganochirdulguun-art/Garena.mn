@@ -28,6 +28,9 @@ async function createInvoice({ amount, description, senderInvoiceNo }) {
     amount: Math.round(amount),
     invoice_description: String(description || 'Garena.mn').slice(0, 255),
     sender_invoice_no: String(senderInvoiceNo || '').slice(0, 64),
+    // Dashboard-ын профайл: QPAY_PROFILE_GARENA_* тохируулсан бол Garena.mn-ийн орлого тусдаа данс/терминал руу
+    // (ККТТ зөвшөөрсний дараа); тохируулаагүй бол үндсэн данс — ямар ч нөлөөгүй.
+    profile: process.env.QPAY_PROFILE || 'garena',
   });
 }
 
