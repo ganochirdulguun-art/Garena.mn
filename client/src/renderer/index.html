@@ -278,10 +278,12 @@
     </header>
     <nav class="maintabs" aria-label="Үндсэн цэс">
       <button type="button" class="nav-btn maintab" data-tab="discord"><svg class="btn-icon-svg"><use href="#ico-nav-discord"/></svg><span class="nav-label">Discord</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="chat" title="Нийтийн чат — бүх онлайн хэрэглэгч"><svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg><span class="nav-label">Нийтийн чат</span><span id="chat-badge-nav" class="nav-badge nav-badge-inline hidden">0</span></button>
       <button type="button" class="nav-btn maintab" data-tab="settings" data-settings-jump="games"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 4 4v2a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-2a4 4 0 0 1 4-4z"/><path d="M7 12v2M6 13h2M16 12.5h.01M18 14h.01"/></svg><span class="nav-label">Тоглоом</span></button>
       <button type="button" class="nav-btn maintab" data-tab="lobby"><svg class="btn-icon-svg"><use href="#ico-nav-rooms"/></svg><span class="nav-label">Өрөөнүүд</span></button>
       <button type="button" class="nav-btn maintab" data-tab="room"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="nav-label">Өрөө</span></button>
       <button type="button" class="nav-btn maintab" data-tab="warkey" title="Garena.mn WarKey — тоглоом дотроо skill/item товчоо тааруулна (Ctrl+F6)"><span class="nav-icon nav-icon-text" aria-hidden="true">⌨</span><span class="nav-label">WarKey</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="ranked" title="Ranked — тоглонгоо Diamond олборло"><span class="nav-icon nav-icon-text" aria-hidden="true">🏆</span><span class="nav-label">Ranked</span></button>
       <span class="maintabs-spacer"></span>
       <span class="conn">
         <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон">
@@ -522,39 +524,98 @@
     </div>
 
     <!-- Profile tab -->
-    <!-- WarKey tab — шигтгэсэн Garena.mn WarKey (src/renderer/warkey.js) -->
+    <!-- WarKey tab — Garena.mn WarKey танилцуулга, татах, заавар (src/renderer/warkey.js) -->
     <div id="tab-warkey" class="tab">
-      <div class="tab-header section-header">
-        <div class="section-title-group">
-          <h2>⌨ WarKey</h2>
-          <span class="section-subtitle">Тоглоом дотроо skill, item, QuickChat товчоо тааруулна · WC3 дотор <b>Ctrl+F6</b> overlay нээнэ · платформтой хамт асна</span>
-        </div>
-        <div class="ranking-controls">
-          <button type="button" id="wk-overlay" class="btn btn-primary">Overlay нээх (Ctrl+F6)</button>
-          <button type="button" id="wk-restart-top" class="btn btn-secondary" title="WarKey процессыг дахин асаана">↻ Дахин асаах</button>
-        </div>
-      </div>
-      <div id="wk-status" class="wk-status off">⌨ WarKey…</div>
-      <div id="wk-body" class="wk-body hidden">
-        <section class="card wk-card">
-          <h3>Inventory <span class="hint">2×3 — тоглоомын item товчнууд (Num7 Num8 / Num4 Num5 / Num1 Num2)-ыг өөрийн товчоор</span></h3>
-          <div id="wk-inv" class="wk-grid"></div>
-        </section>
-        <section class="card wk-card">
-          <h3>Skills <span class="hint">Тоглолт эхлээд hero сонгоход энд гарна; үсэг бичихэд тоглоом дотор шууд солигдоно</span></h3>
-          <div id="wk-skills" class="wk-list"></div>
-        </section>
-        <section class="card wk-card">
-          <h3>QuickChat <span class="hint">Нэг товч = нэг эсвэл хэд хэдэн мессеж (дарааллаар илгээнэ)</span></h3>
-          <div id="wk-chat" class="wk-list"></div>
-          <div class="wk-chat-add">
-            <button type="button" id="wk-new-key" class="wk-key">Товч</button>
-            <input id="wk-new-msg" class="input" placeholder="Мессеж (жишээ: gg wp)" maxlength="120" />
-            <button type="button" id="wk-new-add" class="btn btn-sm">+ Нэмэх</button>
+      <div class="info-hero">
+        <div class="info-hero-text">
+          <span class="info-kicker">WC3 ТУСГАЙ ХЭРЭГСЭЛ · ҮНЭГҮЙ</span>
+          <h2>⌨ Garena.mn WarKey</h2>
+          <p class="info-lead">Цонхоо хаахгүйгээр, яг тоглож байхдаа skill, item, QuickChat товчоо тааруулдаг шинэ төрлийн WarKey. Ердийн WarKey тоглоомоо хаагаад тохируулдаг — Garena.mn WarKey тоглолтын дундуур <b>Ctrl+F6</b> дараад overlay дээрээс шууд солино.</p>
+          <div class="info-actions">
+            <button type="button" id="wk-download" class="btn btn-primary">⬇️ WarKey татах (GarenaWarKey.exe)</button>
+            <button type="button" id="wk-open-site" class="btn btn-secondary">Вэб хуудас · дэлгэрэнгүй</button>
           </div>
-        </section>
-        <p class="bank-note">WarKey платформтой хамт асаж, хамт унтарна. Бие даасан WarKey.exe (GarenaSystem тэмцээний түүхтэй хэрэглэгчид GameRanger/PC төвд) хэвээр ажиллана — хоёуланг зэрэг асаахгүй.</p>
+          <p class="hint">Суулгац шаардлагагүй, шууд нээгддэг · Windows 10/11 · Discord-оор нэвтэрнэ · шинэчлэлт автоматаар</p>
+        </div>
+        <img class="info-hero-img" src="warkey-app.jpg" alt="Garena.mn WarKey" />
       </div>
+
+      <h3 class="info-h3">Давуу тал</h3>
+      <div class="info-cards">
+        <div class="info-card"><span class="info-ico">⚡</span><b>Ctrl+F6 — тоглоом дотор</b><p>Hero-гоо буруу үсэгтэй эхлүүлчихсэн үү? Ctrl+F6 дарахад overlay гарч, skill/item-ийн товчоо шууд солиод үргэлжлүүлнэ. Alt-tab, restart хэрэггүй.</p></div>
+        <div class="info-card"><span class="info-ico">🎯</span><b>Skill + Inventory нэг дор</b><p>Тоглолт эхэлж hero сонгомогц skill-үүд автоматаар танигдана; inventory 2×3 (Num7…Num2) товчнуудаа өөрийн үсэг, Mouse4/5, дугуй руу шилжүүлнэ.</p></div>
+        <div class="info-card"><span class="info-ico">💬</span><b>QuickChat</b><p>Давтагддаг мессежээ (gg, miss top, b…) нэг товчинд тавь. Нэг товчинд хэд хэдэн мессеж дарааллаар илгээнэ.</p></div>
+        <div class="info-card"><span class="info-ico">🧠</span><b>Чат ухаалаг</b><p>Чат нээлттэй үед remap түр зогсдог тул мессеж бичих үед skill санамсаргүй цохихгүй.</p></div>
+        <div class="info-card"><span class="info-ico">🔄</span><b>Авто-шинэчлэлт</b><p>Шинэ хувилбар гармагц өөрөө татаж суулгана. Нэг л удаа суулгаад л болно.</p></div>
+        <div class="info-card"><span class="info-ico">🔐</span><b>Garena.mn-тэй хамт</b><p>GarenaSystem тэмцээний түүхтэй бол хаана ч (GameRanger, PC төв); бусад нь Garena.mn платформ нээлттэй үед ашиглана.</p></div>
+      </div>
+
+      <h3 class="info-h3">Суулгах заавар</h3>
+      <img class="info-guide" src="warkey-guide-install.jpg" alt="WarKey суулгах заавар" />
+      <ol class="info-steps">
+        <li>Дээрх <b>«WarKey татах»</b> товчоор <code>GarenaWarKey.exe</code>-г татна (суулгац биш, шууд нээгддэг).</li>
+        <li>Windows SmartScreen гарвал <b>More info → Run anyway</b>; хөтөч «Keep» асуувал Keep.</li>
+        <li>Файл дээр баруун товч → <b>Run as administrator</b> (WC3 админ эрхээр ажилладаг бол skill унших, солиход заавал).</li>
+        <li>Хөтөч нээгдэж <b>Discord-оор нэвтэрнэ</b> — платформтой ижил акаунт. Дараа нь санана.</li>
+        <li>Цонхыг хаахад tray-д үргэлжлэн ажиллана.</li>
+      </ol>
+
+      <h3 class="info-h3">Хэрэглэх заавар</h3>
+      <img class="info-guide" src="warkey-guide-usage.jpg" alt="WarKey хэрэглэх заавар" />
+      <ol class="info-steps">
+        <li><b>Inventory 2×3</b>: слот дээр дараад өөрийн товчоо дарна (Backspace = арилгах).</li>
+        <li><b>QuickChat</b>: товч + мессеж нэмнэ (F2 → «gg wp»).</li>
+        <li>Тоглолт эхэлж hero сонгосны дараа <b>Skills</b> жагсаалт гарна — skill бүрд үсэг өгнө.</li>
+        <li>Тоглоом дотор <b>Ctrl+F6</b>: overlay-аас slot-ын дугаар дараад шинэ үсгээ дарна. Дахин Ctrl+F6 / Esc = хаах.</li>
+        <li>Skill-ийн үсэг тоглолт бүрд шинээр тааруулагдана (өмнөх тоглолтоос дамжихгүй).</li>
+      </ol>
+      <p class="bank-note">Асуудал гарвал: WarKey-г Run as administrator-оор нээх; нэг зэрэг хоёр WarKey ажиллуулахгүй; шинэчлэлтийг апп өөрөө татна.</p>
+    </div>
+
+    <!-- Ranked tab — Ranked горимын танилцуулга, заавар, зөвлөмж -->
+    <div id="tab-ranked" class="tab">
+      <div class="info-hero">
+        <div class="info-hero-text">
+          <span class="info-kicker">ҮНЭГҮЙ · АВТОМАТ ДҮН · DIAMOND ОЛБОРЛОЛТ</span>
+          <h2>🏆 Ranked — тоглонгоо Diamond олборло</h2>
+          <p class="info-lead">Ranked өрөөнд тоглосон тоглолт бүрийн дүн (K/D/A, creep, denie, neutral, gold, hero, item) DATACOM relay серверээс <b>автоматаар</b> бүртгэгдэж, хүчинтэй хожил бүрд <b>+2 💎</b> олгоно. Бот хост ч, replay ч хэрэггүй — бидний ялсан LAN холболт дээрээ шууд.</p>
+          <div class="info-actions">
+            <button type="button" id="rk-create" class="btn btn-primary">🏆 Ranked өрөө үүсгэх</button>
+            <button type="button" id="rk-profile" class="btn btn-secondary">💎 Миний Diamond · XP</button>
+          </div>
+          <p class="hint">Энгийн өрөө XP л өгнө · Ranked зөвхөн платформоор нэгдсэн тоглогчдод тоологдоно</p>
+        </div>
+        <img class="info-hero-img" src="ranked-guide.jpg" alt="Ranked заавар" />
+      </div>
+
+      <h3 class="info-h3">Яагаад Ranked?</h3>
+      <div class="info-cards">
+        <div class="info-card"><span class="info-ico">💎</span><b>Хожил бүрд 2 Diamond</b><p>Хүчинтэй ranked хожил бүр +2 💎, 10 ranked тоглолтын блокт ≥5 хожвол нэмж +30 💎. Diamond-оор Silver (800) / Gold (1500) гишүүнчлэл авна, найздаа бэлэглэнэ.</p></div>
+        <div class="info-card"><span class="info-ico">📊</span><b>Бодит статистик</b><p>Тоглогч бүрийн K/D/A, creep/denie, neutral, gold, hero, item тоглоом дуусмагц серверт хадгалагдаж профайлд харагдана — хэн ч гараар оруулахгүй, худлаа бичих боломжгүй.</p></div>
+        <div class="info-card"><span class="info-ico">🛡️</span><b>Шударга орчин</b><p>MapHack илрүүлэлт (3 сануулга → бан), ижил бүрэлдэхүүн өдөрт 3 хүртэл, 10 минутын өмнө гарсан хүн хожил авахгүй — фермлэлт, хуйвалдаан ашиггүй.</p></div>
+        <div class="info-card"><span class="info-ico">📈</span><b>Карьер, түүх</b><p>Хожил/хожигдол, win rate, тоглолтын түүх, XP ба Level профайлд хуримтлагдана. Тэмцээнд орохын өмнө бодит чадвараа харуулна.</p></div>
+        <div class="info-card"><span class="info-ico">🚀</span><b>Хамгийн хурдан LAN</b><p>DATACOM relay ~6мс ping; тоглогч бүрийн ping өрөөнд харагдана — хэн гацааж байгааг шууд мэднэ.</p></div>
+        <div class="info-card"><span class="info-ico">🆓</span><b>Үнэгүй</b><p>Ranked-д ямар ч төлбөр байхгүй. Өрөө үүсгэхдээ 🏆 сонгоод л тоглоно.</p></div>
+      </div>
+
+      <h3 class="info-h3">Хэрхэн тоглох вэ</h3>
+      <ol class="info-steps">
+        <li><b>Өрөө үүсгэх</b> → «🏆 Ranked өрөө» checkbox-ийг сонго (жагсаалтад 🏆 тэмдэгтэй).</li>
+        <li><b>6+ тоглогч (3v3-аас дээш)</b> — хоёр багт тус бүр ≥3 тоглогч платформоор «Нэгдэх» дарж орно. 1v1, 2v2 💎 өгөхгүй.</li>
+        <li>Хост <b>«LAN тоглоом нээх»</b> → WC3 → LAN → Create Game; бусад нь WC3-ийн LAN жагсаалтаас нэгдэнэ.</li>
+        <li><b>≥12 минут</b> тоглоод <b>-ff эсвэл throne</b>-оор ялагчтай дуусга.</li>
+        <li>Тоглоом дуусмагц дүн + 💎 автоматаар. Профайл → Diamond · XP хэсэгт харна.</li>
+      </ol>
+
+      <h3 class="info-h3">Зөвлөмж</h3>
+      <ul class="info-tips">
+        <li>Хостоор <b>ногоон ping</b>-тэй хүн нээвэл хамгийн тогтвортой (өрөөний жагсаалтад тоглогч бүрийн ping харагдана).</li>
+        <li>Платформоо <b>хамгийн сүүлийн хувилбар</b>т байлга (авто-шинэчлэлт) — гацалтын засварууд орсон.</li>
+        <li>Тоглоомоос эрт гарахгүй: 10 минутын өмнө гарвал хожил тоологдохгүй, багаа ч хохироно.</li>
+        <li>WC3-ийн LAN нэр тань нэгдэхэд автоматаар бүртгэгдэнэ — нэрээ тоглолтын дундуур бүү соль.</li>
+        <li>MapHack бүү хэрэглэ: 3 удаагийн сануулгын дараа платформоос бан болно.</li>
+      </ul>
+      <p class="bank-note">Diamond бол платформын доторх оноо: Silver/Gold гишүүнчлэл, бэлэглэлтэд зарцуулна; платформ мөнгөөр буцаан авахгүй, бэлэн мөнгөөр наймаалцахыг дэмжихгүй.</p>
     </div>
 
     <div id="tab-profile" class="tab">

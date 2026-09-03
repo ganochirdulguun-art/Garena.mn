@@ -507,7 +507,7 @@ function showTab(name) {
   if (name === 'settings') loadSettings();
   if (name === 'discord')  loadDiscordServers();
   if (name === 'streamers') loadStreamers();
-  if (name === 'warkey') window.warkeyTab?.activate(); else window.warkeyTab?.deactivate();
+  if (name === 'warkey' || name === 'ranked') window.infoTabs?.wire();
   if (name === 'chat') {
     chatUnreadCount = 0;
     updateChatBadge();
@@ -1964,13 +1964,16 @@ document.getElementById('lobby-chat-input').addEventListener('keydown', e => {
 });
 
 function updateChatBadge() {
-  const badge = document.getElementById('chat-badge');
-  if (!badge) return;
-  if (chatUnreadCount > 0) {
-    badge.textContent = chatUnreadCount;
-    badge.style.display = 'inline-block';
-  } else {
-    badge.style.display = 'none';
+  // Найзуудын цонхны товч + үндсэн цэсний "Нийтийн чат" таб хоёулаа
+  for (const badge of [document.getElementById('chat-badge'), document.getElementById('chat-badge-nav')]) {
+    if (!badge) continue;
+    if (chatUnreadCount > 0) {
+      badge.textContent = chatUnreadCount;
+      badge.style.display = 'inline-block';
+      badge.classList.remove('hidden');
+    } else {
+      badge.style.display = 'none';
+    }
   }
 }
 
