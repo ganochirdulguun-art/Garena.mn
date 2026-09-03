@@ -39,8 +39,10 @@ const END = new Date(dayStartUtc + 24 * 3600e3).toISOString();
 const REF = `gift:${dayMn}:${AMOUNT}`;
 const NOTE = `Garena.mn бэлэг — ${dayMn}-нд платформ дээр тоглосонд`;
 
-const ownerIds = String(process.env.OWNER_USER_IDS || '')
+const envOwnerIds = String(process.env.OWNER_USER_IDS || '')
   .split(',').map((s) => parseInt(s.trim(), 10)).filter(Number.isInteger);
+const adminDiscordIds = String(process.env.ADMIN_DISCORD_IDS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -48,6 +50,16 @@ const pool = new Pool({
 });
 
 async function main() {
+  // Эзэн/админ хэрэглэгчид: OWNER_USER_IDS ∪ ADMIN_DISCORD_IDS ∪ admin_whitelist
+  const { rows: adminRows } = await pool.query(
+    `SELECT DISTINCT u.id, u.username FROM users u
+      WHERE u.id = ANY($1::int[])
+         OR (u.discord_id IS NOT NULL AND u.discord_id = ANY($2::text[]))
+         OR (u.discord_id IS NOT NULL AND u.discord_id IN (SELECT discord_id FROM admin_whitelist))`,
+    [envOwnerIds, adminDiscordIds]
+  );
+  const ownerIds = adminRows.map((r) => r.id);
+
   const { rows: played } = await pool.query(
     `WITH src AS (
        SELECT gp.user_id, 'тоглолт'::text AS how, COALESCE(gr.duration_minutes, 0) AS mins
@@ -106,7 +118,21 @@ async function main() {
     `${(p.wc3_name || '—').padEnd(16)} ${String(p.diamonds).padStart(6)}💎  ${p.sources}${extra}`;
 
   console.log(`\n=== ${dayMn} (МН цагаар) · ${AMOUNT}💎 бэлэг · ${APPLY ? 'ОЛГОНО' : 'ЗӨВХӨН ЖАГСААЛТ (dry run)'} ===`);
-  console.log(`Цонх: ${START} → ${END} (UTC) · ref=${REF} · эзэн: ${ownerIds.join(',') || '—'}\n`);
+  console.log(`Цонх: ${START} → ${END} (UTC) · ref=${REF}`);
+  console.log(`Эзэн/админ: ${adminRows.map((r) => `${r.username}#${r.id}`).join(', ') || '—'}`);
+
+  // Сүүлийн SINCE_DAYS хоногийн БҮХ гар бэлэг (ил тод байлгах үүднээс)
+  const { rows: recentGifts } = await pool.query(
+    `SELECT t.user_id, u.username, t.amount, t.type, t.note, t.created_at
+       FROM diamond_transactions t LEFT JOIN users u ON u.id = t.user_id
+      WHERE t.created_at >= NOW() - ($1 || ' days')::interval
+        AND t.type IN ('transfer_in', 'admin_grant')
+      ORDER BY t.created_at`, [String(SINCE_DAYS)]
+  );
+  console.log(`\nСүүлийн ${SINCE_DAYS} хоногийн гар бэлгүүд (${recentGifts.length}):`);
+  recentGifts.forEach((g) => console.log(
+    `  ${String(g.created_at).slice(0, 16)}  ${(g.username || '?').padEnd(20)} +${g.amount}💎 ${g.type}  ${(g.note || '').slice(0, 60)}`));
+  console.log('');
   console.log(`Өнөөдөр тоглосон: ${played.length} хүн\n`);
   console.log(`✅ БЭЛЭГ АВАХ (${targets.length}):`);
   targets.forEach((p) => console.log(line(p)));
