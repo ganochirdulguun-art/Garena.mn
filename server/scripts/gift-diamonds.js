@@ -86,33 +86,44 @@ async function main() {
 
   // Эзэн өөрийн акаунтаас гараар бэлэглэсэн хүмүүс (сүүлийн SINCE_DAYS хоног).
   // ref формат: tx:<ts36>-<илгээгч>-<хүлээн авагч> → хүлээн авагчийн transfer_in мөрөөр олно.
+  // ЗӨВХӨН энэ өдрийн (МН) ЭЕРЭГ бэлгүүд — хасалт (сөрөг admin_grant) бэлэг биш;
+  // өмнөх өдрүүдийн бэлэг ч энэ багцад хамаарахгүй.
   const gifted = new Map();
-  if (ownerIds.length) {
+  {
     const { rows } = await pool.query(
-      `SELECT user_id, amount, created_at, ref, note
+      `SELECT user_id, amount, created_at, ref, note, type
          FROM diamond_transactions
-        WHERE created_at >= NOW() - ($1 || ' days')::interval
-          AND ( (type = 'transfer_in' AND split_part(ref, '-', 2) = ANY($2::text[]))
+        WHERE created_at >= $1 AND created_at < $2 AND amount > 0
+          AND ( (type = 'transfer_in' AND split_part(ref, '-', 2) = ANY($3::text[]))
              OR type = 'admin_grant' )
         ORDER BY created_at`,
-      [String(SINCE_DAYS), ownerIds.map(String)]
+      [START, END, ownerIds.map(String)]
     );
     rows.forEach((r) => gifted.set(r.user_id, r));
   }
+  const skipIds = new Set(String(flag('skip', '')).split(',').map((s) => parseInt(s, 10)).filter(Number.isInteger));
 
   const { rows: already } = await pool.query(
     'SELECT user_id FROM diamond_transactions WHERE ref = $1', [REF]
   );
   const done = new Set(already.map((r) => r.user_id));
 
-  const skipOwner = [], skipGifted = [], skipDone = [], skipBanned = [], targets = [];
+  const skipOwner = [], skipGifted = [], skipDone = [], skipBanned = [], skipManual = [], targets = [];
   for (const p of played) {
     if (ownerIds.includes(p.id)) skipOwner.push(p);
     else if (p.banned) skipBanned.push(p);
+    else if (skipIds.has(p.id)) skipManual.push(p);
     else if (done.has(p.id)) skipDone.push(p);
     else if (gifted.has(p.id)) skipGifted.push(p);
     else targets.push(p);
   }
+  // Нэг хүн хоёр акаунтаар (ижил нэр) орсон эсэх — давхар бэлгийн эрсдэл
+  const byName = new Map();
+  played.forEach((p) => {
+    const k = (p.username || '').trim().toLowerCase();
+    byName.set(k, [...(byName.get(k) || []), p]);
+  });
+  const dupNames = [...byName.values()].filter((v) => v.length > 1);
 
   const line = (p, extra = '') => `  #${String(p.id).padStart(4)} ${(p.username || '?').padEnd(22)} ` +
     `${(p.wc3_name || '—').padEnd(16)} ${String(p.diamonds).padStart(6)}💎  ${p.sources}${extra}`;
@@ -148,7 +159,16 @@ async function main() {
     console.log(`\n🚫 Баннтай (${skipBanned.length}):`);
     skipBanned.forEach((p) => console.log(line(p)));
   }
+  if (skipManual.length) {
+    console.log(`\n⏭️  Гараар хассан --skip (${skipManual.length}):`);
+    skipManual.forEach((p) => console.log(line(p)));
+  }
   if (skipOwner.length) console.log(`\nℹ️  Эзэн өөрөө (${skipOwner.map((p) => p.username).join(', ')}) — алгаслаа`);
+  if (dupNames.length) {
+    console.log(`\n⚠️  ИЖИЛ НЭРТЭЙ ОЛОН АКАУНТ (нэг хүн байж магадгүй — шалгана уу):`);
+    dupNames.forEach((v) => console.log(`  ${v[0].username}: ` +
+      v.map((p) => `#${p.id} (${p.diamonds}💎${gifted.has(p.id) ? ', өнөөдөр бэлэг авсан' : ''})`).join('  ·  ')));
+  }
 
   if (!APPLY) {
     console.log(`\nDRY RUN. Олгохын тулд: node scripts/gift-diamonds.js --amount ${AMOUNT} --date ${dayMn} --apply`);
