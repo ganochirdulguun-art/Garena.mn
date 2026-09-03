@@ -40,8 +40,37 @@ autoUpdater.on('download-progress', (p) => {
   mainWindow?.webContents.send('update:progress', Math.round(p.percent));
 });
 autoUpdater.on('update-downloaded', (info) => {
+  _downloadedVersion = info.version;
   mainWindow?.webContents.send('update:downloaded', { version: info.version });
+  const w = _downloadWaiters.splice(0); w.forEach((r) => r(info.version));
 });
+
+// ── Ямар ч хоцорсон хувилбараас ШУУД хамгийн сүүлийнх рүү (2026-09-03) ──
+// Асуудал: апп асахдаа тухайн үеийн хамгийн сүүлийнхийг татчихдаг; хэрэглэгч хэдэн цагийн дараа
+// хаахад тэр ТАТАГДСАН хувилбар суудаг тул тэр хооронд шинэ хувилбар гарсан бол 2 удаа шинэчилдэг байв.
+// Засвар: (1) 30 мин тутам дахин шалгана (шинэ гарвал electron-updater дахин татна, сүүлд татагдсан нь суудаг),
+// (2) суулгахын/хаахын өмнө дахин шалгаж, татагдсанаас илүү шинэ байвал түүнийг татаж дуусаад суулгана.
+let _downloadedVersion = null;
+const _downloadWaiters = [];
+function cmpVer(a, b) {
+  const pa = String(a || '0').split('.').map((x) => parseInt(x, 10) || 0);
+  const pb = String(b || '0').split('.').map((x) => parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) { const d = (pa[i] || 0) - (pb[i] || 0); if (d) return d; }
+  return 0;
+}
+// Дахин шалгаад, татагдсанаас шинэ хувилбар байвал татаж дуусахыг хүлээнэ (maxWaitMs хүртэл). Буцаана: суулгахад бэлэн хувилбар.
+async function ensureLatestDownloaded(maxWaitMs) {
+  if (!app.isPackaged) return _downloadedVersion;
+  let latest = null;
+  try { latest = (await autoUpdater.checkForUpdates())?.updateInfo?.version || null; } catch { return _downloadedVersion; }
+  if (!latest || cmpVer(latest, _downloadedVersion) <= 0) return _downloadedVersion;
+  console.log(`[AutoUpdater] татагдсан ${_downloadedVersion} < сүүлийн ${latest} — шинийг татаж байна`);
+  const got = await new Promise((resolve) => {
+    const t = setTimeout(() => resolve(null), maxWaitMs);
+    _downloadWaiters.push((v) => { clearTimeout(t); resolve(v); });
+  });
+  return got || _downloadedVersion;
+}
 autoUpdater.on('error', (err) => {
   console.error('[AutoUpdater]', err.message);
   mainWindow?.webContents.send('update:error', err.message);
@@ -158,6 +187,8 @@ app.whenReady().then(() => {
   // Апп бэлэн болсноос 5 секундийн дараа update шалгах
   if (app.isPackaged) {
     setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+    // 30 мин тутам дахин шалгана — өдөрт олон хувилбар гарахад хэрэглэгч хоцрохгүй
+    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 30 * 60 * 1000).unref?.();
   }
 
   app.on('activate', () => {
@@ -186,6 +217,8 @@ app.on('before-quit', async (e) => {
       }
     }
   } catch {}
+  // Хаахад чимээгүй суулгах шинэчлэлт татагдсан бол: илүү шинэ хувилбар гарсан эсэхийг 8 сек дотор шалгаж татна
+  if (_downloadedVersion) { try { await ensureLatestDownloaded(8000); } catch {} }
   gameRelayService.stopAll();
   replayService.stopWatcher();
   stopPlatformPresence();
@@ -387,7 +420,9 @@ ipcMain.handle('auth:changePassword', async (_, { oldPassword, newPassword }) =>
 });
 
 // Update суулгаж restart хийх
-ipcMain.handle('update:install', () => {
+ipcMain.handle('update:install', async () => {
+  // Суулгахын өмнө дахин шалгана: татагдсанаас шинэ гарсан бол түүнийг татаж (≤2 мин) дараа нь суулгана
+  try { await ensureLatestDownloaded(120000); } catch {}
   _isInstallingUpdate = true; // before-quit cleanup алгасах
   // Цонхыг нуухын тулд UAC dialog харагдана
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
