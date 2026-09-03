@@ -11,6 +11,7 @@ const replayService = require('./src/services/replay');
 const firewallService = require('./src/services/firewall');
 const apiService = require('./src/services/api');
 const gameRelayService = require('./src/services/gameRelay');
+const warkeyService = require('./src/services/warkey');   // шигтгэсэн WarKey (далд процесс + локал API)
 
 const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.railway.app';
 
@@ -147,6 +148,10 @@ app.whenReady().then(() => {
   writePlatformPresence();
   _presenceTimer = setInterval(writePlatformPresence, 5000);
 
+  // Шигтгэсэн WarKey: платформын нэвтрэлтээр далд асна (нэвтэрсэн бол шууд, үгүй бол auth:success дээр)
+  warkeyService.setTokenProvider(() => authService.getToken());
+  if (authService.getToken()) setTimeout(() => warkeyService.start('startup'), 1500);
+
   // MapHack хориотой процессын жагсаалтыг серверээс татаж, 10 мин тутам шинэчилнэ
   refreshMaphackList();
   setInterval(refreshMaphackList, 10 * 60 * 1000).unref?.();
@@ -188,6 +193,7 @@ app.on('before-quit', async (e) => {
   } catch {}
   gameRelayService.stopAll();
   replayService.stopWatcher();
+  warkeyService.stop();   // платформтой хамт унтарна
   stopPlatformPresence();
   app.quit();
 });
@@ -222,6 +228,7 @@ function handleDeepLink(url) {
         // Серверээс бүрэн мэдээлэл (avatar_url г.м.) авах
         fetchAndSaveUser().then(() => {
           mainWindow?.webContents.send('auth:success', authService.getUser());
+          warkeyService.start('login');
         }).catch((e) => console.error('[DeepLink] fetchAndSaveUser', e?.message));
       }
     }
@@ -273,6 +280,7 @@ function startAuthPoll(sessionId, label = 'Auth') {
         authService.saveToken(data.token);
         fetchAndSaveUser().then(() => {
           mainWindow?.webContents.send('auth:success', authService.getUser());
+          warkeyService.start('login');
         });
         console.log(`[${label}] Нэвтэрлээ!`);
       }
@@ -413,6 +421,7 @@ ipcMain.handle('update:check', async () => {
 
 ipcMain.handle('auth:logout', async () => {
   closeFriendsWindow();
+  warkeyService.stop();   // нэвтрэлт дуусахад WarKey ч унтарна
   // User-ийн өрөөг сервер дээр хаах/гарах
   try {
     const myRoom = await apiService.getMyRoom();
@@ -1001,6 +1010,19 @@ ipcMain.handle('wc3:name', () => readWc3LocalName());
 gameRelayService.setBotJoinListener((name) => broadcastToWindows('bot:wc3-join', { name }));
 // Relay сүлжээний чанар (RTT/loss) → renderer → сервер → өрөөнд тоглогч бүрийн ping
 gameRelayService.setLatencyListener((d) => broadcastToWindows('net:latency', d));
+
+// ── Шигтгэсэн WarKey — renderer-ийн "WarKey" таб ↔ локал API (src/services/warkey.js) ──
+ipcMain.handle('warkey:status', () => warkeyService.status());
+ipcMain.handle('warkey:state', () => warkeyService.api('GET', '/state'));
+ipcMain.handle('warkey:setInventory', (_, slot, vk) => warkeyService.api('POST', '/inventory', { slot: Number(slot), vk: Number(vk) || 0 }));
+ipcMain.handle('warkey:setSkill', (_, id, letter) => warkeyService.api('POST', '/skill', { id: String(id || ''), letter: String(letter || '') }));
+ipcMain.handle('warkey:chatAdd', (_, vk, message) => warkeyService.api('POST', '/chat/add', { vk: Number(vk) || 0, message: String(message || '') }));
+ipcMain.handle('warkey:chatRemove', (_, index) => warkeyService.api('POST', '/chat/remove', { index: Number(index) }));
+ipcMain.handle('warkey:chatSetKey', (_, index, vk) => warkeyService.api('POST', '/chat/setkey', { index: Number(index), vk: Number(vk) || 0 }));
+ipcMain.handle('warkey:chatSetMessage', (_, index, message) => warkeyService.api('POST', '/chat/setmessage', { index: Number(index), message: String(message || '') }));
+ipcMain.handle('warkey:overlay', () => warkeyService.api('POST', '/overlay'));
+ipcMain.handle('warkey:restart', () => warkeyService.restart());
+ipcMain.handle('warkey:startElevated', () => warkeyService.startElevated());
 ipcMain.handle('relay:addHostPlayer', (_, ip) => {
   gameRelayService.addHostPlayerIp(ip);
   return true;

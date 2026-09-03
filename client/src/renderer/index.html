@@ -281,6 +281,7 @@
       <button type="button" class="nav-btn maintab" data-tab="settings" data-settings-jump="games"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 4 4v2a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-2a4 4 0 0 1 4-4z"/><path d="M7 12v2M6 13h2M16 12.5h.01M18 14h.01"/></svg><span class="nav-label">Тоглоом</span></button>
       <button type="button" class="nav-btn maintab" data-tab="lobby"><svg class="btn-icon-svg"><use href="#ico-nav-rooms"/></svg><span class="nav-label">Өрөөнүүд</span></button>
       <button type="button" class="nav-btn maintab" data-tab="room"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="nav-label">Өрөө</span></button>
+      <button type="button" class="nav-btn maintab" data-tab="warkey" title="Garena.mn WarKey — тоглоом дотроо skill/item товчоо тааруулна (Ctrl+F6)"><span class="nav-icon nav-icon-text" aria-hidden="true">⌨</span><span class="nav-label">WarKey</span></button>
       <span class="maintabs-spacer"></span>
       <span class="conn">
         <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон">
@@ -521,6 +522,41 @@
     </div>
 
     <!-- Profile tab -->
+    <!-- WarKey tab — шигтгэсэн Garena.mn WarKey (src/renderer/warkey.js) -->
+    <div id="tab-warkey" class="tab">
+      <div class="tab-header section-header">
+        <div class="section-title-group">
+          <h2>⌨ WarKey</h2>
+          <span class="section-subtitle">Тоглоом дотроо skill, item, QuickChat товчоо тааруулна · WC3 дотор <b>Ctrl+F6</b> overlay нээнэ · платформтой хамт асна</span>
+        </div>
+        <div class="ranking-controls">
+          <button type="button" id="wk-overlay" class="btn btn-primary">Overlay нээх (Ctrl+F6)</button>
+          <button type="button" id="wk-restart-top" class="btn btn-secondary" title="WarKey процессыг дахин асаана">↻ Дахин асаах</button>
+        </div>
+      </div>
+      <div id="wk-status" class="wk-status off">⌨ WarKey…</div>
+      <div id="wk-body" class="wk-body hidden">
+        <section class="card wk-card">
+          <h3>Inventory <span class="hint">2×3 — тоглоомын item товчнууд (Num7 Num8 / Num4 Num5 / Num1 Num2)-ыг өөрийн товчоор</span></h3>
+          <div id="wk-inv" class="wk-grid"></div>
+        </section>
+        <section class="card wk-card">
+          <h3>Skills <span class="hint">Тоглолт эхлээд hero сонгоход энд гарна; үсэг бичихэд тоглоом дотор шууд солигдоно</span></h3>
+          <div id="wk-skills" class="wk-list"></div>
+        </section>
+        <section class="card wk-card">
+          <h3>QuickChat <span class="hint">Нэг товч = нэг эсвэл хэд хэдэн мессеж (дарааллаар илгээнэ)</span></h3>
+          <div id="wk-chat" class="wk-list"></div>
+          <div class="wk-chat-add">
+            <button type="button" id="wk-new-key" class="wk-key">Товч</button>
+            <input id="wk-new-msg" class="input" placeholder="Мессеж (жишээ: gg wp)" maxlength="120" />
+            <button type="button" id="wk-new-add" class="btn btn-sm">+ Нэмэх</button>
+          </div>
+        </section>
+        <p class="bank-note">WarKey платформтой хамт асаж, хамт унтарна. Бие даасан WarKey.exe (GarenaSystem тэмцээний түүхтэй хэрэглэгчид GameRanger/PC төвд) хэвээр ажиллана — хоёуланг зэрэг асаахгүй.</p>
+      </div>
+    </div>
+
     <div id="tab-profile" class="tab">
       <div class="tab-header section-header">
         <div class="section-title-group">
@@ -1236,5 +1272,6 @@
 
   <script src="socket.io.min.js"></script>
   <script src="app.js"></script>
+  <script src="warkey.js"></script>
 </body>
 </html>

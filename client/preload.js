@@ -154,4 +154,17 @@ contextBridge.exposeInMainWorld('api', {
   // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
+
+  // Шигтгэсэн WarKey (таб ↔ локал API)
+  warkeyStatus:         ()               => ipcRenderer.invoke('warkey:status'),
+  warkeyState:          ()               => ipcRenderer.invoke('warkey:state'),
+  warkeySetInventory:   (slot, vk)       => ipcRenderer.invoke('warkey:setInventory', slot, vk),
+  warkeySetSkill:       (id, letter)     => ipcRenderer.invoke('warkey:setSkill', id, letter),
+  warkeyChatAdd:        (vk, message)    => ipcRenderer.invoke('warkey:chatAdd', vk, message),
+  warkeyChatRemove:     (index)          => ipcRenderer.invoke('warkey:chatRemove', index),
+  warkeyChatSetKey:     (index, vk)      => ipcRenderer.invoke('warkey:chatSetKey', index, vk),
+  warkeyChatSetMessage: (index, message) => ipcRenderer.invoke('warkey:chatSetMessage', index, message),
+  warkeyOverlay:        ()               => ipcRenderer.invoke('warkey:overlay'),
+  warkeyRestart:        ()               => ipcRenderer.invoke('warkey:restart'),
+  warkeyStartElevated:  ()               => ipcRenderer.invoke('warkey:startElevated'),
 });

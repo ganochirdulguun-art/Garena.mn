@@ -4309,3 +4309,40 @@ body:not(.light) .maintab.active {
   filter: drop-shadow(0 6px 24px rgba(216, 35, 42, 0.3));
 }
 .page > * { position: relative; z-index: 1; }
+
+
+/* ── WarKey таб (шигтгэсэн Garena.mn WarKey) ── */
+.nav-icon-text { font-size: 15px; line-height: 1; margin-right: 6px; }
+.wk-status { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; background: rgba(255,255,255,0.03); }
+.wk-status.live { border-color: rgba(63,191,106,0.5); background: rgba(63,191,106,0.08); }
+.wk-status.locked { border-color: rgba(255,193,7,0.5); background: rgba(255,193,7,0.08); }
+.wk-status.off { border-color: rgba(214,72,80,0.5); background: rgba(214,72,80,0.08); }
+.wk-problem { margin-top: 6px; color: #ffc107; font-size: 12.5px; }
+.wk-body { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
+.wk-body .wk-card:nth-child(3), .wk-body .bank-note { grid-column: 1 / -1; }
+.wk-card h3 { margin: 0 0 10px; font-size: 14px; display: flex; flex-direction: column; gap: 2px; }
+.wk-card h3 .hint { font-weight: 400; font-size: 11.5px; }
+.wk-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; max-width: 260px; }
+.wk-slot { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.03); color: var(--text); cursor: pointer; }
+.wk-slot:hover { border-color: var(--accent); }
+.wk-slot.set { border-color: rgba(63,191,106,0.6); background: rgba(63,191,106,0.08); }
+.wk-slot.capturing { border-color: #ffc107; background: rgba(255,193,7,0.12); }
+.wk-slot-n { font-size: 10px; color: var(--text2); align-self: flex-start; }
+.wk-slot-key { font-weight: 700; font-size: 15px; }
+.wk-slot-to { font-size: 10.5px; color: var(--text2); }
+.wk-list { display: flex; flex-direction: column; gap: 6px; }
+.wk-skill-head, .wk-skill { display: grid; grid-template-columns: 1fr 70px 70px 30px; align-items: center; gap: 8px; }
+.wk-skill-head { font-size: 11px; color: var(--text2); padding: 0 6px; }
+.wk-skill { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+.wk-skill.applied { border-color: rgba(63,191,106,0.5); }
+.wk-skill.applying { border-color: rgba(255,193,7,0.5); }
+.wk-skill-name { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wk-skill-def { color: var(--text2); text-align: center; }
+.wk-letter { width: 60px; text-align: center; text-transform: uppercase; font-weight: 700; padding: 4px 6px; }
+.wk-chat-row { display: grid; grid-template-columns: 90px 1fr 34px; gap: 8px; align-items: center; }
+.wk-chat-add { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: center; margin-top: 10px; }
+.wk-key { padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-weight: 700; cursor: pointer; }
+.wk-key:hover { border-color: var(--accent); }
+.wk-key.capturing { border-color: #ffc107; background: rgba(255,193,7,0.12); }
+.wk-hint { color: var(--text2); font-size: 12.5px; padding: 8px 4px; }
+@media (max-width: 1000px) { .wk-body { grid-template-columns: 1fr; } }

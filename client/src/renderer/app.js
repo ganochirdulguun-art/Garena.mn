@@ -507,6 +507,7 @@ function showTab(name) {
   if (name === 'settings') loadSettings();
   if (name === 'discord')  loadDiscordServers();
   if (name === 'streamers') loadStreamers();
+  if (name === 'warkey') window.warkeyTab?.activate(); else window.warkeyTab?.deactivate();
   if (name === 'chat') {
     chatUnreadCount = 0;
     updateChatBadge();
