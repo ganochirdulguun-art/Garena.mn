@@ -1,6 +1,6 @@
 {
   "name": "garena-mn-client",
-  "version": "2.8.3",
+  "version": "2.8.4",
   "description": "Garena.mn Desktop App",
   "author": "ganochirdulguun-art",
   "main": "main.js",
@@ -45,7 +45,10 @@
       "**/*",
       "!dist/**",
       "!node_modules/.cache",
-      "!resources/ZeroTierOne.msi"
+      "!resources/ZeroTierOne.msi",
+      "!**/*.log",
+      "!build-*.log",
+      "!**/*.tmp"
     ],
     "publish": {
       "provider": "github",
