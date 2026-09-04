@@ -29,6 +29,15 @@ const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
 const app = express();
+
+// Хамгаалалтын тор (2026-09-04 аудит): async route handler дотор барьж аваагүй exception → Express 4 барьдаггүй →
+// unhandled rejection → Node 15+ процессийг унагадаг. Лог хийгээд амьд үлдэнэ (бүх хэрэглэгчийн холболт тасрахаас сэргийлнэ).
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason && reason.stack ? reason.stack : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err && err.stack ? err.stack : err);
+});
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
@@ -90,6 +99,7 @@ app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олг�
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
 app.use('/anticheat', require('./routes/anticheat'));
+app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
 app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэрийн эффект
 app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP / шилжүүлэг / худалдан авалт
@@ -853,6 +863,12 @@ async function start(port = PORT) {
   refreshTierCache();                                   // Tier кэш анхны ачаалалт
   setInterval(refreshTierCache, 5 * 60 * 1000).unref?.(); // 5 мин тутам шинэчлэх
   return new Promise((resolve) => {
+    // Route-уудын дараа: алдааг 500 JSON болгоно (default HTML stack trace-ийн оронд)
+    app.use((err, req, res, _next) => {
+      console.error('[express]', req.method, req.originalUrl, err && err.message);
+      if (res.headersSent) return;
+      res.status(err && err.status ? err.status : 500).json({ error: 'server error' });
+    });
     server.listen(port, () => {
       console.log(`Server http://localhost:${port} дээр ажиллаж байна`);
       resolve(server);

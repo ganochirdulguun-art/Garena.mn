@@ -1,5 +1,6 @@
 const express = require('express');
-const welcome = require('../services/welcome');   // шинэ хэрэглэгчийн урамшуулал (+350 💎 + DM)
+const welcome = require('../services/welcome');       // шинэ хэрэглэгчийн урамшуулал (+350 💎 + DM)
+const botNotify = require('../services/botNotify');   // GarenaSystem руу Discord role дохио
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -285,6 +286,8 @@ router.get('/discord/callback', async (req, res) => {
         }
 
         jwtToken = makeJWT(userRow);
+        // GarenaSystem: "Garena хэрэглэгч" Discord role-ийг шууд олгуулна (шинэ, холбосон, нэвтэрсэн — бүгдэд, идемпотент)
+        botNotify.notifyDiscordUser(discordId, discordName, linkUserId ? 'link' : 'login');
       } catch (e) {
         console.error(e);
       }

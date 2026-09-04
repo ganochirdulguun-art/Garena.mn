@@ -94,10 +94,12 @@ router.post('/report', authMW, async (req, res) => {
 // Хамгаалалт: x-api-key === TIERBOT_API_KEY (бот↔платформын хамтын нууц; бот талд RANKING_API_KEY).
 const crypto = require('crypto');
 function botKeyOk(req) {
-  const want = String(process.env.TIERBOT_API_KEY || '');
-  const got = String(req.headers['x-api-key'] || '');
-  if (!want || !got || want.length !== got.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want));
+  // Байтын уртаар харьцуулна (JS string length ≠ UTF-8 byte length → timingSafeEqual RangeError шидэж,
+  // async handler дотор unhandled rejection болж процесс унах эрсдэлтэй байсан — 2026-09-04 аудит)
+  const want = Buffer.from(String(process.env.TIERBOT_API_KEY || ''), 'utf8');
+  const got = Buffer.from(String(req.headers['x-api-key'] || ''), 'utf8');
+  if (!want.length || !got.length || want.length !== got.length) return false;
+  try { return crypto.timingSafeEqual(got, want); } catch { return false; }
 }
 
 const LIST_SQL = `SELECT u.id, u.username, u.discord_id, u.wc3_name, COALESCE(u.maphack_warnings, 0) AS maphack_warnings,
