@@ -25,6 +25,7 @@ const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
 const lanHostRoutes       = require('./routes/lanhost');
 const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)
+const geo                 = require('./services/geo');        // холболтын IP → улс (офлайн; ping тэмдгийн "хол зай")
 const { setIO } = roomRoutes;
 const { runMigrations } = require('./db/migrate');
 
@@ -367,7 +368,11 @@ async function ensureSocketRoomState(socket, roomId) {
 }
 
 io.on('connection', (socket) => {
-  console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})`);
+  // Улс: холбогдох үед НЭГ удаа офлайн GeoIP-ээр (микросекунд) — ping тэмдэгт "хол зай (улс)" харуулахад
+  try {
+    socket.data.geo = geo.geoInfo(geo.clientIp(socket.handshake.headers, socket.handshake.address));
+  } catch { socket.data.geo = {}; }
+  console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}`);
 
   // Лоббид бүртгүүлэх (апп нээгдэхэд дуудагдана)
   // JWT-ийн мэдээллийг ашиглана — client-ийн утгыг хэрэглэхгүй
@@ -599,11 +604,15 @@ io.on('connection', (socket) => {
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
+    const g = socket.data.geo || {};   // холбогдох үед нэг удаа тодорхойлсон (services/geo.js) — тоглоомын замд нөлөөгүй
     io.to(String(roomId)).emit('net:quality', {
       userId: String(socket.user.id),
       rtt: (rtt == null ? null : Math.max(0, Math.min(9999, Number(rtt) || 0))),
       avg: (avg == null ? null : Math.max(0, Math.min(9999, Number(avg) || 0))),
       loss: Math.max(0, Math.min(100, Number(loss) || 0)),
+      country: g.country || null,
+      country_name: g.country_name || '',
+      far: !!g.far,   // Монголоос гадуур → клиент шар "хол зай (улс)" тэмдэг харуулна
     });
   });
 

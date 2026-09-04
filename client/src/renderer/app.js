@@ -384,7 +384,7 @@ async function connectSocket() {
   socket.on('private:sent',    (msg) => handleSentDM(msg));
 
   // Тоглогч бүрийн relay сүлжээний чанар (ping/loss) — өрөөнд харуулна
-  socket.on('net:quality', ({ userId, rtt, avg, loss }) => applyNetQuality(userId, { rtt, avg, loss }));
+  socket.on('net:quality', ({ userId, rtt, avg, loss, country, country_name, far }) => applyNetQuality(userId, { rtt, avg, loss, country, country_name, far: !!far }));
 
   // Өрөөний эзэн өрөөг хаасан
   socket.on('room:closed', ({ reason }) => {
@@ -1081,6 +1081,11 @@ function pingBadge(mid) {
   if (!q) return `<span class="rp-ping" data-ping-user="${mid}"></span>`;
   if (q.rtt == null || q.loss >= 20) {
     return `<span class="rp-ping bad" data-ping-user="${mid}" title="Пакет алдагдал/тасалдал ${q.loss}%">⚠ ${q.loss}%</span>`;
+  }
+  // Гадаадаас (Монголоос гадуур) холбогдсон тоглогч: өндөр ping нь зайн асуудал — шар өнгө + "хол зай (улс)"
+  if (q.far) {
+    const c = escHtml(q.country_name || q.country || '');
+    return `<span class="rp-ping far" data-ping-user="${mid}" title="Хол зай — ${c}-аас тоглож байна. Олон улсын сүлжээний зай (~${q.rtt}мс): платформ, relay-ийн саатал биш">${q.rtt}ms (${c})</span>`;
   }
   // Платформын baseline ~6мс (DATACOM UB relay). Ногоон = үнэхээр хурдан.
   const cls = q.rtt < 25 ? 'good' : q.rtt < 70 ? 'ok' : 'bad';

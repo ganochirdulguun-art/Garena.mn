@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "node tests/server.test.js && node tests/lanhost.test.js && node tests/relaystats.test.js && node tests/anticheat.test.js && node tests/welcome.test.js && node tests/integration.test.js",
+    "test": "node tests/server.test.js && node tests/lanhost.test.js && node tests/relaystats.test.js && node tests/anticheat.test.js && node tests/welcome.test.js && node tests/integration.test.js && node tests/geo.test.js",
     "test:lan": "node tests/lanhost.test.js"
   },
   "dependencies": {
@@ -16,6 +16,7 @@
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.4.0",
+    "geoip-country": "^5.0.202609020121",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3",
     "socket.io": "^4.7.2"

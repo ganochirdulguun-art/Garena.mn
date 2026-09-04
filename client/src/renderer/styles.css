@@ -1333,6 +1333,7 @@ body.light .room-grid-row {
 .rp-ping.good { color: #54c77b; }
 .rp-ping.ok   { color: #f0ba57; }
 .rp-ping.bad  { color: #ff6b63; }
+.rp-ping.far  { color: #f0ba57; }   /* гадаадаас — хол зай (улс), платформын саатал биш */
 
 /* ── MapHack анхааруулгын overlay ── */
 .maphack-overlay {
