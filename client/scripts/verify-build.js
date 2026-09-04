@@ -79,7 +79,12 @@ function checkAsar(asarPath) {
     // 3) root-д лог/түр файл багцлагдсан уу (build.files хасалт ажиллаагүй)
     for (const name of Object.keys(ctx.header.files || {}))
       if (/\.(log|tmp)$/i.test(name)) problems.push('asar root-д ' + name + ' орсон — билдийн лог хавтас дотор бичигдсэн');
-    // 4) бүх файлын offset+size asar-ын хэмжээнээс хэтрэхгүй
+    // 4) app-update.yml asar-ын хажууд байх ёстой — үгүй бол electron-updater ENOENT → авто-шинэчлэл ажиллахгүй
+    //    (2026-09-05 Repair билд publish блокгүй байсан тул алга болсон)
+    const upd = path.join(path.dirname(asarPath), 'app-update.yml');
+    if (!fs.existsSync(upd)) problems.push('resources/app-update.yml алга — билдийн config-д publish блок дутуу (авто-шинэчлэл ажиллахгүй)');
+    else if (!/provider:\s*github/.test(fs.readFileSync(upd, 'utf8'))) problems.push('app-update.yml-д provider: github алга');
+    // 5) бүх файлын offset+size asar-ын хэмжээнээс хэтрэхгүй
     (function walk(node, prefix) {
       for (const [n, e] of Object.entries(node.files || {})) {
         if (e.files) walk(e, prefix + n + '/');
