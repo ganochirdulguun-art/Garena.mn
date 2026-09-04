@@ -5387,7 +5387,7 @@ init();
   });
 
   // ─── Гүйлгээний түүх ───
-  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт' };
+  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт', ranked_win: 'Ranked хожил', welcome: 'Шинэ хэрэглэгчийн урамшуулал' };
   async function openHistory() {
     const m = el('diamond-history-modal');
     if (!m) return;

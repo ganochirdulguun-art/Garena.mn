@@ -1,4 +1,5 @@
 const express = require('express');
+const welcome = require('../services/welcome');   // шинэ хэрэглэгчийн урамшуулал (+350 💎 + DM)
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
@@ -107,6 +108,7 @@ router.post('/register', async (req, res) => {
         'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
         [username, email, hash]
       );
+      welcome.grantWelcomeSafe(result.rows[0].id, { username });   // шинэ хэрэглэгчийн урамшуулал (+💎, DM)
       return res.status(201).json({ token: makeJWT(result.rows[0]), user: result.rows[0] });
     } catch (e) {
       console.error(e);
@@ -274,10 +276,12 @@ router.get('/discord/callback', async (req, res) => {
             `INSERT INTO users (discord_id, username, discord_username, avatar_url)
              VALUES ($1, $2, $2, $3)
              ON CONFLICT (discord_id) DO UPDATE SET username = $2, discord_username = $2, avatar_url = $3
-             RETURNING *`,
+             RETURNING *, (xmax = 0) AS is_new`,
             [discordId, discordName, avatarUrl]
           );
           userRow = result.rows[0];
+          if (userRow && userRow.is_new) welcome.grantWelcomeSafe(userRow.id, { username: discordName });   // анх удаа бүртгүүлсэн
+          if (userRow) delete userRow.is_new;
         }
 
         jwtToken = makeJWT(userRow);

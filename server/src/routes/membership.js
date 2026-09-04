@@ -635,4 +635,5 @@ async function qpayWebhook(req, res) {
 module.exports = {
   router, diamondsRouter, adminRouter, qpayWebhook, setIO,
   tierOf, perksOf, effectiveTier, publicFx, TIERS, NAME_EFFECTS, DIAMOND_PACKS, TRANSFER,
+  addDiamonds, withTx, notifyUser,   // services/welcome.js (шинэ хэрэглэгчийн урамшуулал) дахин ашиглана
 };
