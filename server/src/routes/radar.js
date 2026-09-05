@@ -50,7 +50,9 @@ function sanitizeRadar(b) {
     game_time_sec: Math.max(0, Number(b.game_time_sec) | 0),
     winner_team: [1, 2].includes(Number(b.winner_team)) ? Number(b.winner_team) : null,
     map_name: b.map_name ? String(b.map_name).slice(0, 120) : null,
-    played_at: b.ended_at && !Number.isNaN(Date.parse(b.ended_at)) ? new Date(b.ended_at) : new Date(),
+    // ended_at: ISO мөр ЭСВЭЛ Unix ms тоо (relay meta.endedAt тоо байдаг) — аль нь ч биш бол одоо
+    played_at: (typeof b.ended_at === 'number' && b.ended_at > 1e12) ? new Date(b.ended_at)
+      : (b.ended_at && !Number.isNaN(Date.parse(b.ended_at)) ? new Date(b.ended_at) : new Date()),
   };
 }
 

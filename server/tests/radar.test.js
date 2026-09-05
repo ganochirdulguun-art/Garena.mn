@@ -21,6 +21,10 @@ ok('sanitizeRadar: token цэвэрлэнэ, paths бүхэл тоо болно,
   assert.strictEqual(s.players[1].name, null); assert.strictEqual(s.players[0].hero_orders, 3083);
   assert.strictEqual(s.played_at.toISOString(), '2026-09-05T06:29:00.000Z');
 });
+ok('sanitizeRadar: ended_at Unix ms тоо → played_at зөв огноо', () => {
+  const s = sanitizeRadar({ game_token: 'ab', ended_at: 1788631163260 });
+  assert.strictEqual(s.played_at.toISOString(), new Date(1788631163260).toISOString());
+});
 ok('sanitizeRadar: token дутуу бол алдаа; winner буруу бол null', () => {
   assert.throws(() => sanitizeRadar({ players: [] }), /game_token/);
   assert.strictEqual(sanitizeRadar({ game_token: 'ff', winner_team: 5 }).winner_team, null);
