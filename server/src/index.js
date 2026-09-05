@@ -370,10 +370,14 @@ async function ensureSocketRoomState(socket, roomId) {
 
 io.on('connection', (socket) => {
   // Улс: холбогдох үед НЭГ удаа офлайн GeoIP-ээр (микросекунд) — ping тэмдэгт "хол зай (улс)" харуулахад
+  let clientIp = '';
   try {
-    socket.data.geo = geo.geoInfo(geo.clientIp(socket.handshake.headers, socket.handshake.address));
+    clientIp = geo.clientIp(socket.handshake.headers, socket.handshake.address);
+    socket.data.geo = geo.geoInfo(clientIp);
   } catch { socket.data.geo = {}; }
-  console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}`);
+  // IP-г логд бичнэ (2026-09-05): гацалт оношлоход тоглогч → IP → relay-ийн TCP RTT (ss -tni) холбоход зайлшгүй;
+  // Railway edge лог socket sid агуулдаггүй тул өөр аргаар холбох боломжгүй байсан.
+  console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}${clientIp ? ' ip=' + clientIp : ''}`);
 
   // Лоббид бүртгүүлэх (апп нээгдэхэд дуудагдана)
   // JWT-ийн мэдээллийг ашиглана — client-ийн утгыг хэрэглэхгүй
@@ -606,7 +610,11 @@ io.on('connection', (socket) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
     const g = socket.data.geo || {};   // холбогдох үед нэг удаа тодорхойлсон (services/geo.js) — тоглоомын замд нөлөөгүй
-    io.to(String(roomId)).emit('net:quality', {
+    // 2026-09-05: өмнө нь io.to(roomId) — зөвхөн өрөөний гишүүд хардаг байсан тул эзэн/бусад хүн өрөөг
+    // гаднаас нь харахад ping огт гарахгүй байв. Бүх клиентэд явуулна (8с тутам нэг жижиг event/тоглогч —
+    // ачаалал үл мэдэгдэх; клиент зөвхөн дэлгэцэн дээрх тэмдгийг солино). roomId-г хамт өгнө.
+    io.emit('net:quality', {
+      roomId: String(roomId),
       userId: String(socket.user.id),
       rtt: (rtt == null ? null : Math.max(0, Math.min(9999, Number(rtt) || 0))),
       avg: (avg == null ? null : Math.max(0, Math.min(9999, Number(avg) || 0))),
