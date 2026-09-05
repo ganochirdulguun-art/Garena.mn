@@ -102,6 +102,9 @@ app.use('/warkey', warkeyRoutes);
 app.use('/anticheat', require('./routes/anticheat'));
 app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
+const radarRoutes = require('./routes/radar');           // 📡 Радар: relay capture → hero хөдөлгөөн/kill (replay); саатал: зөвхөн эзэн 0с, бусад 120с (live — Шат 2)
+app.use('/relay', radarRoutes.relayRouter);              // POST /relay/radar (x-relay-key)
+app.use('/radar', radarRoutes.router);                   // GET /radar/games, /radar/:token (нэвтэрсэн)
 app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэрийн эффект
 app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP / шилжүүлэг / худалдан авалт
 app.post('/qpay/webhook', membershipRoutes.qpayWebhook); // QPay dashboard → payment.paid

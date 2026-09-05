@@ -523,6 +523,7 @@ function showTab(name) {
   if (name === 'discord')  loadDiscordServers();
   if (name === 'streamers') loadStreamers();
   if (name === 'warkey' || name === 'ranked') window.infoTabs?.wire();
+  if (name === 'radar')    window.radarTab?.load();   // 📡 Радар — дууссан тоглолтын жагсаалт (radar.js)
   if (name === 'chat') {
     chatUnreadCount = 0;
     updateChatBadge();

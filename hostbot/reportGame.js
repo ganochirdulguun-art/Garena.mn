@@ -47,6 +47,25 @@ function buildPayload(file) {
   };
 }
 
+// 📡 Радар (2026-09-06): ижил capture-аас hero-гийн хөдөлгөөн/kill гаргаж POST /relay/radar — тоглоомын дүнгээс тусдаа
+function buildRadarPayload(file, gameToken) {
+  const { extractRadar } = require('./radarExtract');
+  let meta = {};
+  try { meta = JSON.parse(fs.readFileSync(file + '.meta.json', 'utf8')); } catch {}
+  const r = extractRadar(fs.readFileSync(file));
+  const primaryName = (meta.joiners && meta.primarySid != null) ? meta.joiners[String(meta.primarySid)] || null : null;
+  for (const p of r.players) if (!p.name && primaryName && p.pid !== 1) p.name = primaryName;   // joiner-ийн нэр capture-д байхгүй → meta
+  return { game_token: gameToken, map_name: meta.map || 'DotA v6.74c LoD v5e', ended_at: meta.endedAt || null, winner_team: null, ...r };
+}
+
+async function postRadar(payload) {
+  const url = `${URL_BASE}/relay/radar`;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json', 'x-relay-key': KEY }, body: JSON.stringify(payload) });
+    return { status: res.status, text: await res.text() };
+  } catch (e) { return { status: 0, text: e.message }; }
+}
+
 async function post(payload) {
   const url = `${URL_BASE}/relay/game-stats`;
   const delays = [0, 5000, 20000];
@@ -69,10 +88,24 @@ async function post(payload) {
   if (!file) { console.error('Хэрэглээ: node reportGame.js <capture.w3gs> [--dry]'); process.exit(2); }
   const logf = file + '.report.log';
   const log = (m) => { const line = `${new Date().toISOString()} ${m}`; console.log(line); try { fs.appendFileSync(logf, line + '\n'); } catch {} };
+  const radarOnly = process.argv.includes('--radar-only');   // хуучин capture-уудыг радарт нөхөн оруулах (backfill)
   let payload;
   try { payload = buildPayload(file); } catch (e) { log('задлал алдаа: ' + e.message); process.exit(1); }
-  log(`задлав: ${payload.players.length} тоглогч, winner=${payload.winner}, ${payload.game_time_sec}с, lag=${JSON.stringify(payload.lag)}`);
-  if (dry || !URL_BASE) { console.log(JSON.stringify(payload, null, 2)); return; }
-  const r = await post(payload);
-  log(`POST ${URL_BASE}/relay/game-stats → ${r ? r.status : '?'} ${r ? String(r.text).slice(0, 300) : ''}`);
+  if (!radarOnly) {
+    log(`задлав: ${payload.players.length} тоглогч, winner=${payload.winner}, ${payload.game_time_sec}с, lag=${JSON.stringify(payload.lag)}`);
+    if (dry || !URL_BASE) { console.log(JSON.stringify(payload, null, 2)); }
+    else {
+      const r = await post(payload);
+      log(`POST ${URL_BASE}/relay/game-stats → ${r ? r.status : '?'} ${r ? String(r.text).slice(0, 300) : ''}`);
+    }
+  }
+  // 📡 Радар — дүнгээс хамааралгүй, алдаа гарвал зөвхөн логлоно (тоглоомын дүн бүртгэлд нөлөөлөхгүй)
+  try {
+    const rp = buildRadarPayload(file, payload.game_token);
+    rp.winner_team = payload.winner_team;
+    const pts = Object.values(rp.paths).reduce((n, a) => n + a.length, 0);
+    if (dry || !URL_BASE) { log(`радар (dry): ${rp.players.length} тоглогч, ${pts} цэг, ${rp.kills.length} kill`); return; }
+    const rr = await postRadar(rp);
+    log(`POST ${URL_BASE}/relay/radar (${pts} цэг, ${rp.kills.length} kill) → ${rr.status} ${String(rr.text).slice(0, 200)}`);
+  } catch (e) { log('радар алдаа: ' + e.message); }
 })();

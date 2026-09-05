@@ -184,6 +184,26 @@ async function runMigrations(db) {
     );
     CREATE INDEX IF NOT EXISTS idx_maphack_events_user ON maphack_events(user_id, created_at DESC);
   `);
+  // 📡 Радар (2026-09-06): relay capture-аас hero-гийн хөдөлгөөн (тушаалын зорилтууд), kill/death, hero код —
+  // тоглолт дуусахад reportGame.js POST /relay/radar → энд хадгалж, апп/вэб "Replay радар" үзүүлнэ.
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS radar_games (
+      token          VARCHAR(64) PRIMARY KEY,
+      room_id        INTEGER,
+      room_name      VARCHAR(120),
+      host_name      VARCHAR(64),
+      game_time_sec  INTEGER,
+      winner_team    SMALLINT,
+      players        JSONB NOT NULL DEFAULT '[]',
+      kills          JSONB NOT NULL DEFAULT '[]',
+      events         JSONB NOT NULL DEFAULT '[]',
+      paths          JSONB NOT NULL DEFAULT '{}',
+      map_name       VARCHAR(120),
+      played_at      TIMESTAMP DEFAULT NOW(),
+      created_at     TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_radar_games_played ON radar_games(played_at DESC);
+  `);
 }
 
 module.exports = { runMigrations };
