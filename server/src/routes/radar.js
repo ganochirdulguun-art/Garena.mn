@@ -72,6 +72,8 @@ relayRouter.post('/radar', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'db' });
   let s;
   try { s = sanitizeRadar(req.body || {}); } catch (e) { return res.status(400).json({ error: e.message }); }
+  // Хоосон/туршилтын capture (тоглогч < 2 эсвэл < 60 с) — жагсаалтыг бохирдуулахгүй
+  if (s.players.length < 2 || s.game_time_sec < 60) return res.status(202).json({ ok: false, reason: 'too-small', players: s.players.length, sec: s.game_time_sec });
   let roomId = null, roomName = null, hostName = null;
   try {
     const game = await lanhost.findGameByToken(s.token);
@@ -83,13 +85,16 @@ relayRouter.post('/radar', async (req, res) => {
     }
   } catch (e) { console.warn('[Radar] lookup:', e.message); }
   if (!hostName) hostName = (s.players.find((p) => p.pid === 1) || {}).name || null;
+  // Өрөө тоглолтын дараа устдаг тул нэр нь ихэвчлэн байхгүй → хостын нэрээр нэрлэнэ (клиент "Өрөө #?" гэж харуулахгүй)
+  if (!roomName) roomName = hostName ? `${hostName}-ын тоглолт` : null;
   try {
     await db.query(
       `INSERT INTO radar_games (token, room_id, room_name, host_name, game_time_sec, winner_team, players, kills, events, paths, map_name, played_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (token) DO UPDATE SET players = EXCLUDED.players, kills = EXCLUDED.kills, events = EXCLUDED.events, paths = EXCLUDED.paths,
          game_time_sec = EXCLUDED.game_time_sec, winner_team = EXCLUDED.winner_team, room_id = COALESCE(EXCLUDED.room_id, radar_games.room_id),
-         room_name = COALESCE(EXCLUDED.room_name, radar_games.room_name), host_name = COALESCE(EXCLUDED.host_name, radar_games.host_name)`,
+         room_name = COALESCE(EXCLUDED.room_name, radar_games.room_name), host_name = COALESCE(EXCLUDED.host_name, radar_games.host_name),
+         played_at = EXCLUDED.played_at, map_name = COALESCE(EXCLUDED.map_name, radar_games.map_name)`,
       [s.token, roomId, roomName, hostName, s.game_time_sec, s.winner_team, JSON.stringify(s.players), JSON.stringify(s.kills),
        JSON.stringify(s.events), JSON.stringify(s.paths), s.map_name, s.played_at],
     );

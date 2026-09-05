@@ -203,6 +203,8 @@ async function runMigrations(db) {
       created_at     TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_radar_games_played ON radar_games(played_at DESC);
+    -- Хоосон/туршилтын capture (< 2 тоглогч эсвэл < 60 с) жагсаалтыг бохирдуулахгүй — эхлэх бүрд цэвэрлэнэ
+    DELETE FROM radar_games WHERE game_time_sec < 60 OR jsonb_array_length(players) < 2;
   `);
 }
 

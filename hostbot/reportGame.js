@@ -55,7 +55,10 @@ function buildRadarPayload(file, gameToken) {
   const r = extractRadar(fs.readFileSync(file));
   const primaryName = (meta.joiners && meta.primarySid != null) ? meta.joiners[String(meta.primarySid)] || null : null;
   for (const p of r.players) if (!p.name && primaryName && p.pid !== 1) p.name = primaryName;   // joiner-ийн нэр capture-д байхгүй → meta
-  return { game_token: gameToken, map_name: meta.map || 'DotA v6.74c LoD v5e', ended_at: meta.endedAt || null, winner_team: null, ...r };
+  // Дууссан цаг: meta.endedAt, үгүй бол capture файлын mtime (backfill-д хуучин тоглолтын огноо зөв гарна)
+  let endedAt = meta.endedAt || null;
+  if (!endedAt) { try { endedAt = fs.statSync(file).mtime.toISOString(); } catch {} }
+  return { game_token: gameToken, map_name: meta.map || 'DotA v6.74c LoD v5e', ended_at: endedAt, winner_team: null, ...r };
 }
 
 async function postRadar(payload) {
