@@ -379,6 +379,49 @@ router.delete('/:id', strictAuth, async (req, res) => {
   return res.json({ message: 'Room closed' });
 });
 
+// ── Хост шилжүүлэх (GameRanger маяг, 2026-09-06): хост өрөөнийхөө гишүүнд хост эрхээ өгнө — өрөө хаагдахгүй,
+//    хүмүүс дахин орох шаардлагагүй. Зөвхөн тоглолт явахгүй үед (status='waiting'). room:host_changed → өрөөнд.
+router.post('/:id/transfer-host/:targetId', strictAuth, async (req, res) => {
+  const { id, targetId } = req.params;
+  const userId = req.user.id;
+  if (String(targetId) === String(userId)) return res.status(400).json({ error: 'Өөртөө шилжүүлэх боломжгүй' });
+
+  if (await dbOk()) {
+    try {
+      const r = await db.query('SELECT host_id, status FROM rooms WHERE id = $1', [id]);
+      if (!r.rows[0]) return res.status(404).json({ error: 'Room not found' });
+      if (String(r.rows[0].host_id) !== String(userId)) return res.status(403).json({ error: 'Зөвхөн хост шилжүүлнэ' });
+      if (r.rows[0].status === 'playing') return res.status(409).json({ error: 'Тоглолт явж байхад хост шилжүүлэх боломжгүй — тоглолт дуусахыг хүлээнэ үү' });
+      const m = await db.query('SELECT 1 FROM room_players WHERE room_id = $1 AND user_id = $2', [id, targetId]);
+      if (!m.rows[0]) return res.status(400).json({ error: 'Тухайн хүн өрөөнд байхгүй' });
+      const u = await db.query('SELECT id, username FROM users WHERE id = $1', [targetId]);
+      if (!u.rows[0]) return res.status(404).json({ error: 'User not found' });
+      await db.query('UPDATE rooms SET host_id = $1 WHERE id = $2', [targetId, id]);
+      const payload = { roomId: String(id), host_id: String(targetId), host_name: u.rows[0].username,
+                        by: String(userId), by_name: req.user.username || '' };
+      if (_io) _io.to(String(id)).emit('room:host_changed', payload);
+      emitRoomsUpdated();
+      console.log(`[Room] хост шилжлээ: өрөө ${id} ${req.user.username || userId} → ${u.rows[0].username}`);
+      return res.json({ ok: true, ...payload });
+    } catch (e) {
+      console.error(e);
+      return res.status(500).json({ error: 'Server error' });
+    }
+  }
+
+  if (!allowInMemoryFallback) return requireOperationalDb(res);
+  const room = memRooms.get(id);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  if (String(room.host_id) !== String(userId)) return res.status(403).json({ error: 'Зөвхөн хост шилжүүлнэ' });
+  if (!room.players.has(String(targetId)) && !room.players.has(Number(targetId))) return res.status(400).json({ error: 'Тухайн хүн өрөөнд байхгүй' });
+  room.host_id = targetId;
+  room.host_name = room.players.get(String(targetId)) || room.players.get(Number(targetId)) || room.host_name;
+  const payload = { roomId: String(id), host_id: String(targetId), host_name: room.host_name, by: String(userId), by_name: req.user.username || '' };
+  if (_io) _io.to(String(id)).emit('room:host_changed', payload);
+  emitRoomsUpdated();
+  return res.json({ ok: true, ...payload });
+});
+
 router.post('/:id/kick/:targetId', strictAuth, async (req, res) => {
   const { id, targetId } = req.params;
   const userId = req.user.id;

@@ -400,6 +400,21 @@ async function connectSocket() {
   });
 
   // Kick хийгдсэн
+  // 👑 Хост шилжлээ (сервер: POST /rooms/:id/transfer-host/:targetId) — өрөө хаагдахгүй, ролиуд солигдоно
+  socket.on('room:host_changed', ({ roomId, host_id, host_name, by_name } = {}) => {
+    if (!currentRoom || String(currentRoom.id) !== String(roomId)) return;
+    currentRoom.hostId = String(host_id);
+    currentRoom.isHost = String(host_id) === String(currentUser?.id);
+    if (roomsCache[currentRoom.id]) roomsCache[currentRoom.id].host_id = String(host_id);
+    applyHostRoleUi();
+    if (currentRoom.isHost) {
+      appendSysMsg(`👑 Та энэ өрөөний хост боллоо${by_name ? ` (${by_name} шилжүүлэв)` : ''}. "LAN тоглоом нээх" товч танд гарлаа.`);
+      showToast('Та хост боллоо — WC3 тоглоомоо нээж болно', 'success');
+    } else {
+      appendSysMsg(`👑 Хост шилжлээ: ${host_name}`);
+    }
+  });
+
   socket.on('room:kicked', ({ userId }) => {
     if (!currentUser || String(userId) !== String(currentUser.id)) return;
     appendSysMsg('⚠️ Та өрөөнөөс гаргагдлаа!');
@@ -1812,17 +1827,24 @@ function renderMembers(members) {
     const kickBtn = (isHost && !isMe)
       ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${safeId}" data-name="${safeName}">Kick</button>`
       : '';
+    // 👑 Хост шилжүүлэх (GameRanger маяг) — өрөөгөө хаалгүй хостоо солино (2026-09-06)
+    const hostBtn = (isHost && !isMe && id)
+      ? `<button class="btn btn-sm btn-secondary transfer-host-btn" data-id="${safeId}" data-name="${safeName}" title="Хост эрхээ энэ хүнд шилжүүлэх">👑 Хост</button>`
+      : '';
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
         <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''} ${id ? pingBadge(String(id)) : ''}</div>
       </div>
-      ${kickBtn}
+      ${hostBtn}${kickBtn}
     </li>`;
   }).join('');
 
   ul.querySelectorAll('.kick-btn').forEach(btn => {
     btn.onclick = (e) => { e.stopPropagation(); kickPlayer(btn.dataset.id, btn.dataset.name); };
+  });
+  ul.querySelectorAll('.transfer-host-btn').forEach(btn => {
+    btn.onclick = (e) => { e.stopPropagation(); transferHost(btn.dataset.id, btn.dataset.name); };
   });
   ul.querySelectorAll('.clickable-name').forEach(el => {
     el.addEventListener('click', () => openUserProfile(el.dataset.userId));
@@ -1885,6 +1907,54 @@ function renderInviteFriendsList() {
       showToast(`${btn.dataset.name}-д урилга илгээлээ`, 'success', 3000);
     };
   });
+}
+
+// ── 👑 Хост шилжүүлэх (GameRanger маяг, 2026-09-06) ──
+// Хост өрөөгөө хаалгүйгээр хост эрхээ гишүүндээ өгнө. Сервер room:host_changed → өрөөнийхөнд;
+// хүлээн авсан бүр currentRoom.isHost/hostId-гаа шинэчилж хостын UI-гаа дахин тааруулна.
+async function transferHost(targetId, targetName) {
+  if (!currentRoom || !targetId) return;
+  if (!await showConfirm('Хост шилжүүлэх', `Хост эрхээ ${targetName}-д шилжүүлэх үү? Өрөө хаагдахгүй, та энгийн тоглогч болно.`)) return;
+  try {
+    await window.api.request('post', `/rooms/${currentRoom.id}/transfer-host/${targetId}`);
+  } catch (err) {
+    const msg = String(err?.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    appendSysMsg(`⚠️ Хост шилжүүлж чадсангүй: ${msg}`);
+    showToast(`Хост шилжүүлж чадсангүй: ${msg}`, 'error');
+  }
+}
+
+// Хост эрх солигдоход хостын UI-г дахин тааруулна (_enterRoomUI-ийн хост хэсэгтэй ижил дүрэм)
+function applyHostRoleUi() {
+  if (!currentRoom) return;
+  const isHost = !!currentRoom.isHost;
+  const closeBtn = document.getElementById('btn-close-room'); if (closeBtn) closeBtn.style.display = isHost ? 'grid' : 'none';
+  const leaveBtn = document.getElementById('btn-leave-room'); if (leaveBtn) leaveBtn.style.display = isHost ? 'none' : 'block';
+  const maxRow = document.getElementById('max-players-row');
+  if (maxRow) {
+    maxRow.classList.toggle('hidden', !isHost);
+    const sel = document.getElementById('select-max-players');
+    if (isHost && sel) {
+      sel.value = String(currentRoom.maxPlayers || 10);
+      syncMaxPlayersPicker(sel.value);
+      sel.onchange = async () => {
+        syncMaxPlayersPicker(sel.value);
+        try {
+          await window.api.updateRoom(currentRoom.id, { max_players: Number(sel.value) });
+          currentRoom.maxPlayers = Number(sel.value);
+          updateRoomChrome(currentRoom.members?.length || 0);
+          appendSysMsg(`⚙ Дээд хязгаар: ${sel.value} тоглогч`);
+        } catch {}
+      };
+    } else if (!isHost) {
+      setMaxPlayersPickerOpen(false);
+    }
+  }
+  resetLaunchBtn(isHost);
+  updateRoomChrome(currentRoom.members?.length || 0);
+  if (currentRoom.members) renderMembers(currentRoom.members);
+  // LAN хост панель (тусдаа IIFE) энэ event-ээр товчоо шинэ ролиор дахин зурна
+  document.dispatchEvent(new CustomEvent('garena:host-changed', { detail: { isHost } }));
 }
 
 async function kickPlayer(targetId, targetName) {
@@ -5250,6 +5320,8 @@ init();
 
   el('btn-lan-host')?.addEventListener('click', startHosting);
   el('btn-lan-stop')?.addEventListener('click', stopHosting);
+  // 👑 Хост шилжсэн → "LAN тоглоом нээх" товч/зөвлөмжийг шинэ ролиор дахин тааруулна
+  document.addEventListener('garena:host-changed', () => { if (currentRoom) loadExisting(); });
 
   const timer = setInterval(() => {
     if (typeof socket !== 'undefined' && socket && !socket.__lanHandlers) { socket.__lanHandlers = true; attach(socket); }
