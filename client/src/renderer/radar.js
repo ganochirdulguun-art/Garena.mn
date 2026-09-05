@@ -76,7 +76,9 @@
     const v = el('rd-viewer');
     const { T, sim, kills, byPid } = simulate(g);
     const B = g.bounds || { x0: -8192, x1: 8192, y0: -8192, y1: 8192 };
-    const label = (pid) => byPid[pid]?.name || `Тоглогч #${pid}`;
+    const label = (pid) => (pid == null ? null : (byPid[pid]?.name || `Тоглогч #${pid}`));
+    // Kill event-ийн victim/killer өнгө тоглогчид таарахгүй бол (Roshan = 12, нейтрал) нэрээр нь
+    const who = (pid, colour) => label(pid) || (colour === 12 ? 'Roshan' : `нейтрал (өнгө ${colour})`);
     const teamOf = (pid) => (byPid[pid]?.team === 2 ? 2 : 1);
     const col = (pid) => (teamOf(pid) === 2 ? '#ff5c5c' : '#43d9c9');
     v.innerHTML = `<div class="rd-grid2"><div class="rd-stage">
@@ -88,7 +90,7 @@
         <small class="hint">${esc(g.room_name || '')} · ${esc(g.map_name || '')} · ${fmt(T)} · байрлал ойролцоо (тушаалын зорилтоос), kill/death яг цагаар</small>
       </div>
       <div class="rd-side"><div id="rd-heroes">${g.players.map((p) => `<div class="rd-hero" id="rdh-${p.pid}"><div class="ic" style="background:${col(p.pid)}">${esc((p.hero || '?').slice(0, 4))}</div><div><b>${esc(label(p.pid))}</b> <span class="${teamOf(p.pid) === 2 ? 'c' : 's'}">${teamOf(p.pid) === 2 ? 'Scourge' : 'Sentinel'}</span><br><small class="st"></small><br><small>${esc(heroName(p.hero))}</small></div></div>`).join('')}</div>
-        <div class="rd-feed" id="rd-feed">${kills.map((k) => `<div data-t="${k.t}"><time>${fmt(k.t)}</time><b class="${teamOf(k.killer) === 2 ? 'c' : 's'}">${esc(label(k.killer) || 'өнгө ' + k.kc)}</b> алав → <b class="${teamOf(k.victim) === 2 ? 'c' : 's'}">${esc(label(k.victim) || 'өнгө ' + k.vc)}</b></div>`).join('') || '<div class="past">Kill бүртгэгдээгүй</div>'}</div></div></div>`;
+        <div class="rd-feed" id="rd-feed">${kills.map((k) => `<div data-t="${k.t}"><time>${fmt(k.t)}</time><b class="${teamOf(k.killer) === 2 ? 'c' : 's'}">${esc(who(k.killer, k.kc))}</b> алав → <b class="${k.victim == null ? '' : (teamOf(k.victim) === 2 ? 'c' : 's')}">${esc(who(k.victim, k.vc))}</b></div>`).join('') || '<div class="past">Kill бүртгэгдээгүй</div>'}</div></div></div>`;
     const cv = el('rd-cv'), ctx = cv.getContext('2d'); const img = new Image(); img.src = g.minimap_url || minimapUrl || '';
     const px = (x, y) => [(x - B.x0) / (B.x1 - B.x0) * cv.width, (B.y1 - y) / (B.y1 - B.y0) * cv.height];
     let now = Math.max(0, Math.floor(kills[0]?.t || 0) - 8), playing = false, speed = 4, trail = true, last = 0;
