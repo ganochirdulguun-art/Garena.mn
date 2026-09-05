@@ -12,7 +12,10 @@
     Otch: 'Tauren Chieftain', Oshd: 'Shadow Hunter', Edem: 'Demon Hunter', Ekee: 'Keeper of the Grove', Emoo: 'Priestess of the Moon',
     Ewar: 'Warden', Udea: 'Death Knight', Ulic: 'Lich', Udre: 'Dreadlord', Ucrl: 'Crypt Lord', Nbrn: 'Brewmaster', Nngs: 'Naga Sea Witch',
     Nplh: 'Pit Lord', Nbst: 'Beastmaster', Ntin: 'Tinker', Nalc: 'Alchemist', Nfir: 'Firelord' };
+  // Сервер /radar/* хариунд hero_name/hero_icon (config/dota_heroes.json → Dota 2 CDN icon) ирдэг (2026-09-06);
+  // байхгүй бол WC3 стандарт код эсвэл кодоо харуулна.
   const heroName = (c) => HERO[c] || c || '?';
+  const hName = (p) => (p && (p.hero_name || heroName(p.hero))) || '?';
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   let minimapUrl = null, current = null, raf = null;
@@ -24,8 +27,8 @@
       minimapUrl = r.minimap_url || minimapUrl;
       if (!r.games?.length) { list.innerHTML = '<div class="rd-empty">Радартай тоглолт хараахан алга. Relay-ээр дуусах тоглолт бүр энд автоматаар нэмэгдэнэ.</div>'; return; }
       list.innerHTML = r.games.map((g) => {
-        const t1 = g.players.filter((p) => p.team === 1).map((p) => esc(p.name || heroName(p.hero))).join(', ') || '—';
-        const t2 = g.players.filter((p) => p.team === 2).map((p) => esc(p.name || heroName(p.hero))).join(', ') || '—';
+        const t1 = g.players.filter((p) => p.team === 1).map((p) => esc(p.name || hName(p))).join(', ') || '—';
+        const t2 = g.players.filter((p) => p.team === 2).map((p) => esc(p.name || hName(p))).join(', ') || '—';
         const d = g.played_at ? new Date(g.played_at) : null;
         const when = d ? `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` : '';
         return `<div class="rd-card" data-token="${esc(g.token)}"><b>${esc(g.room_name || ('Өрөө #' + (g.room_id || '?')))}</b>
@@ -89,9 +92,12 @@
         <div class="rd-timeline"><div class="rd-ticks">${kills.map((k) => `<i style="left:${(k.t / T * 100).toFixed(2)}%"></i>`).join('')}</div><input id="rd-slider" type="range" min="0" max="${T}" value="0" step="1"></div>
         <small class="hint">${esc(g.room_name || '')} · ${esc(g.map_name || '')} · ${fmt(T)} · байрлал ойролцоо (тушаалын зорилтоос), kill/death яг цагаар</small>
       </div>
-      <div class="rd-side"><div id="rd-heroes">${g.players.map((p) => `<div class="rd-hero" id="rdh-${p.pid}"><div class="ic" style="background:${col(p.pid)}">${esc((p.hero || '?').slice(0, 4))}</div><div><b>${esc(label(p.pid))}</b> <span class="${teamOf(p.pid) === 2 ? 'c' : 's'}">${teamOf(p.pid) === 2 ? 'Scourge' : 'Sentinel'}</span><br><small class="st"></small><br><small>${esc(heroName(p.hero))}</small></div></div>`).join('')}</div>
+      <div class="rd-side"><div id="rd-heroes">${g.players.map((p) => `<div class="rd-hero" id="rdh-${p.pid}">${p.hero_icon ? `<img class="ic" src="${esc(p.hero_icon)}" alt="" style="object-fit:cover;border:2px solid ${col(p.pid)}">` : `<div class="ic" style="background:${col(p.pid)}">${esc((p.hero || '?').slice(0, 4))}</div>`}<div><b>${esc(label(p.pid))}</b> <span class="${teamOf(p.pid) === 2 ? 'c' : 's'}">${teamOf(p.pid) === 2 ? 'Scourge' : 'Sentinel'}</span><br><small class="st"></small><br><small>${esc(hName(p))}${p.hero_proper ? ' · ' + esc(p.hero_proper) : ''}</small></div></div>`).join('')}</div>
         <div class="rd-feed" id="rd-feed">${kills.map((k) => `<div data-t="${k.t}"><time>${fmt(k.t)}</time><b class="${teamOf(k.killer) === 2 ? 'c' : 's'}">${esc(who(k.killer, k.kc))}</b> алав → <b class="${k.victim == null ? '' : (teamOf(k.victim) === 2 ? 'c' : 's')}">${esc(who(k.victim, k.vc))}</b></div>`).join('') || '<div class="past">Kill бүртгэгдээгүй</div>'}</div></div></div>`;
     const cv = el('rd-cv'), ctx = cv.getContext('2d'); const img = new Image(); img.src = g.minimap_url || minimapUrl || '';
+    // Hero icon-ууд (Dota 2 CDN) — ачаалагдмагц дахин зурна; ачаалагдаагүй/алга бол кодтой дугуй
+    const icons = {};
+    for (const p of g.players) if (p.hero_icon) { const im = new Image(); im.onload = () => draw(); im.onerror = () => { delete icons[p.pid]; }; im.src = p.hero_icon; icons[p.pid] = im; }
     const px = (x, y) => [(x - B.x0) / (B.x1 - B.x0) * cv.width, (B.y1 - y) / (B.y1 - B.y0) * cv.height];
     let now = Math.max(0, Math.floor(kills[0]?.t || 0) - 8), playing = false, speed = 4, trail = true, last = 0;
     const kd = (pid, s) => ({ k: kills.filter((x) => x.t <= s && x.killer === pid).length, d: kills.filter((x) => x.t <= s && x.victim === pid).length });
@@ -107,8 +113,19 @@
           ctx.stroke(); ctx.globalAlpha = 1; }
         const q = sim[pid][now]; if (!q) continue;
         const [a, b] = px(q.dead && q.deadAt ? q.deadAt[0] : q.x, q.dead && q.deadAt ? q.deadAt[1] : q.y);
-        ctx.beginPath(); ctx.arc(a, b, 15, 0, Math.PI * 2); ctx.fillStyle = q.dead ? '#5b6270' : c; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = q.dead ? '#8a909c' : '#fff'; ctx.stroke();
-        ctx.fillStyle = q.dead ? '#cfd3da' : '#04121a'; ctx.font = '700 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((p.hero || '?').slice(0, 4), a, b + 1);
+        const ic = icons[pid];
+        if (ic && ic.complete && ic.naturalWidth) {
+          // Hero-гийн зураг дугуй хүрээнд; үхсэн бол саарал
+          ctx.save(); ctx.beginPath(); ctx.arc(a, b, 17, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+          try { ctx.filter = q.dead ? 'grayscale(1) brightness(.55)' : 'none'; } catch {}
+          ctx.drawImage(ic, a - 17, b - 17, 34, 34); try { ctx.filter = 'none'; } catch {}
+          ctx.restore();
+          ctx.beginPath(); ctx.arc(a, b, 17, 0, Math.PI * 2); ctx.lineWidth = 3; ctx.strokeStyle = q.dead ? '#8a909c' : c; ctx.stroke();
+        } else {
+          ctx.beginPath(); ctx.arc(a, b, 15, 0, Math.PI * 2); ctx.fillStyle = q.dead ? '#5b6270' : c; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = q.dead ? '#8a909c' : '#fff'; ctx.stroke();
+          ctx.fillStyle = q.dead ? '#cfd3da' : '#04121a'; ctx.font = '700 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText((p.hero || '?').slice(0, 4), a, b + 1);
+        }
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         if (q.dead) { ctx.strokeStyle = '#ff2b2b'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(a - 12, b - 12); ctx.lineTo(a + 12, b + 12); ctx.moveTo(a + 12, b - 12); ctx.lineTo(a - 12, b + 12); ctx.stroke(); }
         ctx.fillStyle = '#e6ecf7'; ctx.font = '600 12px sans-serif'; ctx.fillText(label(pid), a, teamOf(pid) === 2 ? b + 28 : b - 24);
         const h = el('rdh-' + pid); if (h) { h.classList.toggle('dead', !!q.dead); const r = kd(pid, now); h.querySelector('.st').textContent = `${q.dead ? 'ҮХСЭН' : 'амьд'} · K ${r.k} / D ${r.d}`; }

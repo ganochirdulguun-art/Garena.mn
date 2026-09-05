@@ -14,6 +14,19 @@ try { db = require('../config/db'); } catch { db = null; }
 
 const REPORT_KEY = process.env.RELAY_REPORT_KEY || '';
 const MAX_PATH_POINTS = 20000;     // нэг тоглогчид
+
+// DotA hero код → нэр + Dota 2 CDN icon (config/dota_heroes.json — DotA 6.72 replay-parser хүснэгт + Dota 2 slug,
+// CDN-ээр баталгаажуулсан). LoD 6.74c custom кодууд ижил (DotA 6.74c суурьтай); 6.73/6.74-ийн шинэ кодууд
+// (жишээ N0M0, H0DO, E02K) хүснэгтэд байхгүй бол кодоороо харагдана — дараа нь нэмнэ.
+let HEROES = {};
+try { HEROES = require('../config/dota_heroes.json'); } catch { HEROES = {}; }
+const ICON_BASE = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons/';
+function heroInfo(code) {
+  const h = code ? HEROES[code] : null;
+  if (!h) return { hero_name: code || null, hero_proper: null, hero_icon: null };
+  return { hero_name: h.name || code, hero_proper: h.proper || null, hero_icon: h.d2 ? `${ICON_BASE}${h.d2}.png` : null };
+}
+const enrichPlayers = (players) => (Array.isArray(players) ? players : []).map((p) => ({ ...p, ...heroInfo(p.hero) }));
 const MAX_PLAYERS = 12;
 
 function keyOk(req) {
@@ -62,7 +75,7 @@ function summaryRow(r) {
   return {
     token: r.token, room_id: r.room_id, room_name: r.room_name, host_name: r.host_name, map_name: r.map_name,
     game_time_sec: r.game_time_sec, winner_team: r.winner_team, kills: Array.isArray(r.kills) ? r.kills.length : Number(r.kill_count || 0),
-    players: players.map((p) => ({ pid: p.pid, team: p.team, name: p.name, hero: p.hero })),
+    players: enrichPlayers(players.map((p) => ({ pid: p.pid, team: p.team, name: p.name, hero: p.hero }))),
     played_at: r.played_at,
   };
 }
@@ -134,11 +147,11 @@ router.get('/:token', authMW, async (req, res) => {
     const base = `https://${req.get('host')}`;
     return res.json({
       token: g.token, room_id: g.room_id, room_name: g.room_name, host_name: g.host_name, map_name: g.map_name,
-      game_time_sec: g.game_time_sec, winner_team: g.winner_team, players: g.players, kills: g.kills, events: g.events, paths: g.paths,
+      game_time_sec: g.game_time_sec, winner_team: g.winner_team, players: enrichPlayers(g.players), kills: g.kills, events: g.events, paths: g.paths,
       played_at: g.played_at, minimap_url: `${base}/assets/radar/lod-minimap@2x.png`,
       bounds: { x0: -8192, x1: 8192, y0: -8192, y1: 8192 },   // LoD 6.74c: war3map.w3e 129×129 tile, center −8192
     });
   } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-module.exports = { router, relayRouter, sanitizeRadar, summaryRow };
+module.exports = { router, relayRouter, sanitizeRadar, summaryRow, heroInfo };

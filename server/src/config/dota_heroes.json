@@ -1,0 +1,657 @@
+{
+ "E02X": {
+  "name": "Grand Magus",
+  "proper": "Rubick",
+  "d2": "rubick"
+ },
+ "E02F": {
+  "name": "Phoenix",
+  "proper": "Icarus",
+  "d2": "phoenix"
+ },
+ "E02I": {
+  "name": "Tuskarr",
+  "proper": "Ymir",
+  "d2": "tusk"
+ },
+ "E02N": {
+  "name": "Gyrocopter",
+  "proper": "Aurel Vlaicu",
+  "d2": "gyrocopter"
+ },
+ "E02J": {
+  "name": "Distruptor",
+  "proper": "Thrall",
+  "d2": "disruptor"
+ },
+ "E02H": {
+  "name": "Shadow Demon",
+  "proper": "Eredar",
+  "d2": "shadow_demon"
+ },
+ "O01F": {
+  "name": "Guardian Wisp",
+  "proper": "Io",
+  "d2": "wisp"
+ },
+ "H071": {
+  "name": "Murloc Nightcrawler",
+  "proper": "Slark",
+  "d2": "slark"
+ },
+ "N0HP": {
+  "name": "Ancient Apparition",
+  "proper": "Kaldr",
+  "d2": "ancient_apparition"
+ },
+ "E002": {
+  "name": "Lightning Revenant",
+  "proper": "Razor",
+  "d2": "razor"
+ },
+ "E004": {
+  "name": "Bone Fletcher",
+  "proper": "Clinkz",
+  "d2": "clinkz"
+ },
+ "E005": {
+  "name": "Moon Rider",
+  "proper": "Luna Moonfang",
+  "d2": "luna"
+ },
+ "E00P": {
+  "name": "Twin Head Dragon",
+  "proper": "Jakiro",
+  "d2": "jakiro"
+ },
+ "E01A": {
+  "name": "Witch Doctor",
+  "proper": "VolJin",
+  "d2": "witch_doctor"
+ },
+ "E01B": {
+  "name": "Spectre",
+  "proper": "Mercurial",
+  "d2": "spectre"
+ },
+ "E01C": {
+  "name": "Warlock",
+  "proper": "Demnok Lannik",
+  "d2": "warlock"
+ },
+ "E01Y": {
+  "name": "Templar Assassin",
+  "proper": "Lanaya",
+  "d2": "templar_assassin"
+ },
+ "EC45": {
+  "name": "Void",
+  "proper": "Darkterror",
+  "d2": "faceless_void"
+ },
+ "EC57": {
+  "name": "Venomancer",
+  "proper": "Lesale Deathbringer",
+  "d2": "venomancer"
+ },
+ "EC77": {
+  "name": "Netherdrake",
+  "proper": "Viper",
+  "d2": "viper"
+ },
+ "Edem": {
+  "name": "Anti-Mage",
+  "proper": "Magina",
+  "d2": "antimage"
+ },
+ "Edmm": {
+  "name": "Demon Hunter",
+  "proper": "Shadowsong",
+  "d2": "antimage"
+ },
+ "Eevi": {
+  "name": "Soul Keeper",
+  "proper": "Terrorblade",
+  "d2": "terrorblade"
+ },
+ "Eevm": {
+  "name": "Soul Keeper",
+  "proper": "Terrorblade",
+  "d2": "terrorblade"
+ },
+ "Ekee": {
+  "name": "Tormented Soul",
+  "proper": "Leshrac the Malicious",
+  "d2": "leshrac"
+ },
+ "Emns": {
+  "name": "Prophet",
+  "proper": "Furion",
+  "d2": "furion"
+ },
+ "Emoo": {
+  "name": "Enchantress",
+  "proper": "Aiushtha",
+  "d2": "enchantress"
+ },
+ "Ewar": {
+  "name": "Phantom Assassin",
+  "proper": "Mortred",
+  "d2": "phantom_assassin"
+ },
+ "H000": {
+  "name": "Centaur Warchief",
+  "proper": "Bradwarden",
+  "d2": "centaur"
+ },
+ "H001": {
+  "name": "Rogue Knight",
+  "proper": "Sven",
+  "d2": "sven"
+ },
+ "H004": {
+  "name": "Slayer",
+  "proper": "Lina Inverse",
+  "d2": "lina"
+ },
+ "H008": {
+  "name": "Bristleback",
+  "proper": "Rigwarl",
+  "d2": "bristleback"
+ },
+ "H00A": {
+  "name": "Holy Knight",
+  "proper": "Chen",
+  "d2": "chen"
+ },
+ "H00D": {
+  "name": "Beastmaster",
+  "proper": "Rexxar",
+  "d2": "beastmaster"
+ },
+ "H00E": {
+  "name": "Dragon Knight",
+  "proper": "Arc Honist",
+  "d2": "dragon_knight"
+ },
+ "H00F": {
+  "name": "Dragon Knight",
+  "proper": "Arc Honist",
+  "d2": "dragon_knight"
+ },
+ "H00G": {
+  "name": "Dragon Knight",
+  "proper": "Arc Honist",
+  "d2": "dragon_knight"
+ },
+ "H00H": {
+  "name": "Oblivion",
+  "proper": "Pugna",
+  "d2": "pugna"
+ },
+ "H00I": {
+  "name": "Geomancer",
+  "proper": "Meepo",
+  "d2": "meepo"
+ },
+ "H00J": {
+  "name": "Geomancer",
+  "proper": "Meepo",
+  "d2": "meepo"
+ },
+ "H00K": {
+  "name": "Goblin Techies",
+  "proper": "Squee Spleen and Spoon",
+  "d2": "techies"
+ },
+ "H00N": {
+  "name": "Dark Seer",
+  "proper": "Ishkafel",
+  "d2": "dark_seer"
+ },
+ "H00Q": {
+  "name": "Sacred Warrior",
+  "proper": "Huskar",
+  "d2": "huskar"
+ },
+ "H00R": {
+  "name": "Undying",
+  "proper": "Dirge",
+  "d2": "undying"
+ },
+ "H00S": {
+  "name": "Storm Spirit",
+  "proper": "Raijin Thunderkeg",
+  "d2": "storm_spirit"
+ },
+ "H00T": {
+  "name": "Clockwerk Goblin",
+  "proper": "Rattletrap",
+  "d2": "rattletrap"
+ },
+ "H00U": {
+  "name": "Invoker",
+  "proper": "Kael",
+  "d2": "invoker"
+ },
+ "H00V": {
+  "name": "Gorgon",
+  "proper": "Medusa",
+  "d2": "medusa"
+ },
+ "H06S": {
+  "name": "Admiral",
+  "proper": "Daelin Proudmoore",
+  "d2": "kunkka"
+ },
+ "H06W": {
+  "name": "Keeper of the Light",
+  "proper": "Ezalor",
+  "d2": "keeper_of_the_light"
+ },
+ "H06X": {
+  "name": "Keeper of the Light",
+  "proper": "Ezalor",
+  "d2": "keeper_of_the_light"
+ },
+ "H06Y": {
+  "name": "Keeper of the Light",
+  "proper": "Ezalor",
+  "d2": "keeper_of_the_light"
+ },
+ "H07I": {
+  "name": "Undying",
+  "proper": "Dirge",
+  "d2": "undying"
+ },
+ "Hamg": {
+  "name": "Treant Protector",
+  "proper": "Rooftrellen",
+  "d2": "treant"
+ },
+ "Harf": {
+  "name": "Omniknight",
+  "proper": "Purist Thunderwrath",
+  "d2": "omniknight"
+ },
+ "Hblm": {
+  "name": "Keeper of the Light",
+  "proper": "Ezalor",
+  "d2": "keeper_of_the_light"
+ },
+ "HC49": {
+  "name": "Naga Siren",
+  "proper": "Slithice",
+  "d2": "naga_siren"
+ },
+ "HC92": {
+  "name": "Stealth Assassin",
+  "proper": "Rikimaru",
+  "d2": "riki"
+ },
+ "Hhkl": {
+  "name": "Paladin",
+  "proper": "Halahk the Lifebringer",
+  "d2": "omniknight"
+ },
+ "Hjai": {
+  "name": "Crystal Maiden",
+  "proper": "Rylai Crestfall",
+  "d2": "crystal_maiden"
+ },
+ "Hlgr": {
+  "name": "Dragon Knight",
+  "proper": "Knight Davion",
+  "d2": "dragon_knight"
+ },
+ "Hmbr": {
+  "name": "Lord of Olympia",
+  "proper": "Zeus",
+  "d2": "zuus"
+ },
+ "Hmkg": {
+  "name": "Ogre Magi",
+  "proper": "Aggron Stonebreaker",
+  "d2": "ogre_magi"
+ },
+ "Hpal": {
+  "name": "Paladin",
+  "proper": "Granis Darkhammer",
+  "d2": "omniknight"
+ },
+ "Hpb1": {
+  "name": "Paladin",
+  "proper": "Lord Nicholas Buzan",
+  "d2": "omniknight"
+ },
+ "Huth": {
+  "name": "Ursa Warrior",
+  "proper": "Ulfsaar",
+  "d2": "ursa"
+ },
+ "Hvsh": {
+  "name": "Bloodseeker",
+  "proper": "Strygwyr",
+  "d2": "bloodseeker"
+ },
+ "Hvwd": {
+  "name": "Vengeful Spirit",
+  "proper": "Shendelzare Silkwood",
+  "d2": "vengefulspirit"
+ },
+ "N00B": {
+  "name": "Faerie Dragon",
+  "proper": "Puck",
+  "d2": "puck"
+ },
+ "N00R": {
+  "name": "Pit Lord",
+  "proper": "Azgalor",
+  "d2": "doom_bringer"
+ },
+ "N013": {
+  "name": "Lone Druid",
+  "proper": "Syllabear",
+  "d2": "lone_druid"
+ },
+ "N014": {
+  "name": "Lone Druid",
+  "proper": "Syllabear",
+  "d2": "lone_druid"
+ },
+ "N015": {
+  "name": "Lone Druid",
+  "proper": "Syllabear",
+  "d2": "lone_druid"
+ },
+ "N016": {
+  "name": "Troll Warlord",
+  "proper": "Jahrakal",
+  "d2": "troll_warlord"
+ },
+ "N017": {
+  "name": "Troll Warlord",
+  "proper": "Jahrakal",
+  "d2": "troll_warlord"
+ },
+ "N01A": {
+  "name": "Silencer",
+  "proper": "Nortrom",
+  "d2": "silencer"
+ },
+ "N01H": {
+  "name": "Alchemist",
+  "proper": "Razzil Darkbrew",
+  "d2": "alchemist"
+ },
+ "N01I": {
+  "name": "Alchemist",
+  "proper": "Razzil Darkbrew",
+  "d2": "alchemist"
+ },
+ "N01J": {
+  "name": "Alchemist",
+  "proper": "Razzil Darkbrew",
+  "d2": "alchemist"
+ },
+ "N01O": {
+  "name": "Lone Druid",
+  "proper": "Syllabear",
+  "d2": "lone_druid"
+ },
+ "N01T": {
+  "name": "Alchemist",
+  "proper": "Razzil Darkbrew",
+  "d2": "alchemist"
+ },
+ "N01V": {
+  "name": "Priestess of the Moon",
+  "proper": "Mirana Nightshade",
+  "d2": "mirana"
+ },
+ "N01W": {
+  "name": "Shadow Priest",
+  "proper": "Dazzle",
+  "d2": "dazzle"
+ },
+ "N02B": {
+  "name": "Troll Warlord",
+  "proper": "Jahrakal",
+  "d2": "troll_warlord"
+ },
+ "N0EG": {
+  "name": "Windrunner",
+  "proper": "Alleria",
+  "d2": "windrunner"
+ },
+ "N0EI": {
+  "name": "Windrunner",
+  "proper": "Alleria",
+  "d2": "windrunner"
+ },
+ "N0EJ": {
+  "name": "Windrunner",
+  "proper": "Alleria",
+  "d2": "windrunner"
+ },
+ "N0EK": {
+  "name": "Windrunner",
+  "proper": "Alleria",
+  "d2": "windrunner"
+ },
+ "N0EM": {
+  "name": "Windrunner",
+  "proper": "Alleria",
+  "d2": "windrunner"
+ },
+ "Naka": {
+  "name": "Bounty Hunter",
+  "proper": "Gondar",
+  "d2": "bounty_hunter"
+ },
+ "Nbbc": {
+  "name": "Juggernaut",
+  "proper": "Yurnero",
+  "d2": "juggernaut"
+ },
+ "Nbrn": {
+  "name": "Drow Ranger",
+  "proper": "Traxex",
+  "d2": "drow_ranger"
+ },
+ "NC00": {
+  "name": "Skeleton King",
+  "proper": "King Leoric",
+  "d2": "skeleton_king"
+ },
+ "Nfir": {
+  "name": "Shadow Fiend",
+  "proper": "Nevermore",
+  "d2": "nevermore"
+ },
+ "Npbm": {
+  "name": "Pandaren Brewmaster",
+  "proper": "Mangix",
+  "d2": "brewmaster"
+ },
+ "Nrob": {
+  "name": "Tinker",
+  "proper": "Gazz Stripbolt",
+  "d2": "tinker"
+ },
+ "Ntin": {
+  "name": "Tinker",
+  "proper": "Boush",
+  "d2": "tinker"
+ },
+ "O00J": {
+  "name": "Spiritbreaker",
+  "proper": "Barathrum",
+  "d2": "spirit_breaker"
+ },
+ "O00P": {
+  "name": "Morphling",
+  "proper": "Morphling",
+  "d2": "morphling"
+ },
+ "O015": {
+  "name": "Tauren Chieftain",
+  "proper": "Cairne Bloodhoof",
+  "d2": "elder_titan"
+ },
+ "O016": {
+  "name": "Batrider",
+  "proper": "Jin'zakk",
+  "d2": "batrider"
+ },
+ "O017": {
+  "name": "Batrider",
+  "proper": "Jin'zakk",
+  "d2": "batrider"
+ },
+ "Ofar": {
+  "name": "Tidehunter",
+  "proper": "Leviathan",
+  "d2": "tidehunter"
+ },
+ "Ogrh": {
+  "name": "Phantom Lancer",
+  "proper": "Azwraith",
+  "d2": "phantom_lancer"
+ },
+ "Opgh": {
+  "name": "Axe",
+  "proper": "Mogul Kahn",
+  "d2": "axe"
+ },
+ "Orkn": {
+  "name": "Shadow Shaman",
+  "proper": "Rhasta",
+  "d2": "shadow_shaman"
+ },
+ "Oshd": {
+  "name": "Bane Elemental",
+  "proper": "Atropos",
+  "d2": "bane"
+ },
+ "Otch": {
+  "name": "Earthshaker",
+  "proper": "Raigor Stonehoof",
+  "d2": "earthshaker"
+ },
+ "U000": {
+  "name": "Nerubian Assassin",
+  "proper": "Anubarak",
+  "d2": "nyx_assassin"
+ },
+ "U006": {
+  "name": "Broodmother",
+  "proper": "Black Arachnia",
+  "d2": "broodmother"
+ },
+ "U008": {
+  "name": "Lycanthrope",
+  "proper": "Banehallow",
+  "d2": "lycan"
+ },
+ "U00A": {
+  "name": "Chaos Knight",
+  "proper": "Nessaj",
+  "d2": "chaos_knight"
+ },
+ "U00C": {
+  "name": "Lifestealer",
+  "proper": "Naix",
+  "d2": "life_stealer"
+ },
+ "U00E": {
+  "name": "Necrolyte",
+  "proper": "Rotundjere",
+  "d2": "necrolyte"
+ },
+ "U00F": {
+  "name": "Butcher",
+  "proper": "Pudge",
+  "d2": "pudge"
+ },
+ "U00K": {
+  "name": "Sand King",
+  "proper": "Crixalis",
+  "d2": "sand_king"
+ },
+ "U00P": {
+  "name": "Obsidian Destroyer",
+  "proper": "Harbinger",
+  "d2": "obsidian_destroyer"
+ },
+ "Ubal": {
+  "name": "Nerubian Weaver",
+  "proper": "Anubseran",
+  "d2": "weaver"
+ },
+ "UC01": {
+  "name": "Queen of Pain",
+  "proper": "Akasha",
+  "d2": "queenofpain"
+ },
+ "UC11": {
+  "name": "Magnataur",
+  "proper": "Magnus",
+  "d2": "magnataur"
+ },
+ "UC18": {
+  "name": "Demon Witch",
+  "proper": "Lion",
+  "d2": "lion"
+ },
+ "UC42": {
+  "name": "Doom Bringer",
+  "proper": "Lucifer",
+  "d2": "doom_bringer"
+ },
+ "UC60": {
+  "name": "Necrolic",
+  "proper": "Visage",
+  "d2": "visage"
+ },
+ "UC76": {
+  "name": "Death Prophet",
+  "proper": "Krobelus",
+  "d2": "death_prophet"
+ },
+ "UC91": {
+  "name": "Slithereen Guard",
+  "proper": "Slardar",
+  "d2": "slardar"
+ },
+ "Ucrl": {
+  "name": "Stone Giant",
+  "proper": "Tiny",
+  "d2": "tiny"
+ },
+ "Udea": {
+  "name": "Lord of Avernus",
+  "proper": "Abaddon",
+  "d2": "abaddon"
+ },
+ "Udre": {
+  "name": "Night Stalker",
+  "proper": "Balanar",
+  "d2": "night_stalker"
+ },
+ "Uktl": {
+  "name": "Enigma",
+  "proper": "Darchrow",
+  "d2": "enigma"
+ },
+ "Ulic": {
+  "name": "Lich",
+  "proper": "KelThuzad",
+  "d2": "lich"
+ },
+ "Usyl": {
+  "name": "Dwarven Sniper",
+  "proper": "Kardel Sharpeye",
+  "d2": "sniper"
+ }
+}
