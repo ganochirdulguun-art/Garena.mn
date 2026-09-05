@@ -136,7 +136,8 @@ app.get('/config', async (req, res) => {
     ? [{ image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
     : [
         { image: `${adBase}/assets/gs-ad-1.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
-        { image: `${adBase}/assets/gmn-ad-warkey.png`, link: adBase, text: 'Garena.mn WarKey — WC3 товчлуур тохируулагч · Hotkey remapper · үнэгүй' },
+        // ZEON Gaming Center — жинхэнэ зар сурталчлагч (2026-09-05, эзний зөвшөөрөл); WarKey-ийн рекламыг эзний хүсэлтээр хассан
+        { image: `${adBase}/assets/gmn-ad-zeon.png`, link: 'https://www.facebook.com/share/p/1Ej9NtzeL5/', text: 'ZEON Gaming Center — Заал 1500₮ · VIP 2500₮ · Хоног 10К · Захиалга 90007791' },
         { image: `${adBase}/assets/gmn-ad-diamond.png`, link: adBase, text: 'Diamond · QPay — цэнэглээд Silver/Gold эрх, нэр эффект, фрэйм' },
       ];
   // Нэмэлт (жинхэнэ) рекламууд: env AD_EXTRA_JSON = [{image,link,text}, ...] JSON массив.
