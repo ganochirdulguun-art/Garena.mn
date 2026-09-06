@@ -1,6 +1,6 @@
 // 📡 Радар таб — hero хөдөлгөөн/үхэл/kill-ийн симуляц (2026-09-06, эзний хүсэлт).
 // Replay: GET /radar/games, /radar/:token. LIVE (Шат 2): GET /radar/live, /radar/live/:token?since= — саатлыг СЕРВЕР
-// хэрэгжүүлнэ (эзэн 0 с, бусад бүгд 120 с); клиент зөвхөн ирсэн өгөгдлийг зурна. Эрх: GET /radar/access — GOLD
+// хэрэгжүүлнэ (delay_sec серверээс ирнэ); клиент зөвхөн ирсэн өгөгдлийг зурна. Эрх: GET /radar/access — GOLD
 // гишүүнчлэл; Bronze/Silver → демо симуляц (/radar/demo) + GOLD болох заавар.
 // Гацалтгүй зарчим: зөвхөн renderer/canvas; таб идэвхгүй үед poll хийхгүй; тоглоомын зам (LAN proxy, relay, main) огт хүрэхгүй.
 (() => {
@@ -30,7 +30,7 @@
     if (!access.ok) { wrap.hidden = true; locked.hidden = false; return renderLocked(); }
     locked.hidden = true; wrap.hidden = false;
     const b = el('rd-access');
-    if (b) b.innerHTML = access.tier === 'owner' ? '<span class="rd-pill own">👑 Эзэн · шууд (0 с)</span>' : `<span class="rd-pill gold">🥇 GOLD · ${access.delay_sec} с саатал</span>`;
+    if (b) b.innerHTML = access.tier === 'owner' ? '<span class="rd-pill own">👑 шууд</span>' : `<span class="rd-pill gold">🥇 GOLD · ${access.delay_sec} с саатал</span>`;
     await Promise.all([loadLive(), loadReplays()]);
     listTimer = setInterval(() => { if (isTabOn()) loadLive(); }, LIVE_LIST_MS);
   }
