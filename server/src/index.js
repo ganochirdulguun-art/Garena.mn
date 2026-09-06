@@ -371,6 +371,34 @@ async function ensureSocketRoomState(socket, roomId) {
   return true;
 }
 
+// ── Relay RTT (2026-09-06): VPS hostbot/relayRtt.js 8 с тутам `ss -tni`-ийн peer RTT-г илгээнэ → IP-ээр өрөөнд буй тоглогчийг
+// олж net:quality-г relay-ийн БОДИТ хэмжилтээр явуулна (клиентийн probe-ийг дарна). Нэг IP-д олон холболт (кафе/NAT) бол дундаж.
+const RELAY_KEY_BUF = Buffer.from(process.env.RELAY_REPORT_KEY || '');
+app.post('/relay/rtt', (req, res) => {
+  const k = Buffer.from(String(req.headers['x-relay-key'] || ''));
+  if (!RELAY_KEY_BUF.length || k.length !== RELAY_KEY_BUF.length || !require('crypto').timingSafeEqual(k, RELAY_KEY_BUF)) return res.status(401).json({ error: 'relay key' });
+  const peers = Array.isArray(req.body?.peers) ? req.body.peers : [];
+  const byIp = new Map();
+  for (const p of peers) {
+    const ip = String(p.ip || '').slice(0, 64); const rtt = Number(p.rtt);
+    if (!ip || !Number.isFinite(rtt)) continue;
+    const e = byIp.get(ip) || { sum: 0, n: 0, retrans: 0 };
+    e.sum += rtt; e.n++; e.retrans += Number(p.retrans) || 0; byIp.set(ip, e);
+  }
+  const now = Date.now(); const seen = new Set(); let sent = 0;
+  for (const socket of io.sockets.sockets.values()) {
+    const ip = socket.data?.ip; const roomId = socket.data?.roomId; const uid = socket.user?.id;
+    if (!ip || !roomId || uid == null || !byIp.has(ip)) continue;
+    socket.data.relayRttAt = now;
+    if (seen.has(String(uid))) continue; seen.add(String(uid));
+    const e = byIp.get(ip); const rtt = Math.round(e.sum / e.n); const g = socket.data.geo || {};
+    io.emit('net:quality', { roomId: String(roomId), userId: String(uid), rtt, avg: rtt, loss: 0, retrans: e.retrans, shared: e.n > 1, source: 'relay',
+      country: g.country || null, country_name: g.country_name || '', far: !!g.far });
+    sent++;
+  }
+  return res.json({ ok: true, peers: peers.length, matched: sent });
+});
+
 io.on('connection', (socket) => {
   // Улс: холбогдох үед НЭГ удаа офлайн GeoIP-ээр (микросекунд) — ping тэмдэгт "хол зай (улс)" харуулахад
   let clientIp = '';
@@ -381,6 +409,7 @@ io.on('connection', (socket) => {
   // IP-г логд бичнэ (2026-09-05): гацалт оношлоход тоглогч → IP → relay-ийн TCP RTT (ss -tni) холбоход зайлшгүй;
   // Railway edge лог socket sid агуулдаггүй тул өөр аргаар холбох боломжгүй байсан.
   console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}${clientIp ? ' ip=' + clientIp : ''}`);
+  socket.data.ip = clientIp || '';   // relay RTT (POST /relay/rtt) → энэ IP-ийн тоглогчийн ping тэмдэг
 
   // Лоббид бүртгүүлэх (апп нээгдэхэд дуудагдана)
   // JWT-ийн мэдээллийг ашиглана — client-ийн утгыг хэрэглэхгүй
@@ -612,6 +641,9 @@ io.on('connection', (socket) => {
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;
+    // 2026-09-06: relay-ийн kernel RTT (POST /relay/rtt) сүүлийн 30 с-д ирсэн бол клиентийн probe-ийг ҮЛ ТООНО —
+    // probe нь PC ачаалал/стрим орж 120–160 мс харагдаж "гацаж байна" гэсэн буруу сэтгэгдэл төрүүлдэг байсан.
+    if (socket.data.relayRttAt && Date.now() - socket.data.relayRttAt < 30000) return;
     const g = socket.data.geo || {};   // холбогдох үед нэг удаа тодорхойлсон (services/geo.js) — тоглоомын замд нөлөөгүй
     // 2026-09-05: өмнө нь io.to(roomId) — зөвхөн өрөөний гишүүд хардаг байсан тул эзэн/бусад хүн өрөөг
     // гаднаас нь харахад ping огт гарахгүй байв. Бүх клиентэд явуулна (8с тутам нэг жижиг event/тоглогч —

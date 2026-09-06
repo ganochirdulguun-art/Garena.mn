@@ -1,0 +1,20 @@
+[Unit]
+Description=Garena.mn relay RTT daemon (ss -tni → платформ, relay-ээс тусдаа)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hostbot
+EnvironmentFile=/etc/systemd/system/garena-relay.service.d/report.env
+ExecStart=/usr/bin/node /opt/hostbot/relayRtt.js
+Restart=always
+RestartSec=5
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=100M
+StandardOutput=append:/var/log/garena-relay-rtt.log
+StandardError=append:/var/log/garena-relay-rtt.log
+
+[Install]
+WantedBy=multi-user.target
