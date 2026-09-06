@@ -262,6 +262,7 @@
   <!-- ② Үндсэн хуудас -->
   <div id="page-main" class="page">
     <!-- Дээд баннер + табууд (мокап №2 — DotA lobby бүтэц, sidebar байхгүй) -->
+    <div class="mf-rail mf-top" aria-hidden="true"></div>
     <header class="topbanner">
       <button type="button" class="brand" data-goto-tab="lobby" title="Өрөөнүүд">
         <img src="logo.png" alt="" />
@@ -1209,6 +1210,7 @@
   <!-- Найзуудын тусдаа цонх горим (full page) -->
   <div id="friends-fullpage" class="page friends-fullpage">
     <div class="friends-window-container">
+      <div class="mf-rail mf-top mf-thin" aria-hidden="true"></div>
       <!-- Улаан толгой = профайл чип (аватар, нэр, LV, tier, 💎) — дарвал үндсэн цонхны Профайл таб -->
       <div class="friends-window-header">
         <button type="button" class="userchip" data-goto-tab="profile" title="Профайл">
@@ -1226,6 +1228,7 @@
           <span id="user-wallet" class="wallet hidden" title="Diamond — 10 тоглолтоос 5-д хожвол +30"><b id="user-wallet-amount">💎 0</b><span>Diamond</span></span>
         </button>
       </div>
+      <div class="mf-rail mf-thin" aria-hidden="true"></div>
       <div class="friends-window-body">
         <!-- Удирдлагын товчнууд (чат / тохиргоо / гарах) — үндсэн цонх руу IPC-ээр дамжуулна -->
         <div class="fw-toolbar">
@@ -1243,6 +1246,7 @@
             </button>
           </div>
         </div>
+        <div class="mf-rail mf-thin" aria-hidden="true"></div>
         <div id="fw-pending-section">
           <div class="dm-section-label">📨 Хүсэлтүүд</div>
           <ul id="fw-pending-list" class="dm-users-list"></ul>
@@ -1253,6 +1257,7 @@
         <ul id="fw-offline-list" class="dm-users-list"></ul>
         <p id="fw-no-friends" class="empty-text pad-empty">Найз байхгүй байна</p>
       </div>
+      <div class="mf-rail mf-bottom mf-thin" aria-hidden="true"></div>
     </div>
   </div>
 
