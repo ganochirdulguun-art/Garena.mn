@@ -33,14 +33,14 @@ ok('summaryRow: paths-гүй жижиг мөр, kill тоо', () => {
   const r = summaryRow({ token: 'ff', room_id: 3, room_name: 'A', host_name: 'h', game_time_sec: 10, winner_team: 1,
     players: [{ pid: 1, team: 1, name: 'x', hero: 'Nbrn', hero_orders: 9 }], kills: [{}, {}], played_at: 'd' });
   assert.strictEqual(r.kills, 2);
-  assert.deepStrictEqual(r.players, [{ pid: 1, team: 1, name: 'x', hero: 'Nbrn', hero_name: 'Drow Ranger', hero_proper: 'Traxex',
-    hero_icon: 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons/drow_ranger.png' }]);
+  assert.strictEqual(r.players[0].hero_name, 'Drow Ranger'); assert.strictEqual(r.players[0].hero_proper, 'Traxex');
+  assert.ok(/\/assets\/heroes\/Nbrn\.png$/.test(r.players[0].hero_icon), 'оригинал WC3 icon (assets/heroes) түрүүлнэ: ' + r.players[0].hero_icon);
   assert.strictEqual(r.paths, undefined);
   assert.strictEqual(summaryRow({ token: 'a', players: [], kill_count: '4' }).kills, 4);
 });
 ok('heroInfo: DotA код → нэр + Dota 2 icon; мэдэгдэхгүй код → кодоороо, icon null', () => {
   const h = heroInfo('N0HP');
-  assert.strictEqual(h.hero_name, 'Ancient Apparition'); assert.ok(/icons\/ancient_apparition\.png$/.test(h.hero_icon));
+  assert.strictEqual(h.hero_name, 'Ancient Apparition'); assert.ok(/icons\/ancient_apparition\.png$/.test(h.hero_icon), 'AA custom icon → Dota 2 fallback');
   assert.strictEqual(heroInfo('Nbrn').hero_name, 'Drow Ranger');
   assert.deepStrictEqual(heroInfo('ZZZZ'), { hero_name: 'ZZZZ', hero_proper: null, hero_icon: null });
   assert.strictEqual(heroInfo(null).hero_name, null);

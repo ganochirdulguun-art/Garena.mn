@@ -17,7 +17,8 @@
  "E02N": {
   "name": "Gyrocopter",
   "proper": "Aurel Vlaicu",
-  "d2": "gyrocopter"
+  "d2": "gyrocopter",
+  "icon": "/assets/heroes/E02N.png"
  },
  "E02J": {
   "name": "Distruptor",
@@ -37,7 +38,8 @@
  "H071": {
   "name": "Murloc Nightcrawler",
   "proper": "Slark",
-  "d2": "slark"
+  "d2": "slark",
+  "icon": "/assets/heroes/H071.png"
  },
  "N0HP": {
   "name": "Ancient Apparition",
@@ -47,402 +49,482 @@
  "E002": {
   "name": "Lightning Revenant",
   "proper": "Razor",
-  "d2": "razor"
+  "d2": "razor",
+  "icon": "/assets/heroes/E002.png"
  },
  "E004": {
   "name": "Bone Fletcher",
   "proper": "Clinkz",
-  "d2": "clinkz"
+  "d2": "clinkz",
+  "icon": "/assets/heroes/E004.png"
  },
  "E005": {
   "name": "Moon Rider",
   "proper": "Luna Moonfang",
-  "d2": "luna"
+  "d2": "luna",
+  "icon": "/assets/heroes/E005.png"
  },
  "E00P": {
   "name": "Twin Head Dragon",
   "proper": "Jakiro",
-  "d2": "jakiro"
+  "d2": "jakiro",
+  "icon": "/assets/heroes/E00P.png"
  },
  "E01A": {
   "name": "Witch Doctor",
   "proper": "VolJin",
-  "d2": "witch_doctor"
+  "d2": "witch_doctor",
+  "icon": "/assets/heroes/E01A.png"
  },
  "E01B": {
   "name": "Spectre",
   "proper": "Mercurial",
-  "d2": "spectre"
+  "d2": "spectre",
+  "icon": "/assets/heroes/E01B.png"
  },
  "E01C": {
   "name": "Warlock",
   "proper": "Demnok Lannik",
-  "d2": "warlock"
+  "d2": "warlock",
+  "icon": "/assets/heroes/E01C.png"
  },
  "E01Y": {
   "name": "Templar Assassin",
   "proper": "Lanaya",
-  "d2": "templar_assassin"
+  "d2": "templar_assassin",
+  "icon": "/assets/heroes/E01Y.png"
  },
  "EC45": {
   "name": "Void",
   "proper": "Darkterror",
-  "d2": "faceless_void"
+  "d2": "faceless_void",
+  "icon": "/assets/heroes/EC45.png"
  },
  "EC57": {
   "name": "Venomancer",
   "proper": "Lesale Deathbringer",
-  "d2": "venomancer"
+  "d2": "venomancer",
+  "icon": "/assets/heroes/EC57.png"
  },
  "EC77": {
   "name": "Netherdrake",
   "proper": "Viper",
-  "d2": "viper"
+  "d2": "viper",
+  "icon": "/assets/heroes/EC77.png"
  },
  "Edem": {
   "name": "Anti-Mage",
   "proper": "Magina",
-  "d2": "antimage"
+  "d2": "antimage",
+  "icon": "/assets/heroes/Edem.png"
  },
  "Edmm": {
   "name": "Demon Hunter",
   "proper": "Shadowsong",
-  "d2": "antimage"
+  "d2": "antimage",
+  "icon": "/assets/heroes/Edmm.png"
  },
  "Eevi": {
   "name": "Soul Keeper",
   "proper": "Terrorblade",
-  "d2": "terrorblade"
+  "d2": "terrorblade",
+  "icon": "/assets/heroes/Eevi.png"
  },
  "Eevm": {
   "name": "Soul Keeper",
   "proper": "Terrorblade",
-  "d2": "terrorblade"
+  "d2": "terrorblade",
+  "icon": "/assets/heroes/Eevm.png"
  },
  "Ekee": {
   "name": "Tormented Soul",
   "proper": "Leshrac the Malicious",
-  "d2": "leshrac"
+  "d2": "leshrac",
+  "icon": "/assets/heroes/Ekee.png"
  },
  "Emns": {
   "name": "Prophet",
   "proper": "Furion",
-  "d2": "furion"
+  "d2": "furion",
+  "icon": "/assets/heroes/Emns.png"
  },
  "Emoo": {
   "name": "Enchantress",
   "proper": "Aiushtha",
-  "d2": "enchantress"
+  "d2": "enchantress",
+  "icon": "/assets/heroes/Emoo.png"
  },
  "Ewar": {
   "name": "Phantom Assassin",
   "proper": "Mortred",
-  "d2": "phantom_assassin"
+  "d2": "phantom_assassin",
+  "icon": "/assets/heroes/Ewar.png"
  },
  "H000": {
   "name": "Centaur Warchief",
   "proper": "Bradwarden",
-  "d2": "centaur"
+  "d2": "centaur",
+  "icon": "/assets/heroes/H000.png"
  },
  "H001": {
   "name": "Rogue Knight",
   "proper": "Sven",
-  "d2": "sven"
+  "d2": "sven",
+  "icon": "/assets/heroes/H001.png"
  },
  "H004": {
   "name": "Slayer",
   "proper": "Lina Inverse",
-  "d2": "lina"
+  "d2": "lina",
+  "icon": "/assets/heroes/H004.png"
  },
  "H008": {
   "name": "Bristleback",
   "proper": "Rigwarl",
-  "d2": "bristleback"
+  "d2": "bristleback",
+  "icon": "/assets/heroes/H008.png"
  },
  "H00A": {
   "name": "Holy Knight",
   "proper": "Chen",
-  "d2": "chen"
+  "d2": "chen",
+  "icon": "/assets/heroes/H00A.png"
  },
  "H00D": {
   "name": "Beastmaster",
   "proper": "Rexxar",
-  "d2": "beastmaster"
+  "d2": "beastmaster",
+  "icon": "/assets/heroes/H00D.png"
  },
  "H00E": {
   "name": "Dragon Knight",
   "proper": "Arc Honist",
-  "d2": "dragon_knight"
+  "d2": "dragon_knight",
+  "icon": "/assets/heroes/H00E.png"
  },
  "H00F": {
   "name": "Dragon Knight",
   "proper": "Arc Honist",
-  "d2": "dragon_knight"
+  "d2": "dragon_knight",
+  "icon": "/assets/heroes/H00F.png"
  },
  "H00G": {
   "name": "Dragon Knight",
   "proper": "Arc Honist",
-  "d2": "dragon_knight"
+  "d2": "dragon_knight",
+  "icon": "/assets/heroes/H00G.png"
  },
  "H00H": {
   "name": "Oblivion",
   "proper": "Pugna",
-  "d2": "pugna"
+  "d2": "pugna",
+  "icon": "/assets/heroes/H00H.png"
  },
  "H00I": {
   "name": "Geomancer",
   "proper": "Meepo",
-  "d2": "meepo"
+  "d2": "meepo",
+  "icon": "/assets/heroes/H00I.png"
  },
  "H00J": {
   "name": "Geomancer",
   "proper": "Meepo",
-  "d2": "meepo"
+  "d2": "meepo",
+  "icon": "/assets/heroes/H00J.png"
  },
  "H00K": {
   "name": "Goblin Techies",
   "proper": "Squee Spleen and Spoon",
-  "d2": "techies"
+  "d2": "techies",
+  "icon": "/assets/heroes/H00K.png"
  },
  "H00N": {
   "name": "Dark Seer",
   "proper": "Ishkafel",
-  "d2": "dark_seer"
+  "d2": "dark_seer",
+  "icon": "/assets/heroes/H00N.png"
  },
  "H00Q": {
   "name": "Sacred Warrior",
   "proper": "Huskar",
-  "d2": "huskar"
+  "d2": "huskar",
+  "icon": "/assets/heroes/H00Q.png"
  },
  "H00R": {
   "name": "Undying",
   "proper": "Dirge",
-  "d2": "undying"
+  "d2": "undying",
+  "icon": "/assets/heroes/H00R.png"
  },
  "H00S": {
   "name": "Storm Spirit",
   "proper": "Raijin Thunderkeg",
-  "d2": "storm_spirit"
+  "d2": "storm_spirit",
+  "icon": "/assets/heroes/H00S.png"
  },
  "H00T": {
   "name": "Clockwerk Goblin",
   "proper": "Rattletrap",
-  "d2": "rattletrap"
+  "d2": "rattletrap",
+  "icon": "/assets/heroes/H00T.png"
  },
  "H00U": {
   "name": "Invoker",
   "proper": "Kael",
-  "d2": "invoker"
+  "d2": "invoker",
+  "icon": "/assets/heroes/H00U.png"
  },
  "H00V": {
   "name": "Gorgon",
   "proper": "Medusa",
-  "d2": "medusa"
+  "d2": "medusa",
+  "icon": "/assets/heroes/H00V.png"
  },
  "H06S": {
   "name": "Admiral",
   "proper": "Daelin Proudmoore",
-  "d2": "kunkka"
+  "d2": "kunkka",
+  "icon": "/assets/heroes/H06S.png"
  },
  "H06W": {
   "name": "Keeper of the Light",
   "proper": "Ezalor",
-  "d2": "keeper_of_the_light"
+  "d2": "keeper_of_the_light",
+  "icon": "/assets/heroes/H06W.png"
  },
  "H06X": {
   "name": "Keeper of the Light",
   "proper": "Ezalor",
-  "d2": "keeper_of_the_light"
+  "d2": "keeper_of_the_light",
+  "icon": "/assets/heroes/H06X.png"
  },
  "H06Y": {
   "name": "Keeper of the Light",
   "proper": "Ezalor",
-  "d2": "keeper_of_the_light"
+  "d2": "keeper_of_the_light",
+  "icon": "/assets/heroes/H06Y.png"
  },
  "H07I": {
   "name": "Undying",
   "proper": "Dirge",
-  "d2": "undying"
+  "d2": "undying",
+  "icon": "/assets/heroes/H07I.png"
  },
  "Hamg": {
   "name": "Treant Protector",
   "proper": "Rooftrellen",
-  "d2": "treant"
+  "d2": "treant",
+  "icon": "/assets/heroes/Hamg.png"
  },
  "Harf": {
   "name": "Omniknight",
   "proper": "Purist Thunderwrath",
-  "d2": "omniknight"
+  "d2": "omniknight",
+  "icon": "/assets/heroes/Harf.png"
  },
  "Hblm": {
   "name": "Keeper of the Light",
   "proper": "Ezalor",
-  "d2": "keeper_of_the_light"
+  "d2": "keeper_of_the_light",
+  "icon": "/assets/heroes/Hblm.png"
  },
  "HC49": {
   "name": "Naga Siren",
   "proper": "Slithice",
-  "d2": "naga_siren"
+  "d2": "naga_siren",
+  "icon": "/assets/heroes/HC49.png"
  },
  "HC92": {
   "name": "Stealth Assassin",
   "proper": "Rikimaru",
-  "d2": "riki"
+  "d2": "riki",
+  "icon": "/assets/heroes/HC92.png"
  },
  "Hhkl": {
   "name": "Paladin",
   "proper": "Halahk the Lifebringer",
-  "d2": "omniknight"
+  "d2": "omniknight",
+  "icon": "/assets/heroes/Hhkl.png"
  },
  "Hjai": {
   "name": "Crystal Maiden",
   "proper": "Rylai Crestfall",
-  "d2": "crystal_maiden"
+  "d2": "crystal_maiden",
+  "icon": "/assets/heroes/Hjai.png"
  },
  "Hlgr": {
   "name": "Dragon Knight",
   "proper": "Knight Davion",
-  "d2": "dragon_knight"
+  "d2": "dragon_knight",
+  "icon": "/assets/heroes/Hlgr.png"
  },
  "Hmbr": {
   "name": "Lord of Olympia",
   "proper": "Zeus",
-  "d2": "zuus"
+  "d2": "zuus",
+  "icon": "/assets/heroes/Hmbr.png"
  },
  "Hmkg": {
   "name": "Ogre Magi",
   "proper": "Aggron Stonebreaker",
-  "d2": "ogre_magi"
+  "d2": "ogre_magi",
+  "icon": "/assets/heroes/Hmkg.png"
  },
  "Hpal": {
   "name": "Paladin",
   "proper": "Granis Darkhammer",
-  "d2": "omniknight"
+  "d2": "omniknight",
+  "icon": "/assets/heroes/Hpal.png"
  },
  "Hpb1": {
   "name": "Paladin",
   "proper": "Lord Nicholas Buzan",
-  "d2": "omniknight"
+  "d2": "omniknight",
+  "icon": "/assets/heroes/Hpb1.png"
  },
  "Huth": {
   "name": "Ursa Warrior",
   "proper": "Ulfsaar",
-  "d2": "ursa"
+  "d2": "ursa",
+  "icon": "/assets/heroes/Huth.png"
  },
  "Hvsh": {
   "name": "Bloodseeker",
   "proper": "Strygwyr",
-  "d2": "bloodseeker"
+  "d2": "bloodseeker",
+  "icon": "/assets/heroes/Hvsh.png"
  },
  "Hvwd": {
   "name": "Vengeful Spirit",
   "proper": "Shendelzare Silkwood",
-  "d2": "vengefulspirit"
+  "d2": "vengefulspirit",
+  "icon": "/assets/heroes/Hvwd.png"
  },
  "N00B": {
   "name": "Faerie Dragon",
   "proper": "Puck",
-  "d2": "puck"
+  "d2": "puck",
+  "icon": "/assets/heroes/N00B.png"
  },
  "N00R": {
   "name": "Pit Lord",
   "proper": "Azgalor",
-  "d2": "doom_bringer"
+  "d2": "doom_bringer",
+  "icon": "/assets/heroes/N00R.png"
  },
  "N013": {
   "name": "Lone Druid",
   "proper": "Syllabear",
-  "d2": "lone_druid"
+  "d2": "lone_druid",
+  "icon": "/assets/heroes/N013.png"
  },
  "N014": {
   "name": "Lone Druid",
   "proper": "Syllabear",
-  "d2": "lone_druid"
+  "d2": "lone_druid",
+  "icon": "/assets/heroes/N014.png"
  },
  "N015": {
   "name": "Lone Druid",
   "proper": "Syllabear",
-  "d2": "lone_druid"
+  "d2": "lone_druid",
+  "icon": "/assets/heroes/N015.png"
  },
  "N016": {
   "name": "Troll Warlord",
   "proper": "Jahrakal",
-  "d2": "troll_warlord"
+  "d2": "troll_warlord",
+  "icon": "/assets/heroes/N016.png"
  },
  "N017": {
   "name": "Troll Warlord",
   "proper": "Jahrakal",
-  "d2": "troll_warlord"
+  "d2": "troll_warlord",
+  "icon": "/assets/heroes/N017.png"
  },
  "N01A": {
   "name": "Silencer",
   "proper": "Nortrom",
-  "d2": "silencer"
+  "d2": "silencer",
+  "icon": "/assets/heroes/N01A.png"
  },
  "N01H": {
   "name": "Alchemist",
   "proper": "Razzil Darkbrew",
-  "d2": "alchemist"
+  "d2": "alchemist",
+  "icon": "/assets/heroes/N01H.png"
  },
  "N01I": {
   "name": "Alchemist",
   "proper": "Razzil Darkbrew",
-  "d2": "alchemist"
+  "d2": "alchemist",
+  "icon": "/assets/heroes/N01I.png"
  },
  "N01J": {
   "name": "Alchemist",
   "proper": "Razzil Darkbrew",
-  "d2": "alchemist"
+  "d2": "alchemist",
+  "icon": "/assets/heroes/N01J.png"
  },
  "N01O": {
   "name": "Lone Druid",
   "proper": "Syllabear",
-  "d2": "lone_druid"
+  "d2": "lone_druid",
+  "icon": "/assets/heroes/N01O.png"
  },
  "N01T": {
   "name": "Alchemist",
   "proper": "Razzil Darkbrew",
-  "d2": "alchemist"
+  "d2": "alchemist",
+  "icon": "/assets/heroes/N01T.png"
  },
  "N01V": {
   "name": "Priestess of the Moon",
   "proper": "Mirana Nightshade",
-  "d2": "mirana"
+  "d2": "mirana",
+  "icon": "/assets/heroes/N01V.png"
  },
  "N01W": {
   "name": "Shadow Priest",
   "proper": "Dazzle",
-  "d2": "dazzle"
+  "d2": "dazzle",
+  "icon": "/assets/heroes/N01W.png"
  },
  "N02B": {
   "name": "Troll Warlord",
   "proper": "Jahrakal",
-  "d2": "troll_warlord"
+  "d2": "troll_warlord",
+  "icon": "/assets/heroes/N02B.png"
  },
  "N0EG": {
   "name": "Windrunner",
   "proper": "Alleria",
-  "d2": "windrunner"
+  "d2": "windrunner",
+  "icon": "/assets/heroes/N0EG.png"
  },
  "N0EI": {
   "name": "Windrunner",
   "proper": "Alleria",
-  "d2": "windrunner"
+  "d2": "windrunner",
+  "icon": "/assets/heroes/N0EI.png"
  },
  "N0EJ": {
   "name": "Windrunner",
   "proper": "Alleria",
-  "d2": "windrunner"
+  "d2": "windrunner",
+  "icon": "/assets/heroes/N0EJ.png"
  },
  "N0EK": {
   "name": "Windrunner",
   "proper": "Alleria",
-  "d2": "windrunner"
+  "d2": "windrunner",
+  "icon": "/assets/heroes/N0EK.png"
  },
  "N0EM": {
   "name": "Windrunner",
   "proper": "Alleria",
-  "d2": "windrunner"
+  "d2": "windrunner",
+  "icon": "/assets/heroes/N0EM.png"
  },
  "Naka": {
   "name": "Bounty Hunter",
@@ -452,47 +534,56 @@
  "Nbbc": {
   "name": "Juggernaut",
   "proper": "Yurnero",
-  "d2": "juggernaut"
+  "d2": "juggernaut",
+  "icon": "/assets/heroes/Nbbc.png"
  },
  "Nbrn": {
   "name": "Drow Ranger",
   "proper": "Traxex",
-  "d2": "drow_ranger"
+  "d2": "drow_ranger",
+  "icon": "/assets/heroes/Nbrn.png"
  },
  "NC00": {
   "name": "Skeleton King",
   "proper": "King Leoric",
-  "d2": "skeleton_king"
+  "d2": "skeleton_king",
+  "icon": "/assets/heroes/NC00.png"
  },
  "Nfir": {
   "name": "Shadow Fiend",
   "proper": "Nevermore",
-  "d2": "nevermore"
+  "d2": "nevermore",
+  "icon": "/assets/heroes/Nfir.png"
  },
  "Npbm": {
   "name": "Pandaren Brewmaster",
   "proper": "Mangix",
-  "d2": "brewmaster"
+  "d2": "brewmaster",
+  "icon": "/assets/heroes/Npbm.png"
  },
  "Nrob": {
   "name": "Tinker",
   "proper": "Gazz Stripbolt",
-  "d2": "tinker"
+  "d2": "tinker",
+  "icon": "/assets/heroes/Nrob.png"
  },
  "Ntin": {
   "name": "Tinker",
   "proper": "Boush",
-  "d2": "tinker"
+  "d2": "tinker",
+  "icon": "/assets/heroes/Ntin.png"
  },
  "O00J": {
   "name": "Spiritbreaker",
   "proper": "Barathrum",
-  "d2": "spirit_breaker"
+  "d2": "spirit_breaker",
+  "icon": "/assets/heroes/O00J.png"
  },
  "O00P": {
   "name": "Morphling",
   "proper": "Morphling",
-  "d2": "morphling"
+  "d2": "morphling",
+  "icon": "/assets/heroes/O00P.png"
  },
  "O015": {
   "name": "Tauren Chieftain",
@@ -512,92 +603,110 @@
  "Ofar": {
   "name": "Tidehunter",
   "proper": "Leviathan",
-  "d2": "tidehunter"
+  "d2": "tidehunter",
+  "icon": "/assets/heroes/Ofar.png"
  },
  "Ogrh": {
   "name": "Phantom Lancer",
   "proper": "Azwraith",
-  "d2": "phantom_lancer"
+  "d2": "phantom_lancer",
+  "icon": "/assets/heroes/Ogrh.png"
  },
  "Opgh": {
   "name": "Axe",
   "proper": "Mogul Kahn",
-  "d2": "axe"
+  "d2": "axe",
+  "icon": "/assets/heroes/Opgh.png"
  },
  "Orkn": {
   "name": "Shadow Shaman",
   "proper": "Rhasta",
-  "d2": "shadow_shaman"
+  "d2": "shadow_shaman",
+  "icon": "/assets/heroes/Orkn.png"
  },
  "Oshd": {
   "name": "Bane Elemental",
   "proper": "Atropos",
-  "d2": "bane"
+  "d2": "bane",
+  "icon": "/assets/heroes/Oshd.png"
  },
  "Otch": {
   "name": "Earthshaker",
   "proper": "Raigor Stonehoof",
-  "d2": "earthshaker"
+  "d2": "earthshaker",
+  "icon": "/assets/heroes/Otch.png"
  },
  "U000": {
   "name": "Nerubian Assassin",
   "proper": "Anubarak",
-  "d2": "nyx_assassin"
+  "d2": "nyx_assassin",
+  "icon": "/assets/heroes/U000.png"
  },
  "U006": {
   "name": "Broodmother",
   "proper": "Black Arachnia",
-  "d2": "broodmother"
+  "d2": "broodmother",
+  "icon": "/assets/heroes/U006.png"
  },
  "U008": {
   "name": "Lycanthrope",
   "proper": "Banehallow",
-  "d2": "lycan"
+  "d2": "lycan",
+  "icon": "/assets/heroes/U008.png"
  },
  "U00A": {
   "name": "Chaos Knight",
   "proper": "Nessaj",
-  "d2": "chaos_knight"
+  "d2": "chaos_knight",
+  "icon": "/assets/heroes/U00A.png"
  },
  "U00C": {
   "name": "Lifestealer",
   "proper": "Naix",
-  "d2": "life_stealer"
+  "d2": "life_stealer",
+  "icon": "/assets/heroes/U00C.png"
  },
  "U00E": {
   "name": "Necrolyte",
   "proper": "Rotundjere",
-  "d2": "necrolyte"
+  "d2": "necrolyte",
+  "icon": "/assets/heroes/U00E.png"
  },
  "U00F": {
   "name": "Butcher",
   "proper": "Pudge",
-  "d2": "pudge"
+  "d2": "pudge",
+  "icon": "/assets/heroes/U00F.png"
  },
  "U00K": {
   "name": "Sand King",
   "proper": "Crixalis",
-  "d2": "sand_king"
+  "d2": "sand_king",
+  "icon": "/assets/heroes/U00K.png"
  },
  "U00P": {
   "name": "Obsidian Destroyer",
   "proper": "Harbinger",
-  "d2": "obsidian_destroyer"
+  "d2": "obsidian_destroyer",
+  "icon": "/assets/heroes/U00P.png"
  },
  "Ubal": {
   "name": "Nerubian Weaver",
   "proper": "Anubseran",
-  "d2": "weaver"
+  "d2": "weaver",
+  "icon": "/assets/heroes/Ubal.png"
  },
  "UC01": {
   "name": "Queen of Pain",
   "proper": "Akasha",
-  "d2": "queenofpain"
+  "d2": "queenofpain",
+  "icon": "/assets/heroes/UC01.png"
  },
  "UC11": {
   "name": "Magnataur",
   "proper": "Magnus",
-  "d2": "magnataur"
+  "d2": "magnataur",
+  "icon": "/assets/heroes/UC11.png"
  },
  "UC18": {
   "name": "Demon Witch",
@@ -607,51 +716,61 @@
  "UC42": {
   "name": "Doom Bringer",
   "proper": "Lucifer",
-  "d2": "doom_bringer"
+  "d2": "doom_bringer",
+  "icon": "/assets/heroes/UC42.png"
  },
  "UC60": {
   "name": "Necrolic",
   "proper": "Visage",
-  "d2": "visage"
+  "d2": "visage",
+  "icon": "/assets/heroes/UC60.png"
  },
  "UC76": {
   "name": "Death Prophet",
   "proper": "Krobelus",
-  "d2": "death_prophet"
+  "d2": "death_prophet",
+  "icon": "/assets/heroes/UC76.png"
  },
  "UC91": {
   "name": "Slithereen Guard",
   "proper": "Slardar",
-  "d2": "slardar"
+  "d2": "slardar",
+  "icon": "/assets/heroes/UC91.png"
  },
  "Ucrl": {
   "name": "Stone Giant",
   "proper": "Tiny",
-  "d2": "tiny"
+  "d2": "tiny",
+  "icon": "/assets/heroes/Ucrl.png"
  },
  "Udea": {
   "name": "Lord of Avernus",
   "proper": "Abaddon",
-  "d2": "abaddon"
+  "d2": "abaddon",
+  "icon": "/assets/heroes/Udea.png"
  },
  "Udre": {
   "name": "Night Stalker",
   "proper": "Balanar",
-  "d2": "night_stalker"
+  "d2": "night_stalker",
+  "icon": "/assets/heroes/Udre.png"
  },
  "Uktl": {
   "name": "Enigma",
   "proper": "Darchrow",
-  "d2": "enigma"
+  "d2": "enigma",
+  "icon": "/assets/heroes/Uktl.png"
  },
  "Ulic": {
   "name": "Lich",
   "proper": "KelThuzad",
-  "d2": "lich"
+  "d2": "lich",
+  "icon": "/assets/heroes/Ulic.png"
  },
  "Usyl": {
   "name": "Dwarven Sniper",
   "proper": "Kardel Sharpeye",
-  "d2": "sniper"
+  "d2": "sniper",
+  "icon": "/assets/heroes/Usyl.png"
  }
 }

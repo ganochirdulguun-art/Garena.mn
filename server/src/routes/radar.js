@@ -21,10 +21,14 @@ const MAX_PATH_POINTS = 20000;     // нэг тоглогчид
 let HEROES = {};
 try { HEROES = require('../config/dota_heroes.json'); } catch { HEROES = {}; }
 const ICON_BASE = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons/';
+// Icon эрэмбэ: (1) ОРИГИНАЛ WC3/DotA BTN icon — WC3 MPQ-аас нэрээр нь татаж public/assets/heroes/<code>.png (эзний шаардлага:
+// "яг оригинал icon"); (2) map дотор нууцалсан custom icon-той 12 hero-д Dota 2 CDN fallback.
+const LOCAL_BASE = (process.env.PUBLIC_BASE_URL || 'https://garenamn-production.up.railway.app').replace(/\/$/, '');
 function heroInfo(code) {
   const h = code ? HEROES[code] : null;
   if (!h) return { hero_name: code || null, hero_proper: null, hero_icon: null };
-  return { hero_name: h.name || code, hero_proper: h.proper || null, hero_icon: h.d2 ? `${ICON_BASE}${h.d2}.png` : null };
+  const icon = h.icon ? `${LOCAL_BASE}${h.icon}` : (h.d2 ? `${ICON_BASE}${h.d2}.png` : null);
+  return { hero_name: h.name || code, hero_proper: h.proper || null, hero_icon: icon };
 }
 const enrichPlayers = (players) => (Array.isArray(players) ? players : []).map((p) => ({ ...p, ...heroInfo(p.hero) }));
 const MAX_PLAYERS = 12;
