@@ -5538,9 +5538,7 @@ init();
       if (!a || (!a.xp && !a.diamonds)) return;
       if (currentUser) { currentUser.play_seconds_total = a.total_sec; currentUser.play_next_diamond_sec = a.next_diamond_sec; }
       const head = `⏱ Тоглосон цагийн урамшуулал: +${fmtN(a.xp)} XP${a.diamonds ? ` · +${a.diamonds} 💎` : ''}${a.level_up ? ` · 🆙 LV ${a.level}` : ''}`;
-      showToast(head + '
-' + (a.lines || []).join('
-'), 'success', 9000);
+      showToast(head + String.fromCharCode(10) + (a.lines || []).join(String.fromCharCode(10)), 'success', 9000);
       try { playSound?.('join'); } catch {}
       refreshMe();
     });
