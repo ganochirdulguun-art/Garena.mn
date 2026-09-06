@@ -68,6 +68,8 @@ async function tick() {
     const now = Date.now();
     let files = [];
     try { files = fs.readdirSync(CAP_DIR).filter((f) => f.endsWith('.w3gs')).map((f) => path.join(CAP_DIR, f)); } catch (e) { log('readdir: ' + e.message); return; }
+    // Устгагдсан/зөөгдсөн файл (readdir-т алга) → дууссан гэж мэдэгдээд хаяна
+    for (const [file, gg] of [...games]) if (!files.includes(file)) { await send(gg, true); games.delete(file); log(`${gg.token.slice(0, 8)} файл алга → дууссан`); }
     for (const file of files) {
       let st; try { st = fs.statSync(file); } catch { continue; }
       if (done.has(file)) { if (now - done.get(file) > 3600e3) done.delete(file); continue; }
