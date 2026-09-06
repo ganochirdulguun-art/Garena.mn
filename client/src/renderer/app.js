@@ -175,6 +175,9 @@ function isDMMode() {
 function isFriendsMode() {
   return new URLSearchParams(window.location.search).get('mode') === 'friends';
 }
+function isRadarMode() {
+  return new URLSearchParams(window.location.search).get('mode') === 'radar';
+}
 
 async function connectSocket() {
   if (socket) socket.disconnect();
@@ -593,6 +596,25 @@ async function init() {
     // Профайл чип (аватар/нэр/LV/tier/💎) — Найзууд цонхны улаан толгойд
     setUserUI(user);
     window.__premium?.refreshMe?.();
+    return;
+  }
+
+  // 📡 Радар always-on-top цонх горим (2.8.11): socket хэрэггүй — зөвхөн HTTP poll (radar.js)
+  if (isRadarMode()) {
+    document.getElementById('page-login').classList.remove('active');
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const user = await window.api.getUser();
+    if (!user) { window.close(); return; }
+    currentUser = user;
+    document.getElementById('radar-fullpage').classList.add('active');
+    const p = new URLSearchParams(window.location.search);
+    // radar.js app.js-ийн ДАРАА ачаалагддаг (await-ийн микротаск түүнээс өмнө гүйдэг) → DOM бэлэн болсны дараа эхлүүлнэ
+    const start = () => { window.radarTab?.openCompact(p.get('token')); window.api.onRadarSwitch?.((d) => window.radarTab?.openCompact(d.token)); };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
+    document.getElementById('rdfp-top')?.addEventListener('click', (e) => {
+      const on = !e.currentTarget.classList.contains('on');
+      e.currentTarget.classList.toggle('on', on); window.api.radarOnTop?.(on);
+    });
     return;
   }
 

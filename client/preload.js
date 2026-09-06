@@ -98,6 +98,9 @@ contextBridge.exposeInMainWorld('api', {
   openDMWindow:      (data) => ipcRenderer.invoke('dm:openWindow', data),
   // Найзуудын тусдаа цонх
   openFriendsWindow: () => ipcRenderer.invoke('friends:openWindow'),
+  openRadarWindow:   (data) => ipcRenderer.invoke('radar:openWindow', data),   // 📡 Радар always-on-top цонх
+  radarOnTop:        (on)   => ipcRenderer.invoke('radar:onTop', on),
+  onRadarSwitch:     (cb)   => ipcRenderer.on('radar:switch', (_, d) => cb(d)),
   isDMWindowOpen:    (userId) => ipcRenderer.invoke('dm:isWindowOpen', userId),
   onDMWindowClosed:  (cb)   => ipcRenderer.on('dm:window-closed', (_, data) => cb(data)),
 

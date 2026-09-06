@@ -577,50 +577,65 @@
     </div>
 
     <!-- 📡 Радар tab — relay бичлэгээс hero-гийн хөдөлгөөн/kill-ийн replay симуляц (src/renderer/radar.js) -->
-    <div id="tab-radar" class="tab">
+    <div id="tab-radar" class="tab rd-scope">
       <style>
-        #tab-radar .rd-wrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
-        @media (max-width:980px){#tab-radar .rd-wrap{grid-template-columns:1fr}}
-        #tab-radar .rd-list{display:grid;gap:8px;max-height:calc(100vh - 220px);overflow:auto;padding-right:4px}
-        #tab-radar .rd-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:10px 12px;cursor:pointer;display:grid;gap:4px}
-        #tab-radar .rd-card:hover,#tab-radar .rd-card.on{border-color:#e0b15a;background:rgba(224,177,90,.08)}
-        #tab-radar .rd-card b{font-size:14px} #tab-radar .rd-card small{color:#9aa6bd;font-variant-numeric:tabular-nums}
-        #tab-radar .rd-stage{background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:12px;display:grid;gap:10px}
-        #tab-radar .rd-stagewrap{perspective:1100px;display:grid;place-items:center;overflow:hidden}
-        #tab-radar canvas{width:min(100%,600px);aspect-ratio:1/1;display:block;background:#000;outline:1px solid rgba(255,255,255,.1);transition:transform .5s ease}
-        #tab-radar .tilt canvas{transform:rotateX(42deg) scale(1.02)}
-        #tab-radar .rd-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-        #tab-radar .rd-row button{font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px;padding:8px 11px;border-radius:4px;border:1px solid rgba(255,255,255,.12);background:#141d31;color:#e6ecf7;cursor:pointer}
-        #tab-radar .rd-row button.on{border-color:#e0b15a;color:#e0b15a}
-        #tab-radar .rd-clock{margin-left:auto;font-family:Consolas,monospace;font-size:20px;font-variant-numeric:tabular-nums}
-        #tab-radar .rd-timeline{position:relative;height:30px} #tab-radar .rd-timeline input{width:100%;margin:0;position:absolute;inset:0;height:30px;accent-color:#e0b15a}
-        #tab-radar .rd-ticks{position:absolute;left:8px;right:8px;top:1px;height:7px;pointer-events:none} #tab-radar .rd-ticks i{position:absolute;top:0;width:2px;height:7px;background:#ff2b2b}
-        #tab-radar .rd-side{display:grid;gap:8px}
-        #tab-radar .rd-hero{display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:8px 10px}
-        #tab-radar .rd-hero .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:11px;color:#04121a}
-        #tab-radar .rd-hero.dead .ic{filter:grayscale(1) brightness(.6)} #tab-radar .rd-hero small{color:#9aa6bd;font-family:Consolas,monospace;font-size:11px}
-        #tab-radar .rd-feed{max-height:220px;overflow:auto;font-size:12px;display:grid;gap:4px} #tab-radar .rd-feed div{opacity:.35} #tab-radar .rd-feed div.past{opacity:1}
-        #tab-radar .rd-feed time{font-family:Consolas,monospace;color:#e0b15a;margin-right:8px}
-        #tab-radar .s{color:#43d9c9} #tab-radar .c{color:#ff5c5c}
-        #tab-radar .rd-empty{color:#9aa6bd;padding:40px;text-align:center}
-        #tab-radar .rd-grid2{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start} @media (max-width:1200px){#tab-radar .rd-grid2{grid-template-columns:1fr}}
-        #tab-radar [hidden]{display:none!important}
-        #tab-radar .rd-col{display:grid;gap:10px;align-content:start} #tab-radar .rd-live{display:grid;gap:8px}
-        #tab-radar .rd-livehead{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.08em;font-size:12px;color:#ff5c5c;text-transform:uppercase}
-        #tab-radar .rd-livehead.rp{color:#e0b15a;margin-top:4px} #tab-radar .rd-livehead .dot{width:9px;height:9px;border-radius:50%;background:#ff2b2b;box-shadow:0 0 8px #ff2b2b}
-        #tab-radar .rd-card.live{border-color:rgba(255,43,43,.35)} #tab-radar .rd-card.live.on{border-color:#ff5c5c;background:rgba(255,43,43,.08)}
-        #tab-radar .rd-empty.small{padding:10px;font-size:12px}
-        #tab-radar .rd-pill{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.04em;vertical-align:middle;border:1px solid}
-        #tab-radar .rd-pill.own{color:#ffd23a;border-color:rgba(255,210,58,.5);background:rgba(255,210,58,.1)} #tab-radar .rd-pill.gold{color:#e0b15a;border-color:rgba(224,177,90,.5);background:rgba(224,177,90,.1)}
-        #tab-radar .rd-stagewrap{position:relative} #tab-radar .rd-status{position:absolute;top:10px;left:10px;padding:5px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.06em;background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.15)}
-        #tab-radar .rd-status.live{border-color:#ff2b2b;color:#ff8080} #tab-radar .rd-status.demo{border-color:#e0b15a;color:#e0b15a}
-        #tab-radar .rd-watermark{position:absolute;right:14px;bottom:10px;font-weight:900;font-size:34px;letter-spacing:.2em;color:rgba(224,177,90,.28);pointer-events:none}
-        #tab-radar .rd-locked{display:block} #tab-radar .rd-lock-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:18px;align-items:start} @media (max-width:1100px){#tab-radar .rd-lock-grid{grid-template-columns:1fr}}
-        #tab-radar .rd-lock-info{background:rgba(255,255,255,.04);border:1px solid rgba(224,177,90,.35);border-radius:6px;padding:18px;display:grid;gap:10px}
-        #tab-radar .rd-lock-badge{display:inline-block;justify-self:start;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.12em;color:#1a1200;background:linear-gradient(180deg,#ffd76a,#d9a13a)}
-        #tab-radar .rd-lock-info h3{margin:0;font-size:20px} #tab-radar .rd-lock-info p{margin:0;color:#c9d0dd;line-height:1.5}
-        #tab-radar .rd-steps{margin:0;padding-left:20px;display:grid;gap:6px;color:#e6ecf7} #tab-radar .rd-lock-actions{display:grid;gap:8px;margin-top:4px}
-        #tab-radar .rd-demo .rd-grid2.demo{grid-template-columns:minmax(0,1fr) 240px} #tab-radar .rd-demo canvas{width:min(100%,560px)}
+        .rd-scope .rd-wrap{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;align-items:start}
+        @media (max-width:980px){.rd-scope .rd-wrap{grid-template-columns:1fr}}
+        .rd-scope .rd-list{display:grid;gap:8px;max-height:calc(100vh - 220px);overflow:auto;padding-right:4px}
+        .rd-scope .rd-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:10px 12px;cursor:pointer;display:grid;gap:4px}
+        .rd-scope .rd-card:hover,.rd-scope .rd-card.on{border-color:#e0b15a;background:rgba(224,177,90,.08)}
+        .rd-scope .rd-card b{font-size:14px} .rd-scope .rd-card small{color:#9aa6bd;font-variant-numeric:tabular-nums}
+        .rd-scope .rd-stage{background:#0b1020;border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:12px;display:grid;gap:10px}
+        .rd-scope .rd-stagewrap{perspective:1100px;display:grid;place-items:center;overflow:hidden}
+        .rd-scope canvas{width:min(100%,600px);aspect-ratio:1/1;display:block;background:#000;outline:1px solid rgba(255,255,255,.1);transition:transform .5s ease}
+        .rd-scope .tilt canvas{transform:rotateX(42deg) scale(1.02)}
+        .rd-scope .rd-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+        .rd-scope .rd-row button{font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:12px;padding:8px 11px;border-radius:4px;border:1px solid rgba(255,255,255,.12);background:#141d31;color:#e6ecf7;cursor:pointer}
+        .rd-scope .rd-row button.on{border-color:#e0b15a;color:#e0b15a}
+        .rd-scope .rd-clock{margin-left:auto;font-family:Consolas,monospace;font-size:20px;font-variant-numeric:tabular-nums}
+        .rd-scope .rd-timeline{position:relative;height:30px} .rd-scope .rd-timeline input{width:100%;margin:0;position:absolute;inset:0;height:30px;accent-color:#e0b15a}
+        .rd-scope .rd-ticks{position:absolute;left:8px;right:8px;top:1px;height:7px;pointer-events:none} .rd-scope .rd-ticks i{position:absolute;top:0;width:2px;height:7px;background:#ff2b2b}
+        .rd-scope .rd-side{display:grid;gap:8px}
+        .rd-scope .rd-hero{display:grid;grid-template-columns:36px 1fr;gap:10px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:6px;padding:8px 10px}
+        .rd-scope .rd-hero .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:11px;color:#04121a}
+        .rd-scope .rd-hero.dead .ic{filter:grayscale(1) brightness(.6)} .rd-scope .rd-hero small{color:#9aa6bd;font-family:Consolas,monospace;font-size:11px}
+        .rd-scope .rd-feed{max-height:220px;overflow:auto;font-size:12px;display:grid;gap:4px} .rd-scope .rd-feed div{opacity:.35} .rd-scope .rd-feed div.past{opacity:1}
+        .rd-scope .rd-feed time{font-family:Consolas,monospace;color:#e0b15a;margin-right:8px}
+        .rd-scope .s{color:#43d9c9} .rd-scope .c{color:#ff5c5c}
+        .rd-scope .rd-empty{color:#9aa6bd;padding:40px;text-align:center}
+        .rd-scope .rd-grid2{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start} @media (max-width:1200px){.rd-scope .rd-grid2{grid-template-columns:1fr}}
+        .rd-scope [hidden]{display:none!important}
+        /* compact (always-on-top цонх): зөвхөн газрын зураг + статус */
+        .rd-scope .rd-grid2.compact{grid-template-columns:minmax(0,1fr)} .rd-scope .rd-grid2.compact .rd-side,.rd-scope .rd-grid2.compact .rd-row,.rd-scope .rd-grid2.compact .rd-timeline,.rd-scope .rd-grid2.compact .hint{display:none}
+        .rd-scope .rd-grid2.compact .rd-stage{padding:0;border:0;background:#000} .rd-scope .rd-grid2.compact canvas{width:100%;outline:0}
+        .rd-scope .rd-open{margin-left:auto;font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.5);color:#fff;cursor:pointer}
+        .rd-scope .rd-status{display:flex;gap:8px;align-items:center;right:10px}
+        #radar-fullpage{display:none;flex-direction:column;height:100vh;background:#000;color:#e6ecf7}
+        #radar-fullpage.active{display:flex}
+        #radar-fullpage .rd-fp-bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:linear-gradient(180deg,#4a3f36,#1f1a16);border-bottom:1px solid #000;font:700 12px var(--font-d,sans-serif);letter-spacing:.06em;-webkit-app-region:drag}
+        #radar-fullpage .rd-fp-bar button{-webkit-app-region:no-drag;font-size:11px;padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.2);background:#111;color:#bbb;cursor:pointer}
+        #radar-fullpage .rd-fp-bar button.on{color:#ffd23a;border-color:rgba(255,210,58,.6)}
+        #radar-fullpage #rd-fp-viewer{flex:1;min-height:0;display:grid;place-items:center;overflow:hidden}
+        #radar-fullpage .rd-grid2.compact{width:100%;height:100%;grid-template-columns:minmax(0,1fr)} #radar-fullpage .rd-grid2.compact .rd-stage{height:100%;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;min-width:0}
+        #radar-fullpage #rd-fp-viewer{grid-template-columns:minmax(0,1fr)} #radar-fullpage .rd-stagewrap{width:100%;min-width:0;display:grid;grid-template-columns:minmax(0,1fr);place-items:center}
+        #radar-fullpage{width:100vw;overflow:hidden} #radar-fullpage .rd-grid2.compact canvas{width:min(100vw,calc(100vh - 40px));height:auto;max-width:100vw}
+        .rd-scope .rd-grid2.compact .rd-status{right:auto}
+        .rd-scope .rd-col{display:grid;gap:10px;align-content:start} .rd-scope .rd-live{display:grid;gap:8px}
+        .rd-scope .rd-livehead{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.08em;font-size:12px;color:#ff5c5c;text-transform:uppercase}
+        .rd-scope .rd-livehead.rp{color:#e0b15a;margin-top:4px} .rd-scope .rd-livehead .dot{width:9px;height:9px;border-radius:50%;background:#ff2b2b;box-shadow:0 0 8px #ff2b2b}
+        .rd-scope .rd-card.live{border-color:rgba(255,43,43,.35)} .rd-scope .rd-card.live.on{border-color:#ff5c5c;background:rgba(255,43,43,.08)}
+        .rd-scope .rd-empty.small{padding:10px;font-size:12px}
+        .rd-scope .rd-pill{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.04em;vertical-align:middle;border:1px solid}
+        .rd-scope .rd-pill.own{color:#ffd23a;border-color:rgba(255,210,58,.5);background:rgba(255,210,58,.1)} .rd-scope .rd-pill.gold{color:#e0b15a;border-color:rgba(224,177,90,.5);background:rgba(224,177,90,.1)}
+        .rd-scope .rd-stagewrap{position:relative} .rd-scope .rd-status{position:absolute;top:10px;left:10px;padding:5px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.06em;background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.15)}
+        .rd-scope .rd-status.live{border-color:#ff2b2b;color:#ff8080} .rd-scope .rd-status.demo{border-color:#e0b15a;color:#e0b15a}
+        .rd-scope .rd-watermark{position:absolute;right:14px;bottom:10px;font-weight:900;font-size:34px;letter-spacing:.2em;color:rgba(224,177,90,.28);pointer-events:none}
+        .rd-scope .rd-locked{display:block} .rd-scope .rd-lock-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:18px;align-items:start} @media (max-width:1100px){.rd-scope .rd-lock-grid{grid-template-columns:1fr}}
+        .rd-scope .rd-lock-info{background:rgba(255,255,255,.04);border:1px solid rgba(224,177,90,.35);border-radius:6px;padding:18px;display:grid;gap:10px}
+        .rd-scope .rd-lock-badge{display:inline-block;justify-self:start;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.12em;color:#1a1200;background:linear-gradient(180deg,#ffd76a,#d9a13a)}
+        .rd-scope .rd-lock-info h3{margin:0;font-size:20px} .rd-scope .rd-lock-info p{margin:0;color:#c9d0dd;line-height:1.5}
+        .rd-scope .rd-steps{margin:0;padding-left:20px;display:grid;gap:6px;color:#e6ecf7} .rd-scope .rd-lock-actions{display:grid;gap:8px;margin-top:4px}
+        .rd-scope .rd-demo .rd-grid2.demo{grid-template-columns:minmax(0,1fr) 240px} .rd-scope .rd-demo canvas{width:min(100%,560px)}
       </style>
       <div class="tab-header section-header">
         <div><h2>📡 Радар <span id="rd-access"></span></h2><p class="hint">Явж буй тоглолтыг гаднаас нь LIVE (саатлаар) болон дууссан тоглолтыг replay-ээр — hero-гийн хөдөлгөөн, үхэл, kill газрын зураг дээр. Байрлал = тушаалуудаас симуляцилсан ойролцоо утга; kill/death яг цагаар. LIVE 120 с саатлаар — оролцогч өөрийн тоглолтыг харахгүй.</p></div>
@@ -1206,6 +1221,12 @@
 
   <!-- DM floating popup container -->
   <div id="dm-popups-container"></div>
+
+  <!-- 📡 Радар always-on-top цонх горим (mode=radar, 2.8.11) — radar.js openCompact -->
+  <div id="radar-fullpage" class="page rd-scope">
+    <div class="rd-fp-bar"><span>📡</span><span id="rdfp-title">LIVE радар</span><span style="flex:1"></span><button type="button" id="rdfp-top" class="on" title="Бусад цонхны дээр байлгах">📌 Дээр</button></div>
+    <div id="rd-fp-viewer"><div class="rd-empty">Холбогдож байна…</div></div>
+  </div>
 
   <!-- Найзуудын тусдаа цонх горим (full page) -->
   <div id="friends-fullpage" class="page friends-fullpage">

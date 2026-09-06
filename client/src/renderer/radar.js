@@ -12,7 +12,8 @@
   const hName = (p) => (p && (p.hero_name || p.hero)) || '?';
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-  const isTabOn = () => !!el('tab-radar')?.classList.contains('active');
+  const RADAR_MODE = new URLSearchParams(window.location.search).get('mode') === 'radar';   // always-on-top цонх
+  const isTabOn = () => RADAR_MODE || !!el('tab-radar')?.classList.contains('active');
   let minimapUrl = null, raf = null, pollTimer = null, listTimer = null, access = null, viewer = null;
 
   function stopViewer() {
@@ -97,13 +98,14 @@
   }
 
   // ── LIVE үзэгч: 5 с тутам delta (since = сүүлд харсан тоглоомын цаг) ──
-  async function openLive(token) {
-    const v = el('rd-viewer'); v.innerHTML = '<div class="rd-empty">LIVE радар холбогдож байна…</div>';
+  async function openLive(token, opts = {}) {
+    const v = opts.mount || el('rd-viewer'); v.innerHTML = '<div class="rd-empty">LIVE радар холбогдож байна…</div>';
     stopViewer();
     let g;
     try { g = await api('get', `/radar/live/${encodeURIComponent(token)}`); } catch (e) { v.innerHTML = `<div class="rd-empty">${esc(e.message || e)}</div>`; return; }
     minimapUrl = g.minimap_url || minimapUrl;
-    const ctl = render(g, { mount: v, live: true });
+    const ctl = render(g, { mount: v, live: true, compact: !!opts.compact });
+    if (opts.compact) { const t = el('rdfp-title'); if (t) t.textContent = g.room_name || 'LIVE радар'; }
     viewer = { token, g, ctl };
     let stalls = 0;
     pollTimer = setInterval(async () => {
@@ -151,7 +153,7 @@
   // opts: { mount, live, demo } → { update(g), setStatus(text) }
   function render(g, opts = {}) {
     const v = opts.mount || el('rd-viewer');
-    const live = !!opts.live, demo = !!opts.demo;
+    const live = !!opts.live, demo = !!opts.demo, compact = !!opts.compact;
     let S = simulate(g);
     const B = g.bounds || { x0: -8192, x1: 8192, y0: -8192, y1: 8192 };
     const label = (pid) => (pid == null ? null : (S.byPid[pid]?.name || `Тоглогч #${pid}`));
@@ -161,8 +163,9 @@
     const heroCard = (p) => `<div class="rd-hero" id="rdh-${p.pid}">${p.hero_icon ? `<img class="ic" src="${esc(p.hero_icon)}" alt="" style="object-fit:cover;border:2px solid ${col(p.pid)}">` : `<div class="ic" style="background:${col(p.pid)}">${esc((p.hero || '?').slice(0, 4))}</div>`}<div><b>${esc(p.name || ('Тоглогч #' + p.pid))}</b><br><small>${esc(hName(p))}${p.hero_proper ? ' · ' + esc(p.hero_proper) : ''}</small><br><small class="st">амьд</small></div></div>`;
     const feedRow = (k) => `<div data-t="${k.t}"><time>${fmt(k.t)}</time><b class="${teamOf(k.killer) === 2 ? 'c' : 's'}">${esc(who(k.killer, k.kc))}</b> алав → <b class="${k.victim == null ? '' : (teamOf(k.victim) === 2 ? 'c' : 's')}">${esc(who(k.victim, k.vc))}</b></div>`;
     const status = live ? (g.delay_sec ? `🔴 LIVE · ${g.delay_sec} с саатал` : '🔴 LIVE · шууд') : demo ? '🎬 ДЕМО · дууссан тоглолтын симуляц' : '';
-    v.innerHTML = `<div class="rd-grid2${demo ? ' demo' : ''}"><div class="rd-stage">
-        <div class="rd-stagewrap" id="rd-stagewrap"><canvas id="rd-cv" width="768" height="768"></canvas>${status ? `<div class="rd-status ${live ? 'live' : 'demo'}" id="rd-status">${status}</div>` : ''}${demo ? '<div class="rd-watermark">GOLD</div>' : ''}</div>
+    const openBtn = live && !compact && window.api?.openRadarWindow ? '<button type="button" class="rd-open" id="rd-open" title="Жижиг, үргэлж дээр байх цонхоор — тоглонгоо харна">⧉ Цонхоор</button>' : '';
+    v.innerHTML = `<div class="rd-grid2${demo ? ' demo' : ''}${compact ? ' compact' : ''}"><div class="rd-stage">
+        <div class="rd-stagewrap" id="rd-stagewrap"><canvas id="rd-cv" width="768" height="768"></canvas>${status ? `<div class="rd-status ${live ? 'live' : 'demo'}"><span id="rd-status">${status}</span>${openBtn}</div>` : ''}${demo ? '<div class="rd-watermark">GOLD</div>' : ''}</div>
         <div class="rd-row"${demo ? ' hidden' : ''}><button id="rd-play">▶ Тоглуулах</button>
           <button data-speed="1"${live ? ' class="on"' : ''}>×1</button><button data-speed="4"${live ? '' : ' class="on"'}>×4</button><button data-speed="16">×16</button><button data-speed="64">×64</button>
           ${live ? '<button id="rd-follow" class="on">🔴 LIVE дага</button>' : ''}
@@ -226,6 +229,7 @@
       raf = requestAnimationFrame(tick);
     }
     img.onload = draw; draw(); if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(tick);
+    q('#rd-open')?.addEventListener('click', () => window.api.openRadarWindow({ token: g.token, title: g.room_name || g.host_name || 'LIVE' }));
     q('#rd-slider')?.addEventListener('input', (e) => { now = Number(e.target.value); follow = false; q('#rd-follow')?.classList.remove('on'); draw(); });
     q('#rd-play')?.addEventListener('click', (e) => { playing = !playing; last = 0; e.currentTarget.textContent = playing ? '❚❚ Зогсоох' : '▶ Тоглуулах'; if (now >= S.T && !live) now = 0; });
     if (playing) { const pb = q('#rd-play'); if (pb) pb.textContent = '❚❚ Зогсоох'; }
@@ -253,5 +257,6 @@
   }
 
   document.getElementById('rd-refresh')?.addEventListener('click', load);
-  window.radarTab = { load, open, openLive, stop: stopAll };
+  const openCompact = (token) => openLive(token, { mount: el('rd-fp-viewer'), compact: true });
+  window.radarTab = { load, open, openLive, openCompact, stop: stopAll };
 })();

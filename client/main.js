@@ -790,6 +790,35 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
   dmWindows.set(uid, dmWin);
 });
 
+// ── 📡 Радар цонх (2.8.11): жижиг, ҮРГЭЛЖ ДЭЭР — тоглоомын дэлгэцийн буланд тавьж LIVE радар харна.
+// Тоглоомын замд хүрэхгүй: тусдаа renderer, зөвхөн 5 с тутмын HTTP poll. Нэг л цонх (дахин нээвэл шинэ тоглолт руу шилжинэ).
+let radarWindow = null;
+ipcMain.handle('radar:openWindow', (_, data) => {
+  const token = String((data && data.token) || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
+  if (!token) return false;
+  const title = `Радар — ${String((data && data.title) || 'LIVE').slice(0, 60)}`;
+  if (radarWindow && !radarWindow.isDestroyed()) {
+    radarWindow.setTitle(title);
+    radarWindow.webContents.send('radar:switch', { token });
+    radarWindow.focus();
+    return true;
+  }
+  const area = screen.getPrimaryDisplay().workArea;
+  radarWindow = new BrowserWindow({
+    width: 400, height: 480, minWidth: 280, minHeight: 320,
+    x: area.x + area.width - 410, y: area.y + 10,
+    title, icon: path.join(__dirname, 'src/renderer/icon.ico'),
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+    autoHideMenuBar: true, alwaysOnTop: true, backgroundColor: '#000000',
+  });
+  radarWindow.setAlwaysOnTop(true, 'screen-saver');
+  radarWindow.loadFile('src/renderer/index.html', { query: { mode: 'radar', token } });
+  hardenWindow(radarWindow);
+  radarWindow.on('closed', () => { radarWindow = null; });
+  return true;
+});
+ipcMain.handle('radar:onTop', (e, on) => { const w = BrowserWindow.fromWebContents(e.sender); if (w && !w.isDestroyed()) w.setAlwaysOnTop(!!on, 'screen-saver'); return !!on; });
+
 // ── Найзуудын тусдаа цонх ─────────────────────────────────
 // ── Найзууд цонх (1.8.5: үндсэн цонхтой ХАМТ нээгдэж, баруун хажууд нь наалддаг хоёр дахь үндсэн цонх) ──
 // Профайл чип + чат/тохиргоо/гарах товчнууд энд байдаг тул дангаар нь хаагдахгүй (closable: false);
