@@ -7,7 +7,8 @@
  "E02F": {
   "name": "Phoenix",
   "proper": "Icarus",
-  "d2": "phoenix"
+  "d2": "phoenix",
+  "icon": "/assets/heroes/E02F.png"
  },
  "E02I": {
   "name": "Tuskarr",
@@ -711,7 +712,8 @@
  "UC18": {
   "name": "Demon Witch",
   "proper": "Lion",
-  "d2": "lion"
+  "d2": "lion",
+  "icon": "/assets/heroes/UC18.png"
  },
  "UC42": {
   "name": "Doom Bringer",
