@@ -1,28 +1,36 @@
 // ── 📡 Радар — relay capture-аас hero-гийн хөдөлгөөн/үхлийн симуляц (2026-09-06, эзний хүсэлт) ──
-// Урсгал: relay тоглоом дуусахад hostbot/reportGame.js → radarExtract → POST /relay/radar (x-relay-key)
-//   → radar_games. Апп/вэб: GET /radar/games (жагсаалт), GET /radar/:token (бүрэн өгөгдөл) — нэвтэрсэн хэрэглэгч.
-// Саатлын бодлого (ЭЗНИЙ ХАТУУ ШИЙДВЭР): ЗӨВХӨН эзэн 0 с; бусад ХЭН Ч (шүүгч/админ/зохион байгуулагч) 120 с;
-//   оролцогчид харахгүй. Энэ файл = тоглолт ДУУССАНЫ ДАРААХ replay (саатал хамаарахгүй); live урсгал Шат 2.
-// Тоглоомын замд (relay, LAN proxy) огт хүрэхгүй — бүх ажил дууссан capture дээр, тусдаа процессоор.
+// Урсгал (replay): relay тоглоом дуусахад hostbot/reportGame.js → radarExtract → POST /relay/radar (x-relay-key)
+//   → radar_games. Апп/вэб: GET /radar/games (жагсаалт), GET /radar/:token (бүрэн өгөгдөл).
+// Урсгал (LIVE, Шат 2): VPS hostbot/radarLive.js 5 с тутамд POST /relay/radar/live (delta) → санах ойн LIVE store
+//   → GET /radar/live (жагсаалт), GET /radar/live/:token?since= (саатал ХЭРЭГЖҮҮЛСЭН харагдац).
+// ЭРХ (эзний шийдвэр 2026-09-06): Радар = GOLD гишүүнчлэлийн онцлог. Эзэн → 0 с саатал. GOLD → 120 с саатал.
+//   Bronze/Silver → GET /radar/access {ok:false} + GET /radar/demo (дууссан тоглолтын үзүүлэнгийн симуляц).
+//   Саатлыг ХЭН Ч богиносгохгүй (шүүгч/админ/зохион байгуулагч бүгд 120 с); тоглолтын оролцогч өөрийн тоглолтыг харахгүй.
+// Тоглоомын замд (relay, LAN proxy) огт хүрэхгүй — бүх ажил capture файл дээр, тусдаа процессоор.
 const express = require('express');
 const crypto = require('crypto');
 const authMW = require('../middleware/auth');
+const adminMW = require('../middleware/admin');
 const lanhost = require('./lanhost');
 
 let db;
 try { db = require('../config/db'); } catch { db = null; }
+let roomRoutes = null;
+try { roomRoutes = require('./rooms'); } catch { roomRoutes = null; }
 
 const REPORT_KEY = process.env.RELAY_REPORT_KEY || '';
 const MAX_PATH_POINTS = 20000;     // нэг тоглогчид
+const MAX_PLAYERS = 12;
+const PUBLIC_DELAY_SEC = 120;      // эзнээс бусад ХЭН Ч — өөрчлөхгүй
+const OWNER_DELAY_SEC = 0;
+const LIVE_KEEP_AFTER_END_MS = (PUBLIC_DELAY_SEC + 60) * 1000;   // дууссаны дараа саатлын үзэгчид дуусгаж үзнэ
+const LIVE_STALE_MS = 10 * 60 * 1000;                             // daemon-оос 10 мин мэдээ ирэхгүй бол хаяна
 
-// DotA hero код → нэр + Dota 2 CDN icon (config/dota_heroes.json — DotA 6.72 replay-parser хүснэгт + Dota 2 slug,
-// CDN-ээр баталгаажуулсан). LoD 6.74c custom кодууд ижил (DotA 6.74c суурьтай); 6.73/6.74-ийн шинэ кодууд
-// (жишээ N0M0, H0DO, E02K) хүснэгтэд байхгүй бол кодоороо харагдана — дараа нь нэмнэ.
+// DotA hero код → нэр + icon (config/dota_heroes.json — DotA 6.72 replay-parser хүснэгт + Dota 2 slug).
 let HEROES = {};
 try { HEROES = require('../config/dota_heroes.json'); } catch { HEROES = {}; }
 const ICON_BASE = 'https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons/';
-// Icon эрэмбэ: (1) ОРИГИНАЛ WC3/DotA BTN icon — WC3 MPQ-аас нэрээр нь татаж public/assets/heroes/<code>.png (эзний шаардлага:
-// "яг оригинал icon"); (2) map дотор нууцалсан custom icon-той 12 hero-д Dota 2 CDN fallback.
+// Icon эрэмбэ: (1) ОРИГИНАЛ WC3/DotA BTN icon — public/assets/heroes/<code>.png (эзний шаардлага); (2) Dota 2 CDN fallback.
 const LOCAL_BASE = (process.env.PUBLIC_BASE_URL || 'https://garenamn-production.up.railway.app').replace(/\/$/, '');
 function heroInfo(code) {
   const h = code ? HEROES[code] : null;
@@ -31,7 +39,6 @@ function heroInfo(code) {
   return { hero_name: h.name || code, hero_proper: h.proper || null, hero_icon: icon };
 }
 const enrichPlayers = (players) => (Array.isArray(players) ? players : []).map((p) => ({ ...p, ...heroInfo(p.hero) }));
-const MAX_PLAYERS = 12;
 
 function keyOk(req) {
   const k = String(req.headers['x-relay-key'] || '');
@@ -84,6 +91,110 @@ function summaryRow(r) {
   };
 }
 
+// ── Эрх: эзэн 0 с / GOLD 120 с / бусад — үгүй ──
+function goldActive(row) {
+  if (!row || String(row.membership || '').toLowerCase() !== 'gold') return false;
+  const until = row.membership_until ? new Date(row.membership_until).getTime() : 0;
+  return until > Date.now();
+}
+const accessCache = new Map();   // userId → { at, res } (30 с) — 5 с тутмын poll-д DB-г дарахгүй
+async function resolveAccess(user) {
+  if (!user || user.id == null) return { ok: false, tier: 'guest', need: 'gold', delay_sec: PUBLIC_DELAY_SEC };
+  if (adminMW.isOwnerUser(user)) return { ok: true, tier: 'owner', delay_sec: OWNER_DELAY_SEC };
+  const c = accessCache.get(String(user.id));
+  if (c && Date.now() - c.at < 30 * 1000) return c.res;
+  let row = null;
+  try { if (db) row = (await db.query('SELECT membership, membership_until FROM users WHERE id = $1', [user.id])).rows[0] || null; } catch {}
+  const tier = row ? String(row.membership || 'bronze').toLowerCase() : 'bronze';
+  const res = goldActive(row) ? { ok: true, tier: 'gold', delay_sec: PUBLIC_DELAY_SEC }
+    : { ok: false, tier: goldActive(row) ? tier : (tier === 'gold' ? 'bronze' : tier), need: 'gold', delay_sec: PUBLIC_DELAY_SEC };
+  accessCache.set(String(user.id), { at: Date.now(), res });
+  return res;
+}
+const requireAccess = async (req, res, next) => {
+  const a = await resolveAccess(req.user);
+  if (!a.ok) return res.status(403).json({ error: 'Радар — GOLD гишүүнчлэлийн онцлог', ...a });
+  req.radarAccess = a; next();
+};
+
+// ── LIVE store (санах ой) ──
+const LIVE = new Map();   // token → live game
+function sweepLive(now = Date.now()) {
+  for (const [t, g] of LIVE) {
+    if ((g.ended_at && now - g.ended_at > LIVE_KEEP_AFTER_END_MS) || now - g.updated_at > LIVE_STALE_MS) LIVE.delete(t);
+  }
+}
+// daemon-ийн delta-г нэгтгэнэ (fromMs=0 → бүтнээр солино) — цэвэр функц
+function mergeLive(g, s, gameTimeMs, fromMs, now = Date.now()) {
+  if (fromMs <= 0) { g.paths = {}; g.kills = []; g.events = []; }
+  for (const [pid, arr] of Object.entries(s.paths)) {
+    const cur = g.paths[pid] || (g.paths[pid] = []);
+    for (const q of arr) if (!cur.length || q[0] > cur[cur.length - 1][0] || fromMs > 0) cur.push(q);
+    if (cur.length > MAX_PATH_POINTS) cur.splice(0, cur.length - MAX_PATH_POINTS);
+  }
+  g.kills.push(...s.kills); g.events.push(...s.events);
+  const oldNames = {}; for (const p of g.players || []) if (p.name) oldNames[p.pid] = p.name;
+  g.players = s.players.map((p) => ({ ...p, name: p.name || oldNames[p.pid] || null }));
+  g.game_time_ms = Math.max(g.game_time_ms || 0, gameTimeMs);
+  g.offset_ms = now - g.game_time_ms;      // wall ↔ тоглоомын цаг; сүүлийн хэмжилт (саатал ХЭЗЭЭ Ч богиносохгүй тал руу)
+  g.updated_at = now;
+  return g;
+}
+// Үзэгчийн харах эрхтэй тоглоомын цаг (ms): wall − саатал − offset; өгөгдлийн захаас хэтрэхгүй
+function visibleMs(g, delaySec, now = Date.now()) {
+  const tv = now - delaySec * 1000 - (g.offset_ms || 0);
+  return Math.max(-1, Math.min(tv, g.game_time_ms || 0));
+}
+// Саатал хэрэгжүүлсэн харагдац — цэвэр функц (tests). since ≥ 0 бол delta (t > since)
+function visibleView(g, tv, since = -1) {
+  const paths = {};
+  for (const [pid, arr] of Object.entries(g.paths || {})) paths[pid] = arr.filter((q) => q[0] <= tv && q[0] > since);
+  const firstT = (pid) => { const a = g.paths?.[pid]; return a && a.length ? a[0][0] : Infinity; };
+  const players = (g.players || []).filter((p) => firstT(p.pid) <= tv);
+  return {
+    game_time_ms: Math.max(0, tv), game_time_sec: Math.max(0, Math.floor(tv / 1000)),
+    players: enrichPlayers(players), paths,
+    kills: (g.kills || []).filter((k) => k.t <= tv && k.t > since),
+    events: (g.events || []).filter((e) => e.t <= tv && e.t > since),
+  };
+}
+function isParticipant(g, user) {
+  if (!user) return true;
+  if (g.participants?.has(String(user.id))) return true;
+  const u = String(user.username || '').trim().toLowerCase();
+  if (u && (g.players || []).some((p) => p.name && p.name.trim().toLowerCase() === u)) return true;
+  return false;
+}
+async function liveMeta(token, s) {
+  const meta = { room_id: null, room_name: null, host_name: null, host_user_id: null, participants: new Set() };
+  try {
+    const game = await lanhost.findGameByToken(token);
+    if (game) {
+      meta.room_id = game.room_id ?? null; meta.host_user_id = game.host_user_id ?? null;
+      if (meta.host_user_id != null) meta.participants.add(String(meta.host_user_id));
+      const room = meta.room_id != null && roomRoutes?.memRooms ? roomRoutes.memRooms.get(Number(meta.room_id)) || roomRoutes.memRooms.get(meta.room_id) : null;
+      if (room) { meta.room_name = room.name || null; for (const id of (room.players?.keys?.() || [])) meta.participants.add(String(id)); }
+      if (!meta.room_name && meta.room_id && db) { try { meta.room_name = (await db.query('SELECT name FROM rooms WHERE id = $1', [meta.room_id])).rows[0]?.name || null; } catch {} }
+      if (meta.host_user_id && db) { try { meta.host_name = (await db.query('SELECT username FROM users WHERE id = $1', [meta.host_user_id])).rows[0]?.username || null; } catch {} }
+      if (!meta.host_name) meta.host_name = game.host_wc3_name || null;
+    }
+  } catch (e) { console.warn('[Radar live] meta:', e.message); }
+  if (!meta.host_name) meta.host_name = (s.players.find((p) => p.pid === 1) || {}).name || null;
+  if (!meta.room_name) meta.room_name = meta.host_name ? `${meta.host_name}-ын тоглолт` : null;
+  return meta;
+}
+function liveRow(g, delaySec, now = Date.now()) {
+  const tv = visibleMs(g, delaySec, now);
+  const v = visibleView(g, tv);
+  return {
+    token: g.token, room_id: g.room_id, room_name: g.room_name, host_name: g.host_name, map_name: g.map_name,
+    started_at: g.started_at, live: true, ended: !!g.ended_at, delay_sec: delaySec,
+    visible_in_sec: tv < 0 ? Math.ceil((-(now - delaySec * 1000 - (g.offset_ms || 0))) / 1000) : 0,
+    game_time_sec: v.game_time_sec, kills: v.kills.length,
+    players: v.players.map((p) => ({ pid: p.pid, team: p.team, name: p.name, hero: p.hero, hero_name: p.hero_name, hero_icon: p.hero_icon })),
+  };
+}
+
 // ── relay → сервер ──
 const relayRouter = express.Router();
 relayRouter.post('/radar', async (req, res) => {
@@ -119,6 +230,7 @@ relayRouter.post('/radar', async (req, res) => {
     );
     const pts = Object.values(s.paths).reduce((n, a) => n + a.length, 0);
     console.log(`[Radar] хадгалав token=${s.token.slice(0, 12)} room=${roomId} ${s.game_time_sec}с тоглогч=${s.players.length} цэг=${pts} kill=${s.kills.length}`);
+    const live = LIVE.get(s.token); if (live && !live.ended_at) live.ended_at = Date.now();
     return res.json({ ok: true, token: s.token, room_id: roomId, points: pts });
   } catch (e) {
     console.error('[Radar] хадгалалт:', e.message);
@@ -126,9 +238,84 @@ relayRouter.post('/radar', async (req, res) => {
   }
 });
 
+// LIVE delta (hostbot/radarLive.js, 5 с тутам). from_ms=0 → бүтэн; store-д байхгүй + from_ms>0 → 409 (бүтнээр дахин)
+relayRouter.post('/radar/live', async (req, res) => {
+  if (!keyOk(req)) return res.status(401).json({ error: 'relay key' });
+  const b = req.body || {};
+  let s;
+  try { s = sanitizeRadar(b); } catch (e) { return res.status(400).json({ error: e.message }); }
+  const gameTimeMs = Math.max(0, Number(b.game_time_ms) | 0), fromMs = Math.max(0, Number(b.from_ms) | 0);
+  sweepLive();
+  let g = LIVE.get(s.token);
+  if (!g && fromMs > 0) return res.status(409).json({ need_full: true });
+  if (!g) {
+    const meta = await liveMeta(s.token, s);
+    g = { token: s.token, started_at: (typeof b.started_at === 'number' && b.started_at > 1e12) ? new Date(b.started_at).toISOString() : new Date().toISOString(),
+      map_name: s.map_name || 'DotA v6.74c LoD v5e', players: [], paths: {}, kills: [], events: [], game_time_ms: 0, offset_ms: 0, updated_at: Date.now(), ended_at: null, ...meta };
+    LIVE.set(s.token, g);
+    console.log(`[Radar live] эхлэв token=${s.token.slice(0, 12)} room=${g.room_id} host=${g.host_name} оролцогч=${g.participants.size}`);
+  }
+  mergeLive(g, s, gameTimeMs, fromMs);
+  if (b.ended && !g.ended_at) { g.ended_at = Date.now(); console.log(`[Radar live] дуусав token=${s.token.slice(0, 12)} t=${Math.round(g.game_time_ms / 1000)}с`); }
+  return res.json({ ok: true, game_time_ms: g.game_time_ms, viewers: 0 });
+});
+
 // ── апп/вэб ──
 const router = express.Router();
-router.get('/games', authMW, async (req, res) => {
+router.get('/access', authMW, async (req, res) => res.json(await resolveAccess(req.user)));
+
+// Bronze/Silver-т үзүүлэнгийн симуляц (дууссан, kill олонтой тоглолт) — GOLD шаардахгүй
+let demoCache = { at: 0, row: null };
+router.get('/demo', authMW, async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'db' });
+  try {
+    if (!demoCache.row || Date.now() - demoCache.at > 10 * 60 * 1000) {
+      const r = await db.query(`SELECT * FROM radar_games WHERE game_time_sec BETWEEN 900 AND 3600 AND jsonb_array_length(players) >= 6
+        ORDER BY jsonb_array_length(kills) DESC, played_at DESC LIMIT 1`);
+      demoCache = { at: Date.now(), row: r.rows[0] || null };
+    }
+    const g = demoCache.row;
+    if (!g) return res.status(404).json({ error: 'демо тоглолт алга' });
+    const base = `https://${req.get('host')}`;
+    return res.json({
+      demo: true, token: g.token, room_name: g.room_name, host_name: g.host_name, map_name: g.map_name,
+      game_time_sec: g.game_time_sec, winner_team: g.winner_team, players: enrichPlayers(g.players), kills: g.kills, events: g.events, paths: g.paths,
+      played_at: g.played_at, minimap_url: `${base}/assets/radar/lod-minimap@2x.png`, bounds: { x0: -8192, x1: 8192, y0: -8192, y1: 8192 },
+    });
+  } catch (e) { return res.status(500).json({ error: e.message }); }
+});
+
+router.get('/live', authMW, requireAccess, (req, res) => {
+  sweepLive();
+  const d = req.radarAccess.delay_sec, owner = req.radarAccess.tier === 'owner';
+  const rows = [];
+  for (const g of LIVE.values()) {
+    if (!owner && isParticipant(g, req.user)) continue;
+    rows.push(liveRow(g, d));
+  }
+  rows.sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)));
+  return res.json({ delay_sec: d, tier: req.radarAccess.tier, games: rows });
+});
+
+router.get('/live/:token', authMW, requireAccess, (req, res) => {
+  const token = String(req.params.token || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
+  const g = LIVE.get(token);
+  if (!g) return res.status(404).json({ error: 'live тоглолт олдсонгүй (дууссан байж магадгүй — Replay жагсаалтаас үз)' });
+  const owner = req.radarAccess.tier === 'owner';
+  if (!owner && isParticipant(g, req.user)) return res.status(403).json({ error: 'Өөрийн оролцож буй тоглолтын радарыг харах боломжгүй' });
+  const d = req.radarAccess.delay_sec;
+  const tv = visibleMs(g, d);
+  const since = req.query.since != null ? Math.max(-1, Number(req.query.since) | 0) : -1;
+  const v = visibleView(g, tv, since);
+  const base = `https://${req.get('host')}`;
+  return res.json({
+    live: true, delay_sec: d, tier: req.radarAccess.tier, token: g.token, room_id: g.room_id, room_name: g.room_name, host_name: g.host_name, map_name: g.map_name,
+    started_at: g.started_at, ended: !!g.ended_at, visible_in_sec: tv < 0 ? Math.ceil(-(Date.now() - d * 1000 - (g.offset_ms || 0)) / 1000) : 0,
+    ...v, minimap_url: `${base}/assets/radar/lod-minimap@2x.png`, bounds: { x0: -8192, x1: 8192, y0: -8192, y1: 8192 },
+  });
+});
+
+router.get('/games', authMW, requireAccess, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'db' });
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
   try {
@@ -136,11 +323,11 @@ router.get('/games', authMW, async (req, res) => {
       `SELECT token, room_id, room_name, host_name, map_name, game_time_sec, winner_team, players, jsonb_array_length(kills) AS kill_count, played_at
        FROM radar_games ORDER BY played_at DESC LIMIT $1`, [limit]);
     const base = `https://${req.get('host')}`;
-    return res.json({ minimap_url: `${base}/assets/radar/lod-minimap@2x.png`, games: r.rows.map(summaryRow) });
+    return res.json({ minimap_url: `${base}/assets/radar/lod-minimap@2x.png`, delay_sec: req.radarAccess.delay_sec, tier: req.radarAccess.tier, games: r.rows.map(summaryRow) });
   } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-router.get('/:token', authMW, async (req, res) => {
+router.get('/:token', authMW, requireAccess, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'db' });
   const token = String(req.params.token || '').replace(/[^0-9a-f]/gi, '').slice(0, 64);
   if (!token) return res.status(400).json({ error: 'token' });
@@ -158,4 +345,4 @@ router.get('/:token', authMW, async (req, res) => {
   } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-module.exports = { router, relayRouter, sanitizeRadar, summaryRow, heroInfo };
+module.exports = { router, relayRouter, sanitizeRadar, summaryRow, heroInfo, goldActive, mergeLive, visibleMs, visibleView, isParticipant, liveRow, PUBLIC_DELAY_SEC, OWNER_DELAY_SEC, _LIVE: LIVE };

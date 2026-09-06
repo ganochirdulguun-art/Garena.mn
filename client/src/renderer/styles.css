@@ -4332,3 +4332,110 @@ body:not(.light) .maintab.active {
 @media (max-width: 1000px) { .info-hero { grid-template-columns: 1fr; } .info-cards { grid-template-columns: 1fr 1fr; } }
 
 .maintab .nav-badge-inline { position: static; margin-left: 6px; display: none; }
+
+/* ══════════════════════════════════════════════════════════════
+   Garena classic тэмтэй металл хүрээ (2026-09-06, эзний хүсэлт) — ДАН CSS gradient: зураг/анимаци/JS байхгүй,
+   renderer л зурна → тоглоомын зам (main, LAN proxy, relay) ба GPU ачаалалд нөлөөгүй. Rail div-үүд index.html-д.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --mf-h: 16px;
+  --mf-rivet: radial-gradient(circle at 50% 42%, #cfd3d8 0 1.2px, #6d7178 1.6px 2.6px, #17181b 3px 3.6px, transparent 4px);
+  --mf-plate: linear-gradient(180deg, #3b3d42 0%, #26272b 22%, #1a1b1e 60%, #0f1012 100%);
+}
+/* Хэвтээ тэмтэй төмөр зурвас (баннер ↓, табын мөр ↓) */
+.mf-rail {
+  position: relative;
+  height: var(--mf-h);
+  flex: 0 0 auto;
+  background: var(--mf-plate);
+  border-top: 1px solid #4a4d53;
+  border-bottom: 1px solid #000;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 0 -2px 3px rgba(0,0,0,.6), 0 4px 10px rgba(0,0,0,.55);
+  z-index: 3;
+}
+.mf-rail::before {              /* тэмнүүд — 30px тутамд */
+  content: "";
+  position: absolute; inset: 0;
+  background-image: var(--mf-rivet);
+  background-size: 30px 100%;
+  background-position: 15px 0;
+  background-repeat: repeat-x;
+}
+.mf-rail::after {               /* доод улаан халуун судал — Garena улааныг хадгална */
+  content: "";
+  position: absolute; left: 0; right: 0; bottom: -2px; height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(216,35,42,.9) 20%, rgba(216,35,42,.9) 80%, transparent);
+  box-shadow: 0 0 6px rgba(216,35,42,.6);
+}
+.topbanner, .maintabs { border-bottom: 0 !important; }
+/* Захын босоо төмөр хүрээ (зүүн/баруун) — цонхны бүх өндрөөр */
+#page-main { position: relative; }
+#page-main::before, #page-main::after {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 12px; z-index: 4; pointer-events: none;
+  background: linear-gradient(90deg, #3b3d42, #1a1b1e 55%, #0f1012);
+  border-right: 1px solid #000;
+  box-shadow: inset 1px 0 0 rgba(255,255,255,.12), 2px 0 8px rgba(0,0,0,.55);
+  background-image: var(--mf-rivet), linear-gradient(90deg, #3b3d42, #1a1b1e 55%, #0f1012);
+  background-size: 100% 30px, 100% 100%; background-position: 0 15px, 0 0; background-repeat: repeat-y, no-repeat;
+}
+#page-main::before { left: 0; }
+#page-main::after  { right: 0; border-right: 0; border-left: 1px solid #000; transform: scaleX(-1); }
+#page-main > .tab { padding-left: 34px !important; padding-right: 34px !important; }
+.topbanner { padding-left: 32px !important; padding-right: 32px !important; }
+.maintabs  { padding-left: 24px !important; padding-right: 24px !important; }
+/* Доод ирмэгийн төмөр зурвас */
+.mf-rail.mf-bottom { z-index: 4; }
+.mf-rail.mf-bottom::after { top: -2px; bottom: auto; }
+
+/* ══ Garena Plus classic Нийтийн чат (2026-09-06, эзний хүсэлт) — хар дэвсгэр, мөр мөрөөр өнгөөр ялгасан ([цаг] цэнхэр,
+   нэр шар, өөрийнх улбар шар, [Системийн мэдэгдэл] улаан, линк цэнхэр). Дан CSS + app.js _appendLobbyMsgDOM мөрийн бүтэц. ══ */
+body:not(.light) .lobby-chat-panel, body:not(.light) .dm-users-panel {
+  background: #060607; border: 1px solid #3a3c41; border-radius: 4px;
+  box-shadow: inset 0 0 0 1px #111214, 0 0 0 1px #000, 0 6px 16px rgba(0,0,0,.55);
+}
+body:not(.light) .lobby-chat-messages {
+  background: #050506; gap: 3px; padding: 10px 12px;
+  font: 13px/1.45 Tahoma, Verdana, "Segoe UI", sans-serif;
+}
+/* мөр мөрөөр — bubble биш */
+.gl { display: block; max-width: 100%; word-break: break-word; }
+.gl .g-time { color: #38b6ff; font-weight: 700; }
+.gl .g-name { color: #ffd23a; font-weight: 700; cursor: pointer; }
+.gl .g-name:hover { text-decoration: underline; }
+.gl.me .g-name { color: #ff8c42; }
+.gl .g-text { color: #f2f2f2; }
+.gl.me .g-text { color: #ffe9a8; }
+.gl.sys .g-tag { color: #ff2b2b; font-weight: 700; }
+.gl.sys .g-text { color: #ffffff; }
+.gl.info .g-text { color: #ffe23a; }
+.gl a, .gl .g-link { color: #4ea6ff; text-decoration: underline; }
+.gl .g-mention { color: #ff8c42; font-weight: 700; }
+.gl .g-del { color: #6d6f75; font-style: italic; }
+.gl .g-x { color: #6d6f75; margin-left: 6px; cursor: pointer; font-size: 11px; }
+.gl:hover { background: rgba(255,255,255,.035); }
+body:not(.light) .lobby-chat-panel .chat-input-row { background: #0b0b0d; border-top: 1px solid #2a2c31; padding: 8px; }
+body:not(.light) .lobby-chat-panel .input { background: #101114; border: 1px solid #34363c; color: #f2f2f2; border-radius: 3px; font-family: Tahoma, Verdana, sans-serif; }
+/* Хэрэглэгчийн жагсаалт — хар, ээлжлэн бараан мөр, ping багана */
+body:not(.light) .dm-users-list { padding: 0; gap: 0; }
+body:not(.light) .dm-users-list li {
+  background: #0a0a0c; border-radius: 0; padding: 5px 8px; border-bottom: 1px solid #141518;
+  font: 12.5px Tahoma, Verdana, sans-serif;
+}
+body:not(.light) .dm-users-list li:nth-child(even) { background: #101114; }
+body:not(.light) .dm-users-list li:hover { background: #1b2a3d; }
+body:not(.light) .dm-username { color: #e8e8e8; }
+.g-ping { min-width: 28px; text-align: right; font-weight: 700; font-size: 12px; color: #39d353; }
+.g-ping.off { color: #ff3b3b; }
+body:not(.light) .dm-section-label { background: #0e0f12; color: #9aa0ab; border-bottom: 1px solid #202227; padding: 5px 8px; font-size: 11px; letter-spacing: .06em; }
+/* .msg bubble стилийг classic мөрөнд дарна (Нийтийн чат л; DM/өрөөний чат bubble хэвээр) */
+body:not(.light) .lobby-chat-messages .msg.gl { display: block; max-width: 100%; align-self: stretch; }
+body:not(.light) .lobby-chat-messages .msg.gl .msg-bubble { display: inline; padding: 0; border: 0; border-radius: 0; background: none; font-size: inherit; line-height: inherit; }
+body:not(.light) .lobby-chat-messages .msg.gl.me .msg-bubble { background: none; color: #ffe9a8; }
+body:not(.light) .lobby-chat-messages .msg.gl .msg-delete { display: inline-flex; vertical-align: middle; opacity: .45; }
+body:not(.light) .lobby-chat-messages .msg.gl:hover .msg-delete { opacity: 1; }
+body:not(.light) .lobby-chat-messages .msg.gl.msg-deleted .msg-bubble { color: #6d6f75; font-style: italic; opacity: 1; }
+body:not(.light) .lobby-chat-messages .msg.gl .mention { color: #ff8c42; }
+body:not(.light) .lobby-chat-messages .msg.gl .mention-me { background: rgba(255,140,66,.18); }
+/* Найзын жагсаалт: офлайн = Garena шиг улаан ✕ (дан CSS) */
+body:not(.light) .dm-users-list .dm-status-dot.offline { width: auto; height: auto; background: none; box-shadow: none; }
+body:not(.light) .dm-users-list .dm-status-dot.offline::before { content: '✕'; color: #ff3b3b; font-size: 11px; font-weight: 700; line-height: 1; }

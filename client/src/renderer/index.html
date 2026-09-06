@@ -276,6 +276,7 @@
         <span class="ad-text">Энд таны реклам байрлана</span>
       </div>
     </header>
+    <div class="mf-rail" aria-hidden="true"></div>
     <nav class="maintabs" aria-label="Үндсэн цэс">
       <button type="button" class="nav-btn maintab" data-tab="discord"><svg class="btn-icon-svg"><use href="#ico-nav-discord"/></svg><span class="nav-label">Discord</span></button>
       <button type="button" class="nav-btn maintab" data-tab="chat" title="Нийтийн чат — бүх онлайн хэрэглэгч"><svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg><span class="nav-label">Нийтийн чат</span><span id="chat-badge-nav" class="nav-badge nav-badge-inline hidden">0</span></button>
@@ -302,6 +303,7 @@
         </button>
       </span>
     </nav>
+    <div class="mf-rail" aria-hidden="true"></div>
     <div class="fire-sparks" aria-hidden="true">
       <span style="--x:6%;--s:3px;--d:8s;--delay:-1s;--drift:34px;--o:.55"></span>
       <span style="--x:14%;--s:2px;--d:10s;--delay:-7s;--drift:-26px;--o:.45"></span>
@@ -601,14 +603,49 @@
         #tab-radar .s{color:#43d9c9} #tab-radar .c{color:#ff5c5c}
         #tab-radar .rd-empty{color:#9aa6bd;padding:40px;text-align:center}
         #tab-radar .rd-grid2{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:12px;align-items:start} @media (max-width:1200px){#tab-radar .rd-grid2{grid-template-columns:1fr}}
+        #tab-radar [hidden]{display:none!important}
+        #tab-radar .rd-col{display:grid;gap:10px;align-content:start} #tab-radar .rd-live{display:grid;gap:8px}
+        #tab-radar .rd-livehead{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.08em;font-size:12px;color:#ff5c5c;text-transform:uppercase}
+        #tab-radar .rd-livehead.rp{color:#e0b15a;margin-top:4px} #tab-radar .rd-livehead .dot{width:9px;height:9px;border-radius:50%;background:#ff2b2b;box-shadow:0 0 8px #ff2b2b}
+        #tab-radar .rd-card.live{border-color:rgba(255,43,43,.35)} #tab-radar .rd-card.live.on{border-color:#ff5c5c;background:rgba(255,43,43,.08)}
+        #tab-radar .rd-empty.small{padding:10px;font-size:12px}
+        #tab-radar .rd-pill{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.04em;vertical-align:middle;border:1px solid}
+        #tab-radar .rd-pill.own{color:#ffd23a;border-color:rgba(255,210,58,.5);background:rgba(255,210,58,.1)} #tab-radar .rd-pill.gold{color:#e0b15a;border-color:rgba(224,177,90,.5);background:rgba(224,177,90,.1)}
+        #tab-radar .rd-stagewrap{position:relative} #tab-radar .rd-status{position:absolute;top:10px;left:10px;padding:5px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.06em;background:rgba(0,0,0,.7);color:#fff;border:1px solid rgba(255,255,255,.15)}
+        #tab-radar .rd-status.live{border-color:#ff2b2b;color:#ff8080} #tab-radar .rd-status.demo{border-color:#e0b15a;color:#e0b15a}
+        #tab-radar .rd-watermark{position:absolute;right:14px;bottom:10px;font-weight:900;font-size:34px;letter-spacing:.2em;color:rgba(224,177,90,.28);pointer-events:none}
+        #tab-radar .rd-locked{display:block} #tab-radar .rd-lock-grid{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);gap:18px;align-items:start} @media (max-width:1100px){#tab-radar .rd-lock-grid{grid-template-columns:1fr}}
+        #tab-radar .rd-lock-info{background:rgba(255,255,255,.04);border:1px solid rgba(224,177,90,.35);border-radius:6px;padding:18px;display:grid;gap:10px}
+        #tab-radar .rd-lock-badge{display:inline-block;justify-self:start;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.12em;color:#1a1200;background:linear-gradient(180deg,#ffd76a,#d9a13a)}
+        #tab-radar .rd-lock-info h3{margin:0;font-size:20px} #tab-radar .rd-lock-info p{margin:0;color:#c9d0dd;line-height:1.5}
+        #tab-radar .rd-steps{margin:0;padding-left:20px;display:grid;gap:6px;color:#e6ecf7} #tab-radar .rd-lock-actions{display:grid;gap:8px;margin-top:4px}
+        #tab-radar .rd-demo .rd-grid2.demo{grid-template-columns:minmax(0,1fr) 240px} #tab-radar .rd-demo canvas{width:min(100%,560px)}
       </style>
       <div class="tab-header section-header">
-        <div><h2>📡 Радар</h2><p class="hint">Дууссан тоглолтын hero-гийн хөдөлгөөн, үхэл, kill-ийг газрын зураг дээр эргүүлж үзнэ. Байрлал = тушаалуудаас симуляцилсан ойролцоо утга; kill/death яг цагаар. Live радар (эзэнд шууд, бусдад 120 с саатлаар) дараагийн шатанд.</p></div>
+        <div><h2>📡 Радар <span id="rd-access"></span></h2><p class="hint">Явж буй тоглолтыг гаднаас нь LIVE (саатлаар) болон дууссан тоглолтыг replay-ээр — hero-гийн хөдөлгөөн, үхэл, kill газрын зураг дээр. Байрлал = тушаалуудаас симуляцилсан ойролцоо утга; kill/death яг цагаар. LIVE саатал: эзэнд шууд, бусад бүгдэд 120 с — оролцогч өөрийн тоглолтыг харахгүй.</p></div>
         <div class="tab-actions"><button type="button" id="rd-refresh" class="btn btn-secondary btn-sm">↻ Шинэчлэх</button></div>
       </div>
-      <div class="rd-wrap">
-        <div class="rd-list" id="rd-list"><div class="rd-empty">Ачааллаж байна…</div></div>
-        <div id="rd-viewer"><div class="rd-empty">Зүүн жагсаалтаас тоглолт сонго.</div></div>
+      <div class="rd-wrap" id="rd-wrap">
+        <div class="rd-col"><div id="rd-live" class="rd-live"></div><div class="rd-list" id="rd-list"><div class="rd-empty">Ачааллаж байна…</div></div></div>
+        <div id="rd-viewer"><div class="rd-empty">Зүүн жагсаалтаас LIVE эсвэл replay тоглолт сонго.</div></div>
+      </div>
+      <!-- Bronze/Silver: GOLD-ын онцлог — демо симуляц + заавар (radar.js renderLocked) -->
+      <div id="rd-locked" class="rd-locked" hidden>
+        <div class="rd-lock-grid">
+          <div class="rd-lock-info">
+            <div class="rd-lock-badge">🥇 GOLD ОНЦЛОГ</div>
+            <h3>Тоглолтыг гаднаас нь LIVE радараар үз</h3>
+            <p>Радар нь явж буй тоглолт бүрийн hero-гийн хөдөлгөөн, үхэл, kill-ийг газрын зураг дээр 120 секундын саатлаар (тэмцээний шударга байдлыг хамгаалахын тулд) LIVE симуляцилж үзүүлнэ. Дууссан тоглолтыг replay-ээр эргүүлж үзэх боломжтой. Баруун талд бодит тоглолтын демо явж байна.</p>
+            <p>Таны одоогийн гишүүнчлэл: <b id="rd-lock-tier">Bronze</b>. Радар зөвхөн <b>GOLD</b> гишүүдэд нээлттэй.</p>
+            <ol class="rd-steps">
+              <li><b>Профайл</b> таб → <b>Гишүүнчлэл</b> хэсэгт очно.</li>
+              <li><b>GOLD</b> сонгоод QPay (эсвэл Diamond ◆) -аар төлнө — 1 сар.</li>
+              <li>Төлбөр батлагдмагц Радар шууд нээгдэнэ (LIVE 120 с саатал + бүх replay). Дагалдах: нэрийн эффект, аватарын хүрээ, GOLD өрөөний дэвсгэр.</li>
+            </ol>
+            <div class="rd-lock-actions"><button type="button" id="rd-go-gold" class="btn btn-primary">🥇 GOLD болох</button><span class="hint">Тоглолтод оролцож буй тоглогч өөрийн тоглолтын радарыг харах боломжгүй — GOLD гишүүн ч мөн адил.</span></div>
+          </div>
+          <div id="rd-demo-viewer" class="rd-demo"><div class="rd-empty">Демо ачааллаж байна…</div></div>
+        </div>
       </div>
     </div>
 
@@ -999,6 +1036,7 @@
         <p class="empty-text">Ачааллаж байна...</p>
       </div>
     </div>
+  <div class="mf-rail mf-bottom" aria-hidden="true"></div>
   </div>
 
   <!-- ③ Өрөөний дотор -->

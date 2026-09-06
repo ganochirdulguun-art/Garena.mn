@@ -1,0 +1,23 @@
+[Unit]
+Description=Garena.mn radar LIVE daemon (capture файл → платформ, relay-ээс тусдаа)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/hostbot
+# relay-тэй ижил env: RELAY_REPORT_URL / RELAY_REPORT_KEY (report.env), RELAY_CAPTURE_DIR (capture.conf)
+EnvironmentFile=/etc/systemd/system/garena-relay.service.d/report.env
+Environment=RELAY_CAPTURE_DIR=/opt/hostbot/captures
+ExecStart=/usr/bin/node /opt/hostbot/radarLive.js
+Restart=always
+RestartSec=5
+# Гацалтгүй зарчим: relay-ээс доогуур CPU/IO эрэмбэ — тоглоомын замд ХЭЗЭЭ Ч саад болохгүй
+Nice=15
+IOSchedulingClass=idle
+MemoryMax=300M
+StandardOutput=append:/var/log/garena-radar-live.log
+StandardError=append:/var/log/garena-radar-live.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1995,15 +1995,14 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time }) {
   const isMe = username === currentUser?.username;
   const t    = formatChatTime(time);
   const div  = document.createElement('div');
-  div.className = `msg ${isMe ? 'me' : 'other'}`;
+  // Garena Plus classic мөр (2026-09-06, эзний хүсэлт): [цаг] Нэр: текст — bubble биш; .msg/.msg-bubble/.msg-delete
+  // class-ууд устгах (lobby:deleted) логиктой нийцэж хэвээр. Өнгө: styles.css .gl (цаг цэнхэр, нэр шар, өөрийнх улбар шар)
+  div.className = `msg gl ${isMe ? 'me' : 'other'}`;
   div.dataset.time = time;
   div.dataset.userId = userId || '';
-  const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
-  const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
-  div.innerHTML = `
-    <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${deleteBtn}</div>
-    <div class="msg-bubble">${parseMentions(escHtml(text), !isMe)}</div>
-  `;
+  const nameEl = isMe ? '<span class="g-name">Та</span>' : `<span class="g-name clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
+  const deleteBtn = isMe ? '<button type="button" class="msg-delete g-x" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
+  div.innerHTML = `<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${parseMentions(escHtml(text), !isMe)}</span>${deleteBtn}`;
   if (!isMe && userId) {
     div.querySelector('.clickable-name')?.addEventListener('click', () => openUserProfile(userId));
   }
