@@ -6,6 +6,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { recordGameResult } = require('../services/results');
+const playtime = require('../services/playtime');
 const lanhost = require('./lanhost');
 
 let db;
@@ -81,8 +82,6 @@ router.post('/game-stats', async (req, res) => {
   const winnerTeam = [1, 2].includes(Number(b.winner_team)) ? Number(b.winner_team) : null;
   const net = netReportOf(b);
   console.log(`[Relay] дүн ирлээ token=${token.slice(0, 12)} room=${game.room_id} winner=${winnerTeam} ${b.game_time_sec}с lag=${JSON.stringify(net.lag)}`);
-  if (!winnerTeam) return res.status(202).json({ ok: false, reason: 'no-winner', room_id: game.room_id });
-
   let joiners = [];
   let ranked = false;
   if (db) {
@@ -94,6 +93,10 @@ router.post('/game-stats', async (req, res) => {
     } catch (e) { console.warn('[Relay] lookup:', e.message); }
   }
   const players = resolvePlayers(b.players.slice(0, 12), { hostUserId: game.host_user_id, hostWc3Name: game.host_wc3_name, joiners });
+  // ⏱ Тоглосон цагийн урамшуулал (XP + 1ц=2💎) — ялагчтай эсэхээс ҮЛ ХАМААРАН, тоглогч бүрт (services/playtime.js);
+  // давхардлыг play_awards UNIQUE(token,user_id) хаана. Дүнгийн бүртгэлээс тусдаа тул алдаа гарвал дүнд нөлөөлөхгүй.
+  const playAwards = await awardPlaytimeForGame(token, game, players, b.game_time_sec, ranked);
+  if (!winnerTeam) return res.status(202).json({ ok: false, reason: 'no-winner', room_id: game.room_id, playtime: playAwards });
   const validity = rankedValidity({ gameTimeSec: b.game_time_sec, winnerTeam, players });
   try {
     const saved = await recordGameResult({
@@ -111,6 +114,25 @@ router.post('/game-stats', async (req, res) => {
     return res.status(500).json({ error: e.message });
   }
 });
+
+// Тоглогч бүрт тоглосон цагийн XP/💎 олгоод socket-оор задаргааг нь мэдэгдэнэ (playtime:award)
+async function awardPlaytimeForGame(token, game, players, gameTimeSec, ranked) {
+  if (!db) return [];
+  const out = [];
+  let notifyUser = null;
+  try { ({ notifyUser } = require('./membership')); } catch {}
+  for (const p of players) {
+    if (!p.user_id) continue;
+    try {
+      const a = await playtime.awardPlaytime(db, { userId: p.user_id, token, gameSeconds: gameTimeSec, leftAtSec: p.left_at_sec, ranked: !!ranked, roomId: game.room_id ?? null });
+      if (a.skipped) continue;
+      out.push({ user_id: p.user_id, counted_sec: a.counted_sec, xp: a.xp, diamonds: a.diamonds });
+      if (notifyUser) notifyUser(p.user_id, 'playtime:award', { ...a, room_id: game.room_id ?? null });
+    } catch (e) { console.warn(`[Relay] playtime user=${p.user_id}:`, e.message); }
+  }
+  if (out.length) console.log(`[Relay] ⏱ цагийн урамшуулал token=${token.slice(0, 12)}: ` + out.map((o) => `u${o.user_id} ${Math.round(o.counted_sec / 60)}м +${o.xp}xp${o.diamonds ? ' +' + o.diamonds + '💎' : ''}`).join(', '));
+  return out;
+}
 
 module.exports = router;
 module.exports.rankedValidity = rankedValidity;

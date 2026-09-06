@@ -545,7 +545,7 @@ router.get('/me', authMW, async (req, res) => {
   if (await dbOk()) {
     try {
       const result = await db.query(
-        'SELECT id, username, email, discord_id, discord_username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, membership, membership_until, name_effect, diamonds, xp, level, block_games, block_wins, tierbot_tier, tierbot_rank, COALESCE(banned,FALSE) AS banned, ban_reason FROM users WHERE id = $1',
+        'SELECT id, username, email, discord_id, discord_username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, membership, membership_until, name_effect, diamonds, xp, level, block_games, block_wins, tierbot_tier, tierbot_rank, COALESCE(banned,FALSE) AS banned, ban_reason, COALESCE(play_seconds_total,0) AS play_seconds_total FROM users WHERE id = $1',
         [req.user.id]
       );
       if (result.rows[0]) {
@@ -559,6 +559,7 @@ router.get('/me', authMW, async (req, res) => {
           ...row, tier: effectiveTier(row), name_effect: publicFx(row).name_effect,
           diamonds: row.diamonds || 0, ...levelProgress(row.xp || 0),
           block_games: row.block_games || 0, block_wins: row.block_wins || 0,
+          play_seconds_total: row.play_seconds_total || 0, play_next_diamond_sec: require('../services/playtime').secToNextDiamond(row.play_seconds_total || 0),
           is_owner: isOwner, is_admin: isAdmin, unlimited_diamonds: isOwner,
         });
       }

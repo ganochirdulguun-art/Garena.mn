@@ -5084,6 +5084,14 @@ init();
     if (lvText) lvText.textContent = `LV ${level} · ${fmtN(xp)} XP · дараагийн түвшин ${fmtN(nextXp)} XP`;
     const xpBar = el('diamond-xp-bar');
     if (xpBar) xpBar.style.width = `${Math.round(prog * 100)}%`;
+    // ⏱ Тоглосон цаг → 💎 (1ц = 2💎, минут хуримтлагдана) + XP (2/мин, дуустал +10, ranked ×1.25)
+    const ps = Number(currentUser.play_seconds_total ?? 0);
+    const nextSec = Number(currentUser.play_next_diamond_sec ?? (3600 - (ps % 3600)));
+    const fmtPlay = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? `${Math.floor(m / 60)}ц ${m % 60}м` : `${m}м`; };
+    const playText = el('diamond-play-text');
+    if (playText) playText.textContent = `⏱ Тоглосон цаг: ${fmtPlay(ps)} · дараагийн 2 💎 хүртэл ${fmtPlay(nextSec)} · 2 XP/мин, дуустал +10 XP, ranked ×1.25`;
+    const playBar = el('diamond-play-bar');
+    if (playBar) playBar.style.width = `${Math.round(((3600 - nextSec) / 3600) * 100)}%`;
   }
 
   // ─── 4. QPay төлбөрийн modal ───
@@ -5486,7 +5494,7 @@ init();
   });
 
   // ─── Гүйлгээний түүх ───
-  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт', ranked_win: 'Ranked хожил', welcome: 'Шинэ хэрэглэгчийн урамшуулал' };
+  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт', ranked_win: 'Ranked хожил', welcome: 'Шинэ хэрэглэгчийн урамшуулал', playtime: 'Тоглосон цаг (1ц = 2💎)' };
   async function openHistory() {
     const m = el('diamond-history-modal');
     if (!m) return;
@@ -5524,6 +5532,17 @@ init();
       prem().renderAll?.();
       if (d.reason === 'purchase') showToast(`💎 +${fmtN(d.delta)} Diamond нэмэгдлээ (QPay)`, 'success');
       if (d.reason === 'admin_grant' && d.amount < 0) showToast(`💎 ${fmtN(d.amount)} Diamond (админ)`, 'warning');
+    });
+    // ⏱ Тоглосон цагийн урамшуулал — relay тоглолт дуусахад серверээс задаргаатай ирнэ (services/playtime.js)
+    s.on('playtime:award', (a) => {
+      if (!a || (!a.xp && !a.diamonds)) return;
+      if (currentUser) { currentUser.play_seconds_total = a.total_sec; currentUser.play_next_diamond_sec = a.next_diamond_sec; }
+      const head = `⏱ Тоглосон цагийн урамшуулал: +${fmtN(a.xp)} XP${a.diamonds ? ` · +${a.diamonds} 💎` : ''}${a.level_up ? ` · 🆙 LV ${a.level}` : ''}`;
+      showToast(head + '
+' + (a.lines || []).join('
+'), 'success', 9000);
+      try { playSound?.('join'); } catch {}
+      refreshMe();
     });
     s.on('membership:updated', (d) => {
       showToast(`Гишүүнчлэл: ${String(d.tier || '').toUpperCase()}${d.membership_until ? ` — ${new Date(d.membership_until).toLocaleDateString('mn-MN')} хүртэл` : ''}`, 'success');

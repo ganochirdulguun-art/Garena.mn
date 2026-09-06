@@ -34,6 +34,8 @@ async function runMigrations(db) {
       ADD COLUMN IF NOT EXISTS name_effect VARCHAR(24) DEFAULT 'solid',
       ADD COLUMN IF NOT EXISTS diamonds INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS xp INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS play_seconds_total INTEGER DEFAULT 0,   -- ⏱ идэвхтэй тоглосон нийт секунд (services/playtime.js)
+      ADD COLUMN IF NOT EXISTS play_diamonds_paid INTEGER DEFAULT 0,   -- тоглосон цагаас олгосон 💎 (1ц = 2💎)
       ADD COLUMN IF NOT EXISTS level INTEGER DEFAULT 1,
       ADD COLUMN IF NOT EXISTS block_games INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS block_wins INTEGER DEFAULT 0;
@@ -93,6 +95,22 @@ async function runMigrations(db) {
       created_at  TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_diamond_tx_user ON diamond_transactions(user_id, created_at DESC);
+
+    -- ⏱ Тоглосон цагийн урамшуулал: нэг тоглолт (relay token) нэг тоглогчид нэг л удаа (services/playtime.js)
+    CREATE TABLE IF NOT EXISTS play_awards (
+      id          SERIAL PRIMARY KEY,
+      token       VARCHAR(64) NOT NULL,
+      user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      room_id     INTEGER,
+      game_sec    INTEGER DEFAULT 0,
+      counted_sec INTEGER DEFAULT 0,
+      xp          INTEGER DEFAULT 0,
+      diamonds    INTEGER DEFAULT 0,
+      ranked      BOOLEAN DEFAULT FALSE,
+      created_at  TIMESTAMP DEFAULT NOW(),
+      UNIQUE (token, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_play_awards_user ON play_awards(user_id, created_at DESC);
 
     -- Бот хостын ажлууд (RGC маяг): өрөөний host "Бот хост" дарахад үүснэ, бот авч хостолно
     CREATE TABLE IF NOT EXISTS bot_jobs (
