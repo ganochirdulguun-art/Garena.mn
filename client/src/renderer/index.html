@@ -374,7 +374,11 @@
         </select>
         <input id="room-max" type="number" value="10" min="2" max="12" class="input" title="Тоглогчдын дээд тоо" placeholder="Тоглогчдын дээд тоо" />
         <textarea id="room-desc" class="input" placeholder="Тайлбар (заавал биш) — дүрэм, нөхцөл гэх мэт..." maxlength="200" rows="2"></textarea>
-        <input id="room-bg" type="url" class="input hidden" placeholder="Өрөөний дэвсгэр зураг — https://… (GOLD гишүүн)" maxlength="500" />
+        <div id="room-bg-row" class="hidden" style="display:flex;gap:8px;align-items:center">
+          <input id="room-bg" type="url" class="input" style="flex:1;margin:0" placeholder="Өрөөний дэвсгэр зураг — https://… эсвэл 📁 (GOLD гишүүн)" maxlength="500" />
+          <button id="room-bg-upload" type="button" class="btn btn-secondary" style="white-space:nowrap" title="Компьютерээсээ зураг сонгох (JPG/PNG/WebP, ≤2MB)">📁 Зураг</button>
+          <input id="room-bg-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" />
+        </div>
         <p id="room-bg-hint" class="hint">GOLD гишүүд өрөөндөө өөрийн дэвсгэр зураг тавьж болно.</p>
         <div class="password-row">
           <label class="checkbox-label">

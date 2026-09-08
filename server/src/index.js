@@ -90,6 +90,7 @@ app.use(apiLimiter);
 app.use('/auth', authRoutes);
 app.use('/rooms', botRoutes.roomRouter);   // бот хост (/rooms/:id/bot-host) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', lanHostRoutes.router);   // тоглогч-хост LAN (/rooms/:id/lan-host) — roomRoutes-оос ӨМНӨ
+app.use('/rooms', require('./routes/roomBg').router);   // дэвсгэр зураг upload/serve (/rooms/background) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', roomRoutes);
 app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);

@@ -5169,7 +5169,8 @@ init();
     decorate(document);
     applyFrame(document.querySelector('.userchip-avatar'), tier);
     applyFrame(document.querySelector('.profile-avatar-wrap'), tier);
-    el('room-bg')?.classList.toggle('hidden', tier !== 'gold');
+    el('room-bg-row')?.classList.toggle('hidden', tier !== 'gold');
+    el('room-bg')?.classList.toggle('hidden', false);
     el('room-bg-hint')?.classList.toggle('hidden', tier === 'gold');
   }
   document.querySelectorAll('#fx-picker [data-fx]').forEach((b) => b.addEventListener('click', async () => {
@@ -5194,6 +5195,31 @@ init();
     } catch (e) { showToast(errMsg(e), 'error'); }
     finally { b.disabled = false; }
   }));
+
+  // ─── 5b. Дэвсгэр зураг файлаас байршуулах (GOLD) — 📁 товч → POST /rooms/background → URL талбарт ───
+  el('room-bg-upload')?.addEventListener('click', () => el('room-bg-file')?.click());
+  el('room-bg-file')?.addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { showToast('JPG/PNG/WebP зураг сонгоно уу', 'warning'); return; }
+    if (f.size > 2 * 1024 * 1024) { showToast('Зураг 2MB-с бага байх ёстой', 'warning'); return; }
+    const btn = el('room-bg-upload');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳…'; }
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const rd = new FileReader();
+        rd.onload = () => resolve(rd.result);
+        rd.onerror = () => reject(new Error('Файл уншиж чадсангүй'));
+        rd.readAsDataURL(f);
+      });
+      const r = await api('post', '/rooms/background', { image: dataUrl });
+      const inp = el('room-bg');
+      if (inp) inp.value = r.url;
+      showToast('Дэвсгэр зураг байршлаа — өрөө үүсгэхэд хэрэглэгдэнэ ✅', 'success');
+    } catch (err) { showToast(errMsg(err), 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.textContent = '📁 Зураг'; } }
+  });
 
   // ─── 6. Өрөөний дэвсгэр (GOLD, room цонхонд) ───
   if (isRoomMode()) {
