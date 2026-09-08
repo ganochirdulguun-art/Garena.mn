@@ -5251,9 +5251,10 @@ init();
     if (/^https:\/\/\S+$/i.test(bg)) {
       const pr = el('page-room');
       if (pr) {
-        pr.style.backgroundImage = `linear-gradient(rgba(8,4,5,.55), rgba(8,4,5,.8)), url("${bg.replace(/"/g, '%22')}")`;
+        pr.style.backgroundImage = `linear-gradient(rgba(8,4,5,.42), rgba(8,4,5,.62)), url("${bg.replace(/"/g, '%22')}")`;
         pr.style.backgroundSize = 'cover';
         pr.style.backgroundPosition = 'center';
+        pr.classList.add('has-custom-bg');   // чат хэсэгт зураг бүдэг blur-тэй нэвт харагдана (styles.css)
       }
     }
   }

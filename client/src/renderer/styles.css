@@ -4458,3 +4458,15 @@ body:not(.light) .lobby-chat-messages .msg.gl .mention-me { background: rgba(255
 /* Найзын жагсаалт: офлайн = Garena шиг улаан ✕ (дан CSS) */
 body:not(.light) .dm-users-list .dm-status-dot.offline { width: auto; height: auto; background: none; box-shadow: none; }
 body:not(.light) .dm-users-list .dm-status-dot.offline::before { content: '✕'; color: #ff3b3b; font-size: 11px; font-weight: 700; line-height: 1; }
+
+/* Өрөөний дэвсгэр (GOLD) — хэрэглэгчийн зурагтай үед чат хэсэгт зураг бага зэрэг бүдэгрүүлэлттэй (blur) нэвт харагдана. 2026-09-08 */
+#page-room.has-custom-bg .chat-panel {
+  background: rgba(16, 10, 12, 0.34);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+#page-room.has-custom-bg .chat-messages {
+  background:
+    linear-gradient(180deg, rgba(6, 8, 20, 0.08), rgba(6, 8, 20, 0.22)),
+    radial-gradient(circle at 50% 2%, rgba(216, 35, 42, 0.08), transparent 34%);
+}
