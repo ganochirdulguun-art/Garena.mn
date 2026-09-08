@@ -70,6 +70,29 @@ function netReportOf(body) {
   };
 }
 
+// Гацалтын мэдэгдэл — тоглолт дуусахад аль тоглогч хэдэн удаа гацаасныг өрөөний чатад зарлана (2026-09-08,
+// эзний хүсэлт: «сервер гацлаа» гэсэн буруу ойлголтыг арилгаж, жинхэнэ эх үүсвэрийг ил болгоно).
+// Цэвэр функц (tests/relaystats.test.js): зөвхөн мэдэгдэхүйц гацалт (≥3 дэлгэц эсвэл ≥5с).
+function lagNoticeText(lag, players) {
+  const byPid = new Map((players || []).map((p, i) => [i + 1, p.name]));
+  for (const p of players || []) if (p.pid) byPid.set(p.pid, p.name);
+  const bad = (lag || []).filter((l) => (l.lag_screens || 0) >= 3 || (l.total_lag_sec || 0) >= 5);
+  if (!bad.length) return null;
+  const parts = bad.map((l) => {
+    const nm = (l.name && !/^\(joiner/.test(l.name) ? l.name : byPid.get(l.pid)) || `pid${l.pid}`;
+    return `${nm} — ${l.lag_screens} удаа (${Math.round(l.total_lag_sec)}с)`;
+  });
+  return `⚠️ Гацалтын тайлан: ${parts.join(' · ')}. Гацалт тухайн тоглогчийн интернэт/PC-ээс үүссэн — relay хэвийн.`;
+}
+
+function postRoomNotice(roomId, text) {
+  try {
+    const { io } = require('../index');
+    if (!io || !roomId || !text) return;
+    io.to(String(roomId)).emit('chat:message', { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true });
+  } catch { /* мэдэгдэл эмзэг биш */ }
+}
+
 const router = express.Router();
 
 router.post('/game-stats', async (req, res) => {
@@ -96,6 +119,11 @@ router.post('/game-stats', async (req, res) => {
   // ⏱ Тоглосон цагийн урамшуулал (XP + 1ц=2💎) — ялагчтай эсэхээс ҮЛ ХАМААРАН, тоглогч бүрт (services/playtime.js);
   // давхардлыг play_awards UNIQUE(token,user_id) хаана. Дүнгийн бүртгэлээс тусдаа тул алдаа гарвал дүнд нөлөөлөхгүй.
   const playAwards = await awardPlaytimeForGame(token, game, players, b.game_time_sec, ranked);
+  // Гацаасан тоглогчийг өрөөнд нэрээр нь зарлана (хэн гацаасан нь бүх тоглогчид харагдана)
+  if (b.game_time_sec >= 60) {
+    const notice = lagNoticeText(net.lag, b.players);
+    if (notice) postRoomNotice(game.room_id, notice);
+  }
   if (!winnerTeam) return res.status(202).json({ ok: false, reason: 'no-winner', room_id: game.room_id, playtime: playAwards });
   const validity = rankedValidity({ gameTimeSec: b.game_time_sec, winnerTeam, players });
   try {
@@ -138,3 +166,4 @@ module.exports = router;
 module.exports.rankedValidity = rankedValidity;
 module.exports.resolvePlayers = resolvePlayers;
 module.exports.RANKED = RANKED;
+module.exports.lagNoticeText = lagNoticeText;

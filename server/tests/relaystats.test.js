@@ -37,3 +37,16 @@ ok('resolvePlayers: нэг user_id-г хоёр тоглогчид давхар �
   assert.strictEqual(r[0].user_id, 1); assert.strictEqual(r[1].user_id, undefined);
 });
 console.log(`\n=== relaystats: ${n} PASS ===`);
+
+// ── lagNoticeText ──
+{
+  const { lagNoticeText } = require('../src/routes/relayStats');
+  const players = [{ pid: 1, name: 'Host' }, { pid: 2, name: 'BouNce.1' }];
+  const t = lagNoticeText([{ pid: 2, name: '(joiner pid2)', lag_screens: 19, total_lag_sec: 18.5 }], players);
+  assert(t.includes('BouNce.1') && t.includes('19 удаа') && t.includes('19с') === false && t.includes('(19с)'), t);
+  assert.strictEqual(lagNoticeText([{ pid: 2, lag_screens: 1, total_lag_sec: 3.5 }], players), null);
+  assert.strictEqual(lagNoticeText([], players), null);
+  const t2 = lagNoticeText([{ pid: 3, lag_screens: 4, total_lag_sec: 2 }], players);
+  assert(t2.includes('pid3'), t2);
+  console.log('PASS lagNoticeText: нэр тодруулна, өчүүхэн гацалт зарлахгүй');
+}
