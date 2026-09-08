@@ -32,12 +32,17 @@ const KEEP_EVENT = /^(Hero|Tower|Rax|Roshan|Aegis|Throne|GameStart|RuneUse|Couri
 
 function createRadarStream() {
   const AP = loadActionParser(); const ap = new AP();
-  const st = { names: {}, lastSel: {}, orders: {}, typeCount: {}, events: [], slots: [], t: 0, rest: Buffer.alloc(0), bytes: 0, packets: 0 };
+  const st = { names: {}, lastSel: {}, orders: {}, typeCount: {}, events: [], slots: [], t: 0, rest: Buffer.alloc(0), bytes: 0, packets: 0, lagEv: [] };
 
   function packet(p) {
     const id = p[1];
     try {
       if (id === 0x06) { const e = p.indexOf(0, 9); st.names[p[8]] = p.subarray(9, e < 0 ? p.length : e).toString('utf8'); }
+      else if (id === 0x10) {            // START_LAG — хэн гацааж эхэлснийг live мэдэрнэ (Lag Sentry, 2026-09-08)
+        const n = p[4];
+        for (let k = 0; k < n && 5 + k * 5 < p.length; k++) st.lagEv.push({ t: st.t, pid: p[5 + k * 5] });
+        if (st.lagEv.length > 500) st.lagEv.splice(0, st.lagEv.length - 500);
+      }
       else if (id === 0x09 || id === 0x04) {
         const n = p[6]; st.slots.length = 0;
         for (let k = 0; k < n; k++) { const b = 7 + k * 9; if (b + 9 <= p.length) st.slots.push({ pid: p[b], team: p[b + 4], colour: p[b + 5] }); }
@@ -106,7 +111,8 @@ function createRadarStream() {
       const s = st.slots.find((x) => String(x.pid) === String(pid)) || {};
       return { pid: Number(pid), colour: s.colour ?? null, team: s.team === 1 ? 2 : 1, name: st.names[pid] || null, hero: heroes[pid]?.type || null, hero_orders: heroes[pid]?.orders || 0 };
     });
-    return { game_time_sec: Math.round(st.t / 1000), game_time_ms: st.t, players, colourOf, paths, kills, events: ev.filter((e) => KEEP_EVENT.test(e.key)).slice(0, 2000) };
+    return { game_time_sec: Math.round(st.t / 1000), game_time_ms: st.t, players, colourOf, paths, kills, events: ev.filter((e) => KEEP_EVENT.test(e.key)).slice(0, 2000),
+      lag_events: st.lagEv.filter((e) => e.t > sinceMs).map((e) => [e.t, e.pid]).slice(0, 200) };
   }
 
   return { feed, snapshot, get gameTimeMs() { return st.t; }, get bytes() { return st.bytes; }, get packets() { return st.packets; } };

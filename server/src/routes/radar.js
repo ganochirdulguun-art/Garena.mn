@@ -69,8 +69,11 @@ function sanitizeRadar(b) {
   const events = (Array.isArray(b.events) ? b.events : []).slice(0, 2000)
     .filter((e) => e && Number.isFinite(Number(e.t)) && e.key)
     .map((e) => ({ t: Math.round(e.t), key: String(e.key).slice(0, 32), v: Number(e.v) >>> 0 }));
+  const lag_events = (Array.isArray(b.lag_events) ? b.lag_events : []).slice(0, 200)
+    .filter((e) => Array.isArray(e) && Number.isFinite(Number(e[0])))
+    .map((e) => [Math.round(e[0]), Number(e[1]) | 0]);
   return {
-    token, players, paths, kills, events,
+    token, players, paths, kills, events, lag_events,
     game_time_sec: Math.max(0, Number(b.game_time_sec) | 0),
     winner_team: [1, 2].includes(Number(b.winner_team)) ? Number(b.winner_team) : null,
     map_name: b.map_name ? String(b.map_name).slice(0, 120) : null,
@@ -239,6 +242,64 @@ relayRouter.post('/radar', async (req, res) => {
 });
 
 // LIVE delta (hostbot/radarLive.js, 5 с тутам). from_ms=0 → бүтэн; store-д байхгүй + from_ms>0 → 409 (бүтнээр дахин)
+// ── ⚡ Lag Sentry (2026-09-08, эзний зорилт: «гацвал тэр дор нь оношил») ──
+// radarLive capture-аас START_LAG мэдрэн илгээнэ → энд ХЭН гацааж буйг нэрээр нь, ШАЛТГААНЫГ нь (relay RTT-ээр
+// интернэт үү, PC үү) тодорхойлж өрөөний чатад шууд зарлана. Тоглоомын замд огт хүрэхгүй (зөвхөн мэдэгдэл).
+const LAG_PID_GAP_MS = 90000;      // нэг тоглогчийг 90с-д 1 л удаа зарлана
+const LAG_GAME_GAP_MS = 15000;     // нэг тоглоомд 15с-д 1 мэдэгдэл (спамгүй)
+
+function lagCauseText(rtt) {
+  if (Number.isFinite(rtt)) {
+    return rtt >= 130 ? `интернэт удаан (relay RTT ${Math.round(rtt)}мс)`
+                      : `интернэт хэвийн (${Math.round(rtt)}мс) — PC/WC3 ачаалал магадлалтай`;
+  }
+  return 'интернэт эсвэл PC ачаалал';
+}
+
+// Цэвэр функц (tests/radar.test.js): шинэ lag event-үүдээс аль pid-ийг зарлахыг throttle-тэй шийднэ
+function sentryPick(lagEvents, state, now = Date.now()) {
+  const out = [];
+  for (const [, pid] of lagEvents || []) {
+    if (!pid) continue;
+    if (now - (state.lastAny || 0) < LAG_GAME_GAP_MS) continue;
+    if (now - (state.byPid.get(pid) || 0) < LAG_PID_GAP_MS) continue;
+    state.byPid.set(pid, now); state.lastAny = now;
+    out.push(pid);
+  }
+  return out;
+}
+
+async function lagSentry(g, s) {
+  if (!g.room_id || !s.lag_events?.length) return;
+  g._sentry = g._sentry || { byPid: new Map(), lastAny: 0 };
+  const pids = sentryPick(s.lag_events, g._sentry);
+  if (!pids.length) return;
+  let io = null;
+  try { io = require('../index').io; } catch { return; }
+  if (!io) return;
+  // pid → нэр → платформ user_id (lan_game_players wc3_name) → relay RTT (socket.data.relayRtt)
+  if (!g._uidByName && db) {
+    g._uidByName = new Map();
+    try {
+      const jr = await db.query('SELECT user_id, wc3_name FROM lan_game_players WHERE token = $1', [g.token]);
+      for (const r of jr.rows) if (r.wc3_name) g._uidByName.set(String(r.wc3_name).trim().toLowerCase(), String(r.user_id));
+    } catch { /* нэр холбогдохгүй ч зарлана */ }
+  }
+  for (const pid of pids) {
+    const name = (g.players || []).find((p) => p.pid === pid)?.name || `Тоглогч #${pid}`;
+    let rtt = null;
+    const uid = g._uidByName?.get(String(name).trim().toLowerCase());
+    if (uid) {
+      for (const sock of io.sockets.sockets.values()) {
+        if (String(sock.user?.id) === uid && Number.isFinite(sock.data?.relayRtt)) { rtt = sock.data.relayRtt; break; }
+      }
+    }
+    const text = `⚡ Гацалт илэрлээ: **${name}** — ${lagCauseText(rtt)}. Бусад тоглогчид хэвийн.`;
+    io.to(String(g.room_id)).emit('chat:message', { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true });
+    console.log(`[LagSentry] token=${g.token.slice(0, 12)} room=${g.room_id} pid=${pid} name=${name} rtt=${rtt}`);
+  }
+}
+
 relayRouter.post('/radar/live', async (req, res) => {
   if (!keyOk(req)) return res.status(401).json({ error: 'relay key' });
   const b = req.body || {};
@@ -256,6 +317,7 @@ relayRouter.post('/radar/live', async (req, res) => {
     console.log(`[Radar live] эхлэв token=${s.token.slice(0, 12)} room=${g.room_id} host=${g.host_name} оролцогч=${g.participants.size}`);
   }
   mergeLive(g, s, gameTimeMs, fromMs);
+  lagSentry(g, s).catch(() => {});
   if (b.ended && !g.ended_at) { g.ended_at = Date.now(); console.log(`[Radar live] дуусав token=${s.token.slice(0, 12)} t=${Math.round(g.game_time_ms / 1000)}с`); }
   return res.json({ ok: true, game_time_ms: g.game_time_ms, viewers: 0 });
 });
@@ -345,4 +407,4 @@ router.get('/:token', authMW, requireAccess, async (req, res) => {
   } catch (e) { return res.status(500).json({ error: e.message }); }
 });
 
-module.exports = { router, relayRouter, sanitizeRadar, summaryRow, heroInfo, goldActive, mergeLive, visibleMs, visibleView, isParticipant, liveRow, PUBLIC_DELAY_SEC, OWNER_DELAY_SEC, _LIVE: LIVE };
+module.exports = { router, relayRouter, sanitizeRadar, summaryRow, heroInfo, goldActive, mergeLive, visibleMs, visibleView, isParticipant, liveRow, PUBLIC_DELAY_SEC, OWNER_DELAY_SEC, _LIVE: LIVE, sentryPick, lagCauseText };

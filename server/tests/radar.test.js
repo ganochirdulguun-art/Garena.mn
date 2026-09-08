@@ -93,3 +93,25 @@ ok('isParticipant: өрөөний гишүүн (id) эсвэл тоглогчи�
   assert.strictEqual(isParticipant(g, null), true);
 });
 console.log(`=== radar live: ${n} PASS ===`);
+
+// ── ⚡ Lag Sentry ──
+{
+  const { sentryPick, lagCauseText } = require('../src/routes/radar');
+  const st = { byPid: new Map(), lastAny: 0 };
+  assert.deepStrictEqual(sentryPick([[1000, 2], [1200, 2], [1300, 3]], st, 100000), [2]);        // нэг мэдэгдэл/15с
+  assert.deepStrictEqual(sentryPick([[2000, 3]], st, 116000), [3]);                               // 16с дараа өөр pid → OK
+  assert.deepStrictEqual(sentryPick([[3000, 2]], st, 130000), []);                                // pid2-ийн 90с болоогүй
+  assert.deepStrictEqual(sentryPick([[4000, 2]], st, 200000), [2]);                               // 100с дараа → OK
+  assert(lagCauseText(180).includes('удаан') && lagCauseText(45).includes('PC') && lagCauseText(null).includes('интернэт эсвэл'));
+  console.log('PASS lag sentry: throttle + шалтгаан ангилал');
+}
+{
+  const { createRadarStream } = require('../../hostbot/radarExtract');
+  const st = createRadarStream();
+  const frame = Buffer.from([0xF7, 0x10, 10, 0, 1, 5, 0, 0, 0, 0]);   // START_LAG n=1 pid=5
+  st.feed(frame);
+  const snap = st.snapshot(-1);
+  assert.deepStrictEqual(snap.lag_events, [[0, 5]], JSON.stringify(snap.lag_events));
+  assert.deepStrictEqual(st.snapshot(0).lag_events, [], 't>since шүүлт');
+  console.log('PASS radarExtract: START_LAG frame → lag_events');
+}

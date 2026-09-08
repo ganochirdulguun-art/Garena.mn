@@ -391,6 +391,7 @@ app.post('/relay/rtt', (req, res) => {
     const ip = socket.data?.ip; const roomId = socket.data?.roomId; const uid = socket.user?.id;
     if (!ip || !roomId || uid == null || !byIp.has(ip)) continue;
     socket.data.relayRttAt = now;
+    socket.data.relayRtt = Math.round(byIp.get(ip).sum / byIp.get(ip).n);   // ⚡ Lag Sentry шалтгаан ангилалд
     if (seen.has(String(uid))) continue; seen.add(String(uid));
     const e = byIp.get(ip); const rtt = Math.round(e.sum / e.n); const g = socket.data.geo || {};
     io.emit('net:quality', { roomId: String(roomId), userId: String(uid), rtt, avg: rtt, loss: 0, retrans: e.retrans, shared: e.n > 1, source: 'relay',
