@@ -1420,6 +1420,7 @@ document.getElementById('btn-submit-room').onclick = async () => {
     document.getElementById('room-password').value = '';
     document.getElementById('room-password').style.display = 'none';
     showToast(`"${room.name}" өрөө үүслээ`, 'success');
+    roomsCache[String(room.id)] = room;   // 🖼 background_url зэрэг талбарууд enterRoom-д хэрэгтэй (шинэ өрөө cache-д байгаагүй)
     enterRoom(room.id, room.name, room.game_type, true, null, room.status);
   }
   try {
