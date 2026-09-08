@@ -256,7 +256,7 @@ async function setRoomWaitingIfNoPlayersInGame(roomId) {
   if (dbForMigration) {
     try {
       await dbForMigration.query(
-        "UPDATE rooms SET status='waiting' WHERE id=$1 AND status='playing'",
+        "UPDATE rooms SET status='waiting', playing_since=NULL WHERE id=$1 AND status='playing'",
         [roomId]
       );
     } catch (e) {

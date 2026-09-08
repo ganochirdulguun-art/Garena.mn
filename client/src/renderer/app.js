@@ -1226,6 +1226,17 @@ function roomGridRow(r, inProgress, idx = 0) {
   `;
 }
 
+setInterval(() => {
+  document.querySelectorAll('[data-started]').forEach((elx) => {
+    const t = Number(elx.dataset.started);
+    if (!t) return;
+    const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
+    const dur = mins >= 60 ? `${Math.floor(mins / 60)}ц ${mins % 60}м` : `${mins} мин`;
+    const d = new Date(t);
+    elx.textContent = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')} · ${dur}`;
+  });
+}, 60000);
+
 function renderRoomDetail(r) {
   if (!r) {
     return `
@@ -1242,6 +1253,17 @@ function renderRoomDetail(r) {
                    (r.members || []).some(m => String(m.id) === myId);
   const status = roomStatusMeta(r, inProgress, isMyRoom);
   const networkLabel = 'LAN bridge';
+  // Хостын тоглолт хэзээ эхэлснийг гаднаас харуулна (playing_since — LAN тоглоом нээгдэх/бот-хост эхлэхэд серверт тавигдана)
+  let startedRow = '';
+  if (inProgress && r.playing_since) {
+    const st = new Date(r.playing_since);
+    if (!Number.isNaN(st.getTime())) {
+      const mins = Math.max(0, Math.floor((Date.now() - st.getTime()) / 60000));
+      const dur = mins >= 60 ? `${Math.floor(mins / 60)}ц ${mins % 60}м` : `${mins} мин`;
+      const hhmm = `${String(st.getHours()).padStart(2, '0')}:${String(st.getMinutes()).padStart(2, '0')}`;
+      startedRow = `<div><span>Эхэлсэн</span><strong data-started="${st.getTime()}">${hhmm} · ${dur}</strong></div>`;
+    }
+  }
 
   return `
     <div class="room-detail-card ${inProgress ? 'room-playing' : ''} ${isMyRoom ? 'room-mine' : ''}">
@@ -1261,6 +1283,7 @@ function renderRoomDetail(r) {
         <div><span>Host</span><strong>${escHtml(r.host_name || '-')}</strong></div>
         <div><span>Players</span><strong>${r.player_count || 0}/${r.max_players || '-'}</strong></div>
         <div><span>Network</span><strong>${networkLabel}</strong></div>
+        ${startedRow}
       </div>
       <div class="room-members room-detail-players">
         <span class="room-detail-label">Тоглогчид · ${r.player_count || 0}/${r.max_players || '-'}</span>

@@ -26,8 +26,8 @@ async function syncRoomStatus(roomId) {
   const m = roomGames.get(String(roomId));
   const active = !!(m && m.size > 0);
   try {
-    if (active) await db.query("UPDATE rooms SET status='playing' WHERE id=$1 AND status='waiting'", [roomId]);
-    else await db.query("UPDATE rooms SET status='waiting' WHERE id=$1 AND status='playing'", [roomId]);
+    if (active) await db.query("UPDATE rooms SET status='playing', playing_since=NOW() WHERE id=$1 AND status='waiting'", [roomId]);
+    else await db.query("UPDATE rooms SET status='waiting', playing_since=NULL WHERE id=$1 AND status='playing'", [roomId]);
     if (_io) _io.emit('rooms:updated');
   } catch (e) { /* статус синк алдаа — эмзэг биш */ }
 }

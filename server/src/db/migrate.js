@@ -42,6 +42,8 @@ async function runMigrations(db) {
 
     ALTER TABLE rooms
       ADD COLUMN IF NOT EXISTS background_url TEXT DEFAULT '';
+    ALTER TABLE rooms
+      ADD COLUMN IF NOT EXISTS playing_since TIMESTAMPTZ;
 
     -- Тоглолтын дүн: эх сурвалж (replay | bot) + ботын тоглоомын мэдээлэл
     ALTER TABLE game_results

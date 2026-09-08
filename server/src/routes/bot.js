@@ -105,7 +105,7 @@ async function sweepStaleJobs() {
     );
     for (const row of r.rows) {
       if (!row.room_id) continue;
-      await db.query(`UPDATE rooms SET status='waiting' WHERE id=$1 AND status='playing'`, [row.room_id]).catch(() => {});
+      await db.query(`UPDATE rooms SET status='waiting', playing_since=NULL WHERE id=$1 AND status='playing'`, [row.room_id]).catch(() => {});
       emitRoom(row.room_id, 'room:bot_job', { id: row.id, status: 'cancelled', error: 'timeout' });
     }
     if (r.rows.length && _io) _io.emit('rooms:updated');
@@ -307,7 +307,7 @@ botRouter.post('/jobs/:id/started', async (req, res) => {
     if (!upd.rows[0]) return res.status(409).json({ error: `job is '${job.status}', not hosting/lobby` });
     botops.record('info', 'job_started', `Ажил #${job.id} (${job.game_name}) эхэллээ — ${(req.body?.players || []).length} тоглогч`, { job_id: job.id });
     if (job.room_id) {
-      await db.query(`UPDATE rooms SET status = 'playing' WHERE id = $1`, [job.room_id]);
+      await db.query(`UPDATE rooms SET status = 'playing', playing_since = NOW() WHERE id = $1`, [job.room_id]);
       if (_io) { _io.to(String(job.room_id)).emit('room:started'); _io.emit('rooms:updated'); }
     }
     emitRoom(job.room_id, 'room:bot_started', { job_id: job.id, players: req.body?.players || [] });
@@ -359,7 +359,7 @@ botRouter.post('/jobs/:id/failed', async (req, res) => {
     // lobby timeout (хэн ч нэгдээгүй) = энгийн; бусад алдаа = Discord мэдэгдэл
     botops.alert(/lobby (дууссан|timeout)/i.test(err) ? 'info' : 'warn', 'job_failed', `Ажил #${job.id} (${job.game_name}, өрөө ${job.room_id}) FAILED: ${err.slice(0, 300)}`, { job_id: job.id, bot: job.bot_name });
     if (job.room_id) {
-      await db.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status = 'playing'`, [job.room_id]);
+      await db.query(`UPDATE rooms SET status = 'waiting', playing_since = NULL WHERE id = $1 AND status = 'playing'`, [job.room_id]);
     }
     emitRoom(job.room_id, 'room:bot_job', await jobToPublic({ ...job, status: 'failed', error: req.body?.error }));
     return res.json({ ok: true });

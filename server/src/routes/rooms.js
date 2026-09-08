@@ -62,6 +62,7 @@ function roomToPublic(room) {
     ranked: !!room.ranked,   // 🏆 Ranked өрөө: хүчинтэй хожил бүр 2💎 (relay дүн), энгийн өрөө 💎 үгүй
     background_url: room.background_url || '',
     status: room.status,
+    playing_since: room.playing_since || null,
     has_password: room.has_password,
     zerotier_network_id: room.zerotier_network_id || null,
     player_count: room.players.size,
@@ -83,7 +84,7 @@ router.get('/', optAuth, async (req, res) => {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
-          r.status, r.has_password, r.zerotier_network_id,
+          r.status, r.has_password, r.zerotier_network_id, r.playing_since,
           COUNT(rp.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
@@ -113,7 +114,7 @@ router.get('/mine', optAuth, async (req, res) => {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
-          r.status, r.has_password, r.zerotier_network_id,
+          r.status, r.has_password, r.zerotier_network_id, r.playing_since,
           COUNT(rp2.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp2.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
