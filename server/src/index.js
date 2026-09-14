@@ -43,6 +43,11 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: '*' },
   maxHttpBufferSize: 8e6, // DM зураг/файл (base64) дамжуулахад — default 1MB бага
+  // 2026-09-14: WC3 fullscreen үед Electron нуугдсан цонхнуудын таймерыг удаашруулж ping хоцордог тул
+  // default 20с timeout 30с тутам масс-салалт үүсгэдэг байв (Kaze/Kev.!/Bambuuz_Jr 3 цонх зэрэг) →
+  // тэсвэртэй болгов. Клиент v2.8.16-д backgroundThrottling:false нэмсэн ч хуучин клиентүүдэд энэ хамгаална.
+  pingTimeout: 90000,
+  pingInterval: 25000,
 });
 
 const PORT = process.env.PORT || 3000;

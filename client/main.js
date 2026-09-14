@@ -99,8 +99,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-    },
+      nodeIntegration: false, backgroundThrottling: false, },
     frame: true,
     autoHideMenuBar: true,
     backgroundColor: '#0c0b0f',
@@ -390,7 +389,7 @@ ipcMain.handle('auth:linkDiscord', () => {
     width: 520, height: 700, title: 'Discord холбох',
     parent: mainWindow, modal: true,
     autoHideMenuBar: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false, },
   });
   authWin.loadURL(`${apiService.SERVER_URL}/auth/discord?link=1&token=${encodeURIComponent(token)}`);
   const handleRedirect = (url) => {
@@ -715,8 +714,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-    },
+      nodeIntegration: false, backgroundThrottling: false, },
     autoHideMenuBar: true,
     backgroundColor: '#0d0d1a',
   });
@@ -774,8 +772,7 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-    },
+      nodeIntegration: false, backgroundThrottling: false, },
     autoHideMenuBar: true,
     backgroundColor: '#0d0d1a',
   });
@@ -808,7 +805,7 @@ ipcMain.handle('radar:openWindow', (_, data) => {
     width: 400, height: 480, minWidth: 280, minHeight: 320,
     x: area.x + area.width - 410, y: area.y + 10,
     title, icon: path.join(__dirname, 'src/renderer/icon.ico'),
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
+    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false, },
     autoHideMenuBar: true, alwaysOnTop: true, backgroundColor: '#000000',
   });
   radarWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -845,8 +842,7 @@ function openFriendsWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-    },
+      nodeIntegration: false, backgroundThrottling: false, },
     autoHideMenuBar: true,
     closable: false,
     backgroundColor: '#0d0d1a',
