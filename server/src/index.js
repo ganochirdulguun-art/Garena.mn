@@ -323,6 +323,7 @@ const lobbyHistory = [];
 const LOBBY_HISTORY_MAX = 100;
 // Өрөөний чатын түүх (roomId → [{username, text, time}, ...])
 const roomMessages = {};
+const _ipSeen = new Map();   // "uid|ip" → сүүлд upsert хийсэн ms (5 мин throttle, санах ойд)
 // Rejoin grace period: userId → { timer, roomId, username }
 const disconnectTimers = {};
 const REJOIN_GRACE_MS = 45000; // 45 секунд
@@ -417,6 +418,21 @@ io.on('connection', (socket) => {
   // Railway edge лог socket sid агуулдаггүй тул өөр аргаар холбох боломжгүй байсан.
   console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}${clientIp ? ' ip=' + clientIp : ''}`);
   socket.data.ip = clientIp || '';   // relay RTT (POST /relay/rtt) → энэ IP-ийн тоглогчийн ping тэмдэг
+  // Хэрэглэгч↔IP-г түүхэнд upsert (2026-09-15): «нэг IP-аас хамт байгаа» илрүүлэлт (!same_ip). Throttle 5 мин,
+  // fire-and-forget (холболтыг блоклохгүй). Зөвхөн бодит нэвтэрсэн (user.id) + IP-тэй.
+  if (clientIp && socket.user?.id != null) {
+    const _ipKey = `${socket.user.id}|${clientIp}`;
+    const _last = _ipSeen.get(_ipKey) || 0;
+    if (Date.now() - _last > 5 * 60 * 1000) {
+      _ipSeen.set(_ipKey, Date.now());
+      if (dbForMigration) {
+        dbForMigration.query(
+          `INSERT INTO user_ips (user_id, ip) VALUES ($1, $2)
+           ON CONFLICT (user_id, ip) DO UPDATE SET last_seen = NOW(), hits = user_ips.hits + 1`,
+          [socket.user.id, String(clientIp).slice(0, 64)]).catch(() => { /* IP лог эмзэг биш */ });
+      }
+    }
+  }
 
   // Лоббид бүртгүүлэх (апп нээгдэхэд дуудагдана)
   // JWT-ийн мэдээллийг ашиглана — client-ийн утгыг хэрэглэхгүй

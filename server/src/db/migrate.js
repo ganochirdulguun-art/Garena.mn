@@ -44,6 +44,16 @@ async function runMigrations(db) {
       ADD COLUMN IF NOT EXISTS background_url TEXT DEFAULT '';
     ALTER TABLE rooms
       ADD COLUMN IF NOT EXISTS playing_since TIMESTAMPTZ;
+    -- Хэрэглэгч холбогдох бүрийн IP (2026-09-15): «нэг IP-аас хамт байгаа» (кафе/гэр/multi-account) илрүүлэхэд
+    CREATE TABLE IF NOT EXISTS user_ips (
+      user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      ip          VARCHAR(64) NOT NULL,
+      first_seen  TIMESTAMPTZ DEFAULT NOW(),
+      last_seen   TIMESTAMPTZ DEFAULT NOW(),
+      hits        INTEGER DEFAULT 1,
+      PRIMARY KEY (user_id, ip)
+    );
+    CREATE INDEX IF NOT EXISTS idx_user_ips_ip ON user_ips (ip);
 
     -- Тоглолтын дүн: эх сурвалж (replay | bot) + ботын тоглоомын мэдээлэл
     ALTER TABLE game_results
