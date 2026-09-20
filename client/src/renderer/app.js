@@ -5608,3 +5608,14 @@ init();
     ['diamond-transfer-modal', 'diamond-buy-modal', 'diamond-history-modal'].forEach((id) => el(id)?.classList.add('hidden'));
   });
 })();
+
+// ── Хөдөлгөөнт лого: цонх идэвхгүй/далд (WC3 тоглож буй) үед CSS хөдөлгөөнийг БҮРЭН зогсооно.
+// backgroundThrottling:false тул Chromium өөрөө зогсоодоггүй — гацалтад нөлөөлөхгүй зарчим.
+(function () {
+  const root = document.documentElement;
+  const sync = () => root.classList.toggle('win-idle', document.hidden || !document.hasFocus());
+  window.addEventListener('focus', sync);
+  window.addEventListener('blur', sync);
+  document.addEventListener('visibilitychange', sync);
+  sync();
+})();
