@@ -22,11 +22,12 @@ IGW=$(q network internet-gateway list -c "$T" --vcn-id "$VCN" | python -c "impor
 RT=$(q network vcn get --vcn-id "$VCN" | python -c "import sys,json; print(json.load(sys.stdin)['data']['default-route-table-id'])")
 q network route-table update --rt-id "$RT" --force --route-rules "[{\"destination\":\"0.0.0.0/0\",\"destinationType\":\"CIDR_BLOCK\",\"networkEntityId\":\"$IGW\"}]" >/dev/null
 SL=$(q network vcn get --vcn-id "$VCN" | python -c "import sys,json; print(json.load(sys.stdin)['data']['default-security-list-id'])")
-# Ingress: SSH 22, HTTP 80, HTTPS 443 (DERP), 7000 (relay) TCP; 3478 UDP (STUN); ICMP
+# Ingress: SSH 22, HTTP 80, HTTPS 443 (DERP), 8443 (headscale), 7000 (relay) TCP; 3478 UDP (STUN); ICMP
 q network security-list update --security-list-id "$SL" --force --egress-security-rules '[{"destination":"0.0.0.0/0","protocol":"all","isStateless":false}]' --ingress-security-rules '[
  {"source":"0.0.0.0/0","protocol":"6","isStateless":false,"tcpOptions":{"destinationPortRange":{"min":22,"max":22}}},
  {"source":"0.0.0.0/0","protocol":"6","isStateless":false,"tcpOptions":{"destinationPortRange":{"min":80,"max":80}}},
  {"source":"0.0.0.0/0","protocol":"6","isStateless":false,"tcpOptions":{"destinationPortRange":{"min":443,"max":443}}},
+ {"source":"0.0.0.0/0","protocol":"6","isStateless":false,"tcpOptions":{"destinationPortRange":{"min":8443,"max":8443}}},
  {"source":"0.0.0.0/0","protocol":"6","isStateless":false,"tcpOptions":{"destinationPortRange":{"min":7000,"max":7000}}},
  {"source":"0.0.0.0/0","protocol":"17","isStateless":false,"udpOptions":{"destinationPortRange":{"min":3478,"max":3478}}},
  {"source":"0.0.0.0/0","protocol":"17","isStateless":false,"udpOptions":{"destinationPortRange":{"min":41641,"max":41641}}},
