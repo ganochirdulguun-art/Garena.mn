@@ -8,8 +8,8 @@ regions:
     nodes:
       - name: derp1
         regionid: 900
-        hostname: derp1.garena.mn
-        ipv4: "0.0.0.0"
+        hostname: 140-245-104-214.sslip.io   # түр (DNS derp1.garena.mn бэлэн болмогц солино)
+        ipv4: "140.245.104.214"
         stunport: 3478
         stunonly: false
         derpport: 443
