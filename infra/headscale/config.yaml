@@ -1,0 +1,44 @@
+# Garena.mn mesh control plane. Тайлбар: MagicDNS/override_local_dns УНТРААЛТТАЙ — тоглогчийн PC-ийн DNS-ийг хөндөхгүй (гацалтад нөлөөлөхгүй зарчим).
+server_url: https://hs.garena.mn
+listen_addr: 0.0.0.0:8080
+metrics_listen_addr: 127.0.0.1:9090
+grpc_listen_addr: 127.0.0.1:50443
+grpc_allow_insecure: false
+noise:
+  private_key_path: /var/lib/headscale/noise_private.key
+prefixes:
+  v4: 100.64.0.0/10
+  v6: fd7a:115c:a1e0::/48
+  allocation: sequential
+derp:
+  server:
+    enabled: false          # STUN/DERP нь Oracle VPS дээр (Railway UDP дэмждэггүй)
+  urls: []                  # Tailscale-ийн нийтийн DERP-ийг ашиглахгүй — зөвхөн өөрийн VPS-үүд
+  paths:
+    - /etc/headscale/derp.yaml
+  auto_update_enabled: false
+disable_check_updates: true
+node:
+  ephemeral:
+    inactivity_timeout: 30m
+database:
+  type: sqlite
+  sqlite:
+    path: /var/lib/headscale/db.sqlite
+    write_ahead_log: true
+log:
+  level: info
+  format: text
+policy:
+  mode: file
+  path: ""                  # ACL хожим (default: бүх node хоорондоо)
+dns:
+  magic_dns: false
+  override_local_dns: false
+  nameservers:
+    global: []
+  search_domains: []
+unix_socket: /var/run/headscale/headscale.sock
+unix_socket_permission: "0770"
+logtail:
+  enabled: false

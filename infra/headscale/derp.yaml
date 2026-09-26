@@ -1,0 +1,15 @@
+# Өөрийн DERP relay-үүд (Tailscale клиент хамгийн бага саатлынхийг өөрөө сонгоно, унавал дараагийнх).
+# ipv4-ийг сервер бэлэн болмогц бөглөнө. stunonly=false = STUN+DERP хоёулаа.
+regions:
+  900:
+    regionid: 900
+    regioncode: sg
+    regionname: Singapore (Oracle)
+    nodes:
+      - name: derp1
+        regionid: 900
+        hostname: derp1.garena.mn
+        ipv4: "0.0.0.0"
+        stunport: 3478
+        stunonly: false
+        derpport: 443
