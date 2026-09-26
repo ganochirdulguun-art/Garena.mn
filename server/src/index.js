@@ -107,6 +107,8 @@ app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
 app.use('/anticheat', require('./routes/anticheat'));
 app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
+const meshRoutes = require('./routes/mesh');
+app.use('/mesh', meshRoutes.router);                     // Tailscale/Headscale mesh: preauth түлхүүр + клиентийн mesh IP тайлан (Ш2, 2026-09-27)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
 const radarRoutes = require('./routes/radar');           // 📡 Радар: relay capture → hero хөдөлгөөн/kill (replay); саатал: зөвхөн эзэн 0с, бусад 120с (live — Шат 2)
 app.use('/relay', radarRoutes.relayRouter);              // POST /relay/radar (x-relay-key)
@@ -160,7 +162,9 @@ app.get('/config', async (req, res) => {
     }
   } catch {}
   // zerotierNetworkId: null — хуучин (≤v2.4.0) клиентүүд энэ талбарыг уншдаг тул хэлбэрийг хадгална
-  res.json({ zerotierNetworkId: null, zerotierMode: 'off', serverVersion: require('../package.json').version, ad: ads[0], ads });
+  // mesh: клиент 2.9+ Tailscale-ээр энэ login_server-т автоматаар нэгдэнэ (preauth = POST /mesh/authkey)
+  res.json({ zerotierNetworkId: null, zerotierMode: 'off', serverVersion: require('../package.json').version, ad: ads[0], ads,
+    mesh: { login_server: require('./routes/mesh').loginServer() } });
 });
 
 let dbForMigration;
@@ -661,6 +665,8 @@ io.on('connection', (socket) => {
 
   // Тоглогчийн relay сүлжээний чанар (RTT/loss) — өрөөнийхөнд broadcast (аль тоглогч
   // гацааж байгааг харах). WC3 lockstep тул нэг муу холболт бүгдийг гацаадаг.
+  // Клиентийн mesh (Tailscale) IP — Ш3-д хостын endpoint баталгаажуулалтад (100.64/10 биш бол үл тоох)
+  socket.on('mesh:ip', (ip) => { if (meshRoutes.isMeshIp(ip)) socket.data.meshIp = String(ip); });
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;

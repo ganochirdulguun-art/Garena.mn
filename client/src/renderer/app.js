@@ -582,6 +582,20 @@ async function init() {
   window.api.onMaphack?.(showMaphackModal);
   // Relay сүлжээний саатал (RTT/loss)-ыг серверт мэдэгдэнэ → өрөөнд тоглогч бүрийн ping
   window.api.onNetLatency?.((d) => { try { socket?.emit('net:report', d); } catch {} });
+  // Mesh (Tailscale) төлөв: тохиргооны дэлгэцэд харуулна + mesh IP-гээ серверт socket-оор мэдэгдэнэ (Ш3-д хостын endpoint)
+  const renderMesh = (st) => {
+    const el = document.getElementById('mesh-status'); if (!el || !st) return;
+    const m = { Running: st.ip ? `холбогдсон · ${st.ip}` : 'холбогдож байна…', NotInstalled: st.error === 'declined' ? 'суулгалтыг зөвшөөрөөгүй' : 'суугаагүй', NeedsLogin: 'нэвтрэх шаардлагатай', Disabled: 'унтраалттай', ForeignTailnet: 'өөр Tailscale сүлжээ (хөндөхгүй)', TooOld: 'хуучин Tailscale', Stopped: 'зогссон' };
+    el.textContent = (m[st.state] || st.state || '—') + (st.error && st.state !== 'NotInstalled' ? ` (${st.error})` : '');
+    el.style.color = st.state === 'Running' && st.ip ? 'var(--ok, #4caf50)' : '';
+    if (st.ip) { try { socket?.emit('mesh:ip', st.ip); } catch {} }
+  };
+  window.api.onMeshStatus?.(renderMesh);
+  window.api.meshStatus?.().then(renderMesh).catch(() => {});
+  document.getElementById('btn-mesh-retry')?.addEventListener('click', async () => {
+    const b = document.getElementById('btn-mesh-retry'); if (b) { b.disabled = true; b.textContent = 'Холбож байна…'; }
+    try { renderMesh(await window.api.meshEnsure()); } catch {} finally { if (b) { b.disabled = false; b.textContent = 'Дахин холбох'; } }
+  });
 
   // Найзуудын тусдаа цонх горим
   if (isFriendsMode()) {

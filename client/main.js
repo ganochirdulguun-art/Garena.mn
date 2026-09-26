@@ -11,6 +11,7 @@ const replayService = require('./src/services/replay');
 const firewallService = require('./src/services/firewall');
 const apiService = require('./src/services/api');
 const gameRelayService = require('./src/services/gameRelay');
+const meshService = require('./src/services/mesh');   // Tailscale/Headscale mesh — чимээгүй суулгалт + нэгдэлт (Ш2, 2026-09-27)
 
 const SERVER_URL = process.env.SERVER_URL || 'https://garenamn-production.up.railway.app';
 
@@ -182,6 +183,10 @@ app.whenReady().then(() => {
   // Апп эхлэхдээ argv-д deep link байгаа эсэх шалгах (Windows)
   const deepLinkUrl = process.argv.find(a => a.startsWith('garenamn://'));
   if (deepLinkUrl) handleDeepLink(deepLinkUrl);
+
+  // Mesh (Tailscale): нэвтэрсний дараа чимээгүй нэгдэнэ; 20с-д эхэлж 30 мин тутам дахин шалгана (блоклохгүй)
+  setTimeout(() => meshEnsure().catch(() => {}), 20 * 1000);
+  setInterval(() => meshEnsure().catch(() => {}), 30 * 60 * 1000).unref?.();
 
   // Апп бэлэн болсноос 5 секундийн дараа update шалгах
   if (app.isPackaged) {
@@ -1001,6 +1006,25 @@ ipcMain.handle('streamers:openUrl', async (_, url) => {
     await shell.openExternal(url);
   }
 });
+
+// ── Mesh (Tailscale ↔ Headscale) ──────────────────────────────────────────
+let _meshLoginServer = null;   // сервер /config → mesh.login_server (null = mesh унтраалттай)
+async function meshEnsure() {
+  if (!authService.getToken()) return meshService.last();   // нэвтрээгүй бол хүлээнэ
+  if (!_meshLoginServer) {
+    try { const { data } = await axios.get(`${apiService.SERVER_URL}/config`, { timeout: 10000 }); _meshLoginServer = data?.mesh?.login_server || null; } catch {}
+  }
+  const msiPath = app.isPackaged ? path.join(process.resourcesPath, 'tailscale-setup.msi') : path.join(__dirname, 'resources', 'tailscale-setup.msi');
+  return meshService.ensure({
+    loginServer: _meshLoginServer,
+    msiPath,
+    getAuthKey: () => apiService.request('post', '/mesh/authkey'),
+    report: (rec) => apiService.request('post', '/mesh/report', rec),
+    onStatus: (st) => broadcastToWindows('mesh:status', st),
+  });
+}
+ipcMain.handle('mesh:status', async () => { try { if (meshService.installed()) await meshService.status(); } catch {} return meshService.last(); });
+ipcMain.handle('mesh:ensure', async () => { try { return await meshEnsure(); } catch (e) { return { ...meshService.last(), error: e.message }; } });
 
 // Firewall + сүлжээ тохиргоо (тусдаа товчноос) — ZeroTier хасагдсан, зөвхөн галт хана
 ipcMain.handle('firewall:setup', async () => {

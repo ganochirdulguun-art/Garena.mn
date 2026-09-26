@@ -38,6 +38,7 @@ function bblog(msg) {
 function _rankIp(addr) {
   const p = String(addr || '').split('.').map(Number);
   if (p[0] === 10 && p[1] === 147) return 90;   // ZeroTier — хамгийн сүүлд
+  if (p[0] === 100 && p[1] >= 64 && p[1] <= 127) return 90;   // Tailscale mesh (100.64/10) — GAMEINFO-г mesh-ээр цацахгүй (өрөө хооронд нэвчихгүй)
   if (p[0] === 192 && p[1] === 168) return 10;   // энгийн гэрийн LAN — тэргүүнд
   if (p[0] === 172 && p[1] >= 16 && p[1] <= 31) return 20;
   if (p[0] === 10) return 40;                     // бусад 10.x

@@ -63,6 +63,9 @@ function elevatedNetworkSetup(gamePaths, force) {
         'netsh advfirewall firewall add rule name="WC3 LAN UDP Out" dir=out action=allow protocol=UDP localport=6112 profile=any | Out-Null',
         'netsh advfirewall firewall add rule name="WC3 LAN TCP In" dir=in action=allow protocol=TCP localport=6112 profile=any | Out-Null',
         'netsh advfirewall firewall add rule name="WC3 LAN TCP Out" dir=out action=allow protocol=TCP localport=6112 profile=any | Out-Null',
+        '# Mesh хост listener (клиент дотор relay, Ш3): TCP 7000 in — зөвхөн энэ програмд',
+        'netsh advfirewall firewall delete rule name="Garena.mn Mesh Host TCP In" >$null 2>&1',
+        `netsh advfirewall firewall add rule name="Garena.mn Mesh Host TCP In" dir=in action=allow protocol=TCP localport=7000 program="${process.execPath.replace(/'/g, "''")}" profile=any | Out-Null`,
         '',
       );
     }

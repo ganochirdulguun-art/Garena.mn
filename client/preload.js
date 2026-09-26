@@ -86,6 +86,10 @@ contextBridge.exposeInMainWorld('api', {
   getAd:           ()          => ipcRenderer.invoke('config:ad'),
   onBotWc3Join:    (cb)        => ipcRenderer.on('bot:wc3-join', (_, d) => cb(d)),
   onNetLatency:    (cb)        => ipcRenderer.on('net:latency', (_, d) => cb(d)),
+  // Mesh (Tailscale) төлөв
+  meshStatus:      ()          => ipcRenderer.invoke('mesh:status'),
+  meshEnsure:      ()          => ipcRenderer.invoke('mesh:ensure'),
+  onMeshStatus:    (cb)        => ipcRenderer.on('mesh:status', (_, d) => cb(d)),
 
   // Тоглоом эхлүүлэх
   launchGame: (gameType) => ipcRenderer.invoke('game:launch', gameType),

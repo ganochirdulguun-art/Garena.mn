@@ -1,2 +1,6 @@
 # Багцлах WarKey exe — scripts/fetch-warkey.js татна (git-д оруулахгүй)
 resources/warkey/
+
+# Багцлах Tailscale MSI — scripts/fetch-tailscale.js татна (git-д оруулахгүй)
+resources/tailscale-setup.msi
+resources/*.part
