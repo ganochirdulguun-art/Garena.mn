@@ -1,5 +1,5 @@
 # Garena.mn mesh control plane. Тайлбар: MagicDNS/override_local_dns УНТРААЛТТАЙ — тоглогчийн PC-ийн DNS-ийг хөндөхгүй (гацалтад нөлөөлөхгүй зарчим).
-server_url: https://hs.garena.mn
+server_url: https://headscale-production-db57.up.railway.app   # DNS hs.garena.mn бэлэн болмогц солино (клиентүүд re-login шаардана)
 listen_addr: 0.0.0.0:8080
 metrics_listen_addr: 127.0.0.1:9090
 grpc_listen_addr: 127.0.0.1:50443
