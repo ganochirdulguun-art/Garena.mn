@@ -475,7 +475,16 @@ function startRelayLatencyProbe(relayIp, relayPort, label) {
 // WC3 → локал proxy(127.0.0.1:localPort) → relay(joiner handshake) → хост тоглогчийн WC3.
 // GAMEINFO-г локал WC3 руу inject (v2.5.3 техник, _gameInfoInject) → LAN жагсаалтад гарна.
 // ═══════════════════════════════════════════════════════════
-function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
+// Ш3: endpoints = [{type:'direct',ip,port}, {type:'relay',ip,port}] — эхлээд шууд (mesh) оролдоно, 1.5с-д
+// холбогдохгүй бол relay. Эхлэхэд нэг удаа урьдчилан шалгаж сонголтыг санана (WC3 join хүлээлтгүй).
+function _probeTcp(ip, port, ms) {
+  return new Promise((resolve) => {
+    const s = net.connect(Number(port), ip); let fin = false;
+    const done = (ok) => { if (fin) return; fin = true; try { s.destroy(); } catch {} resolve(ok); };
+    s.setTimeout(ms, () => done(false)); s.once('connect', () => done(true)); s.once('error', () => done(false));
+  });
+}
+function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoints }) {
   stopLanJoin();
   stopBotBridge(); stopHost(); stopFinder();   // 6112-ийг булаах бусад socket-уудыг цэвэрлэнэ
   if (!relayIp || !relayPort || !game || !gameInfoB64) throw new Error('LAN join мэдээлэл дутуу');
@@ -483,25 +492,48 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
   if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) throw new Error('GAMEINFO пакет буруу');
   const lp = Number(localPort) || 6250;
   const state = { relayIp, relayPort: Number(relayPort), game: String(game), localPort: lp, running: true,
-                  server: null, udp: null, timer: null, conns: new Set(), _label: `LAN join relay ${relayIp}:${relayPort}` };
+                  server: null, udp: null, timer: null, conns: new Set(), _label: `LAN join relay ${relayIp}:${relayPort}`,
+                  direct: null, useDirect: false };
+  const d = (Array.isArray(endpoints) ? endpoints : []).find((e) => e && e.type === 'direct' && isMeshIp(e.ip) && e.port);
+  if (d) {
+    state.direct = { ip: String(d.ip), port: Number(d.port) };
+    _probeTcp(state.direct.ip, state.direct.port, 1500).then((ok) => {
+      state.useDirect = ok;
+      bblog(`LAN join: шууд (mesh) ${state.direct.ip} ${ok ? 'ХОЛБОГДОНО ✅' : 'боломжгүй → relay'}`);
+      if (ok) { clearInterval(state.latTimer); state.latTimer = startRelayLatencyProbe(state.direct.ip, state.direct.port, 'join-direct'); }
+    });
+  }
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн порт талбарыг локал proxy порт болгоно
   state.packet = local;
 
   // TCP proxy: WC3 бүрийн холболтыг relay руу (joiner handshake урдаа) дамжуулна.
   state.server = net.createServer((client) => {
-    const up = net.connect(state.relayPort, state.relayIp);
     state.conns.add(client);
-    const done = () => { state.conns.delete(client); try { client.destroy(); } catch {} try { up.destroy(); } catch {} };
-    client.setNoDelay(true); up.setNoDelay(true);
+    client.setNoDelay(true);
     client.pause();   // handshake илгээх хүртэл WC3-ийн байтыг түр саатуулна
-    up.on('connect', () => {
-      try { up.write(JSON.stringify({ t: 'joiner', game: state.game }) + '\n'); } catch {}
-      const nm = null; // WC3 REQJOIN нэрийг доор pipe дундаас барьж болно (одоохондоо шаардлагагүй)
-      client.pipe(up); up.pipe(client);
-      client.resume();
-    });
-    client.on('error', done); up.on('error', done); client.on('close', done); up.on('close', done);
+    let up = null, linked = false;
+    const done = () => { state.conns.delete(client); try { client.destroy(); } catch {} try { up?.destroy(); } catch {} };
+    const dial = (ip, port, isDirect) => {
+      const u = net.connect(Number(port), ip); up = u; u.setNoDelay(true);
+      const t = isDirect ? setTimeout(() => { if (!linked) { try { u.destroy(); } catch {} } }, 2500) : null;
+      u.on('connect', () => {
+        clearTimeout(t); linked = true;
+        try { u.write(JSON.stringify({ t: 'joiner', game: state.game }) + '\n'); } catch {}
+        client.pipe(u); u.pipe(client);
+        client.resume();
+        bblog(`LAN join: WC3 холболт → ${isDirect ? 'ШУУД ' + ip : 'relay ' + ip}`);
+      });
+      u.on('error', () => {});
+      u.on('close', () => {
+        clearTimeout(t);
+        if (!linked && isDirect) { state.useDirect = false; bblog('LAN join: шууд холболт амжилтгүй → relay'); return dial(state.relayIp, state.relayPort, false); }
+        done();
+      });
+    };
+    if (state.useDirect && state.direct) dial(state.direct.ip, state.direct.port, true);
+    else dial(state.relayIp, state.relayPort, false);
+    client.on('error', done); client.on('close', done);
   });
   state.server.on('error', (e) => bblog('lanjoin tcp: ' + e.message));
   // БҮХ интерфэйст сонсоно (зөвхөн 127.0.0.1 биш). GAMEINFO нь LAN IP-ээс цацагддаг тул
@@ -518,6 +550,7 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort }) {
 // Lobby өөрчлөгдөхөд (хүн орж/гарах) GAMEINFO-г дахин эхлүүлэлгүй солино.
 function updateLanJoin({ gameInfoB64 }) {
   if (!_lanJoin || !gameInfoB64) return false;
+  // (endpoints өөрчлөгдвөл startLanJoin-г дахин дуудна — энд зөвхөн GAMEINFO)
   const pkt = Buffer.from(String(gameInfoB64), 'base64');
   if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) return false;
   pkt.writeUInt16LE(_lanJoin.localPort, pkt.length - 2);
@@ -538,16 +571,90 @@ function stopLanJoin() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ХОСТ-ТАЛЫН БИЧЛЭГ (Ш3, 2026-09-28)
+// Mesh (P2P) тоглолтод урсгал relay-ээр дамждаггүй тул хост клиент өөрөө бичиж Oracle relay-ийн
+// capture суваг руу урсгана — relay-ийн бичлэгтэй ЯГ ИЖИЛ файл → radarLive/reportGame өөрчлөлтгүй.
+// PASSIVE: splice-ыг огт хөндөхгүй, зөвхөн wc3→joiner 'data'-г хуулна; бүх алдаа try/catch → тоглоомд нөлөөгүй.
+// Санах ойд хадгална (дээд 60MB); тасарвал relay-ийн хүлээн авсан offset-оос үргэлжлүүлнэ.
+// ═══════════════════════════════════════════════════════════
+const HC_MAX = 60 * 1024 * 1024;
+function createHostCapture({ ip, port, key, game }) {
+  const hc = { ip, port: Number(port), key, game, chunks: [], total: 0, capped: false, joiners: {}, primary: null, primarySid: null,
+               socks: new Map(), sock: null, sent: 0, ready: false, ending: false, ended: false, retry: null, metaDirty: false };
+  const frame = (type, payload) => { const h = Buffer.alloc(5); h[0] = type; h.writeUInt32LE(payload.length, 1); return Buffer.concat([h, payload]); };
+  const bytesFrom = (off) => {   // off-оос хойшхи бүх байт (chunks-ыг хуулахгүй дараалан)
+    const out = []; let pos = 0;
+    for (const c of hc.chunks) { const end = pos + c.length; if (end > off) out.push(off > pos ? c.subarray(off - pos) : c); pos = end; }
+    return out;
+  };
+  const pump = () => {
+    if (!hc.ready || !hc.sock) return;
+    try {
+      if (hc.sent < hc.total) { for (const b of bytesFrom(hc.sent)) { for (let i = 0; i < b.length; i += 65536) hc.sock.write(frame(1, b.subarray(i, i + 65536))); } hc.sent = hc.total; }
+      if (hc.metaDirty) { hc.metaDirty = false; hc.sock.write(frame(2, Buffer.from(JSON.stringify({ joiners: hc.joiners, primarySid: hc.primarySid })))); }
+      if (hc.ending && !hc.ended) { hc.ended = true; hc.sock.write(frame(3, Buffer.alloc(0))); hc.sock.end(); bblog(`host-capture дууслаа ${hc.total}B`); }
+    } catch {}
+  };
+  const connect = () => {
+    if (hc.ended || hc.sock) return;
+    const s = net.connect(hc.port, hc.ip); hc.sock = s; hc.ready = false; s.setNoDelay(true);
+    let buf = Buffer.alloc(0);
+    s.on('connect', () => { try { s.write(JSON.stringify({ t: 'capture', game: hc.game, key: hc.key }) + '\n'); } catch {} });
+    s.on('data', (d) => {
+      if (hc.ready) return;
+      buf = Buffer.concat([buf, d]); const nl = buf.indexOf(0x0a); if (nl < 0) return;
+      try { const m = JSON.parse(buf.subarray(0, nl).toString('utf8')); if (m.t === 'capture_ok') { hc.sent = Math.min(Number(m.offset) || 0, hc.total); hc.ready = true; hc.metaDirty = true; pump(); } } catch {}
+    });
+    const lost = () => { if (hc.sock !== s) return; hc.sock = null; hc.ready = false; if (!hc.ended) hc.retry = setTimeout(connect, 3000); };
+    s.on('error', () => {}); s.on('close', lost);
+  };
+  const onWc3Data = (d) => {
+    if (hc.capped || hc.ended) return;
+    if (hc.total + d.length > HC_MAX) { hc.capped = true; return; }
+    hc.chunks.push(Buffer.from(d)); hc.total += d.length; pump();
+  };
+  const setPrimary = (wc3) => { hc.primary = wc3; hc.primarySid = hc.socks.get(wc3) ?? null; hc.metaDirty = true; try { wc3.on('data', onWc3Data); } catch {} pump(); };
+  // wc3 = локал WC3 руу залгасан socket (wc3→joiner урсгал = бичлэг); joinerSide = joiner-ийн байт ирдэг socket (REQJOIN нэр)
+  hc.attach = (wc3, sid, joinerSide, leftover) => {
+    try {
+      hc.socks.set(wc3, String(sid));
+      wc3.once('close', () => {
+        hc.socks.delete(wc3);
+        if (hc.primary === wc3) { try { wc3.removeListener('data', onWc3Data); } catch {} hc.primary = null; const next = hc.socks.keys().next().value; if (next) setPrimary(next); }
+      });
+      if (!hc.primary) setPrimary(wc3);
+      let nb = Buffer.from(leftover || []);
+      const tryName = () => {
+        const n = parseReqJoinName(nb);
+        if (n) { hc.joiners[String(sid)] = n; hc.metaDirty = true; pump(); return true; }
+        return nb.length > 2048;
+      };
+      if (!tryName()) { const on = (d) => { nb = Buffer.concat([nb, d]); if (tryName()) joinerSide.removeListener('data', on); }; joinerSide.on('data', on); }
+    } catch {}
+  };
+  hc.end = () => { hc.ending = true; clearTimeout(hc.retry); if (!hc.sock && !hc.ended) connect(); pump(); setTimeout(() => { try { hc.sock?.destroy(); } catch {} }, 15000); };
+  connect();
+  return hc;
+}
+
+// ═══════════════════════════════════════════════════════════
 // ТОГЛОГЧ-ХОСТ LAN — ХОСТ тал (2026-08-31)
 // 1) Локал WC3-ийн GAMEINFO-г SEARCHGAME probe-оор барина (onGameInfo callback → платформд зарлана).
 // 2) Relay руу control холболт нээж бүртгүүлнэ (game = санамсаргүй токен).
 // 3) newjoiner бүрд relay-д hostdata холболт + локал WC3(127.0.0.1:6112) руу splice.
 // ═══════════════════════════════════════════════════════════
-function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo }) {
+// Ш3 (2026-09-28): meshIp = хостын Tailscale IP → тэр IP дээр MESH_HOST_PORT-д шууд (P2P) joiner хүлээн авна;
+// capture = {ip,port,key} → хост өөрөө бичиж Oracle relay руу урсгана (relay давхар бичихгүй: register nocap).
+const MESH_HOST_PORT = 7000;
+function isMeshIp(ip) { const p = String(ip || '').split('.').map(Number); return p.length === 4 && p[0] === 100 && p[1] >= 64 && p[1] <= 127; }
+function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo, meshIp, capture }) {
   stopLanHost();
   if (!relayIp || !relayPort || !game) throw new Error('LAN host мэдээлэл дутуу');
   const state = { relayIp, relayPort: Number(relayPort), game: String(game), running: true,
-                  control: null, probe: null, timer: null, conns: new Set(), giB64: null };
+                  control: null, probe: null, timer: null, conns: new Set(), giB64: null, direct: null, listener: null, hc: null, dsid: 0 };
+  if (capture && capture.ip && capture.port && capture.key) {
+    try { state.hc = createHostCapture({ ip: capture.ip, port: capture.port, key: capture.key, game: state.game }); bblog('host-capture асав'); } catch (e) { bblog('host-capture алдаа: ' + e.message); }
+  }
 
   // 1) GAMEINFO capture — эфемер socket-оос 127.0.0.1:6112 руу SEARCHGAME probe (6112-т bind ХИЙХГҮЙ,
   //    war3-тай мөргөлдөхгүй). WC3 host бол GAMEINFO-гоор хариулна → барьж авна.
@@ -575,7 +682,7 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo 
     state.conns.add(hd); state.conns.add(wc3);
     let hdOk = false, wc3Ok = false, spliced = false;
     const done = () => { state.conns.delete(hd); state.conns.delete(wc3); try { hd.destroy(); } catch {} try { wc3.destroy(); } catch {} };
-    const maybeSplice = () => { if (spliced || !hdOk || !wc3Ok) return; spliced = true; hd.pipe(wc3); wc3.pipe(hd); };
+    const maybeSplice = () => { if (spliced || !hdOk || !wc3Ok) return; spliced = true; hd.pipe(wc3); wc3.pipe(hd); state.hc?.attach(wc3, session, hd, null); };
     hd.setNoDelay(true); wc3.setNoDelay(true);
     hd.on('connect', () => { try { hd.write(JSON.stringify({ t: 'hostdata', game: state.game, session }) + '\n'); } catch {} hdOk = true; maybeSplice(); });
     wc3.on('connect', () => { wc3Ok = true; maybeSplice(); });
@@ -589,7 +696,7 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo 
     const ctl = net.connect(state.relayPort, state.relayIp);
     state.control = ctl; ctl.setNoDelay(true);
     let cbuf = Buffer.alloc(0);
-    ctl.on('connect', () => { try { ctl.write(JSON.stringify({ t: 'register', game: state.game, key: relayKey || '', name: wc3Name || '' }) + '\n'); } catch {} });
+    ctl.on('connect', () => { try { ctl.write(JSON.stringify({ t: 'register', game: state.game, key: relayKey || '', name: wc3Name || '', nocap: state.hc ? 1 : 0 }) + '\n'); } catch {} });
     ctl.on('data', (d) => {
       cbuf = Buffer.concat([cbuf, d]); let nl;
       while ((nl = cbuf.indexOf(0x0a)) !== -1) {
@@ -604,8 +711,44 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo 
   };
   connectControl();
 
+  // 3) Mesh (P2P) шууд joiner — зөвхөн Tailscale IP дээр сонсоно (LAN/интернэтэд нээгдэхгүй).
+  //    Протокол relay-тэй ижил: эхний мөр {"t":"joiner","game":G} → токен таарвал локал WC3 руу splice.
+  if (meshIp && isMeshIp(meshIp)) {
+    try {
+      const srv = net.createServer((sock) => {
+        sock.setNoDelay(true); state.conns.add(sock);
+        let buf = Buffer.alloc(0);
+        const hsTimer = setTimeout(() => { try { sock.destroy(); } catch {} }, 10000);
+        const onHs = (d) => {
+          buf = Buffer.concat([buf, d]); const nl = buf.indexOf(0x0a);
+          if (nl < 0) { if (buf.length > 4096) sock.destroy(); return; }
+          clearTimeout(hsTimer); sock.removeListener('data', onHs);
+          let m = null; try { m = JSON.parse(buf.subarray(0, nl).toString('utf8')); } catch {}
+          if (!m || m.t !== 'joiner' || String(m.game) !== state.game) { sock.destroy(); return; }
+          const leftover = buf.subarray(nl + 1);
+          const sid = 'd' + (++state.dsid);
+          const wc3 = net.connect(WC3_PORT, '127.0.0.1'); wc3.setNoDelay(true); state.conns.add(wc3);
+          sock.pause();
+          wc3.on('connect', () => {
+            if (leftover.length) { try { wc3.write(leftover); } catch {} }
+            sock.pipe(wc3); wc3.pipe(sock); sock.resume();
+            state.hc?.attach(wc3, sid, sock, leftover);
+            bblog(`LAN host: ШУУД (mesh) joiner ${sock.remoteAddress} sid=${sid} → локал WC3`);
+          });
+          const done = () => { state.conns.delete(sock); state.conns.delete(wc3); try { sock.destroy(); } catch {} try { wc3.destroy(); } catch {} };
+          wc3.on('error', done); wc3.on('close', done); sock.on('close', done);
+        };
+        sock.on('data', onHs); sock.on('error', () => {}); sock.on('close', () => { clearTimeout(hsTimer); state.conns.delete(sock); });
+      });
+      srv.on('error', (e) => { bblog('mesh listener алдаа: ' + e.message); state.direct = null; });
+      srv.listen(MESH_HOST_PORT, String(meshIp), () => bblog(`mesh listener ${meshIp}:${MESH_HOST_PORT}`));
+      state.listener = srv; state.direct = { ip: String(meshIp), port: MESH_HOST_PORT };
+    } catch (e) { bblog('mesh listener эхлээгүй: ' + e.message); }
+  }
+
   state.latTimer = startRelayLatencyProbe(relayIp, relayPort, 'host');   // зам чанарын оношилгоо
   _lanHost = state;
+  return { direct: state.direct };
 }
 
 function stopLanHost() {
@@ -616,6 +759,8 @@ function stopLanHost() {
   clearInterval(s.latTimer);
   try { s.probe?.close(); } catch {}
   try { s.control?.destroy(); } catch {}
+  try { s.listener?.close(); } catch {}
+  try { s.hc?.end(); } catch {}   // бичлэгийг дуусгаж relay-д тайлан эхлүүлнэ
   s.conns.forEach((c) => { try { c.destroy(); } catch {} });
   bblog('LAN host зогслоо');
 }
@@ -644,4 +789,5 @@ module.exports = {
   startLanHost, stopLanHost,
   startLanJoin, updateLanJoin, stopLanJoin,
   stopAll, isRunning,
+  _createHostCapture: createHostCapture,   // тест
 };

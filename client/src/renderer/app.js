@@ -5337,10 +5337,12 @@ init();
     const btn = el('btn-lan-host'); if (btn) btn.disabled = true;
     try {
       const r = await api('post', `/rooms/${currentRoom.id}/lan-host/begin`);
-      hosting = { token: r.game_token };
+      hosting = { token: r.game_token, direct: null };
       const wc3Name = await getWc3Name();
       await window.api.launchGame(currentRoom?.gameType || '');
-      await window.api.startLanHost({ relayIp: r.relay_ip, relayPort: r.relay_port, game: r.game_token, relayKey: r.relay_key, wc3Name: wc3Name || '' });
+      // Ш3: capture = хост өөрөө бичлэг хийнэ (mesh P2P тоглолтын XP/дүн/радар); direct = mesh шууд endpoint
+      const hr = await window.api.startLanHost({ relayIp: r.relay_ip, relayPort: r.relay_port, game: r.game_token, relayKey: r.relay_key, wc3Name: wc3Name || '', capture: r.capture || null });
+      if (hosting) hosting.direct = hr?.direct || null;
       setHostState('WC3 нээгдэж байна… "Local Area Network" → "Create Game" → өөрийн map-аа сонгож тоглоом үүсгэ. Дараа өрөөнийхэн чинь автоматаар харна.', 'hosting');
       appendSysMsg('🎮 WC3 нээгдэж байна. LAN → Create Game → map сонгож тоглоомоо үүсгээрэй — өрөөнийхэн чинь нэгдэнэ.');
     } catch (e) { hosting = null; showToast(errMsg(e), 'error'); setHostState('LAN тоглоом нээгээд өрөөнийхнөө урина.', 'idle'); }
@@ -5359,7 +5361,7 @@ init();
     if (!hosting?.token || !gameinfo_b64) return;
     try {
       const wc3Name = await getWc3Name();
-      await api('post', `/rooms/${currentRoom.id}/lan-host/announce`, { game_token: hosting.token, gameinfo_b64, host_wc3_name: wc3Name || undefined });
+      await api('post', `/rooms/${currentRoom.id}/lan-host/announce`, { game_token: hosting.token, gameinfo_b64, host_wc3_name: wc3Name || undefined, direct: hosting.direct || undefined });
       setHostState('✅ Тоглоом зарлагдлаа — өрөөнийхэн чинь LAN жагсаалтаас нэгдэнэ.', 'live');
     } catch { /* дараагийн probe-д дахин оролдоно */ }
   });
@@ -5370,7 +5372,7 @@ init();
     try {
       if (joinedToken && joinedToken !== token) { try { await window.api.stopLanJoin?.(); } catch {} }
       await window.api.launchGame(currentRoom?.gameType || '');
-      await window.api.startLanJoin({ relayIp: g.relay_ip, relayPort: g.relay_port, game: g.game_token, gameInfoB64: g.gameinfo_b64 });
+      await window.api.startLanJoin({ relayIp: g.relay_ip, relayPort: g.relay_port, game: g.game_token, gameInfoB64: g.gameinfo_b64, endpoints: g.endpoints || null });
       joinedToken = token; renderGames();
       // Алхам 3: WC3 нэрээ серверт бүртгүүлнэ → relay-ийн дүн (K/D/A, 💎) нэрээр ЯГ таарна
       try { const wc3Name = await getWc3Name(); await api('post', `/rooms/${currentRoom.id}/lan-host/${token}/join`, { wc3_name: wc3Name || '' }); } catch {}

@@ -1053,9 +1053,12 @@ ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotB
 
 // ── Тоглогч-хост LAN (relay) ──
 // Хост тал: локал WC3 GAMEINFO баригдмагц onGameInfo → renderer руу 'lan:gameinfo' event
-ipcMain.handle('relay:startLanHost', (_, opts) => {
-  gameRelayService.startLanHost({ ...(opts || {}), onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }) });
-  return true;
+ipcMain.handle('relay:startLanHost', async (_, opts) => {
+  // Ш3: mesh (Tailscale) холбогдсон бол Tailscale IP дээр шууд joiner хүлээн авна (renderer announce-д direct-ийг илгээнэ)
+  let meshIp = null;
+  try { const st = meshService.installed() ? await meshService.status() : meshService.last(); if (st.state === 'Running' && st.ip) meshIp = st.ip; } catch {}
+  const r = gameRelayService.startLanHost({ ...(opts || {}), meshIp, onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }) });
+  return { ok: true, direct: r?.direct || null };
 });
 ipcMain.handle('relay:stopLanHost', () => { gameRelayService.stopLanHost(); return true; });
 ipcMain.handle('relay:startLanJoin', (_, opts) => gameRelayService.startLanJoin(opts || {}));

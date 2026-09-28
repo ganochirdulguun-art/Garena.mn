@@ -13,6 +13,12 @@
  *   {"t":"register","game":G,"key":K,"name":N}  → хост control (KEY шаардлагатай)
  *   {"t":"joiner","game":G}                      → joiner data (game байх ёстой)
  *   {"t":"hostdata","game":G,"session":S}        → хост data (session хүлээгдэж байх ёстой)
+ *   {"t":"capture","game":G,"key":HMAC}          → ХОСТ-ТАЛЫН бичлэг (Ш3, 2026-09-28): mesh (P2P) тоглолтод урсгал relay-ээр
+ *       дамждаггүй тул хост клиент өөрөө бичиж энд урсгана. key = HMAC-SHA256(RELAY_REPORT_KEY, G)[:32] (зөвхөн хост мэднэ).
+ *       Хариу {"t":"capture_ok","offset":N}
+ → клиент N-ээс үргэлжлүүлнэ (тасарч дахин холбогдоход давхардал/цоорхойгүй).
+ *       Дараа нь frame-үүд: [type u8][len u32LE][payload]; 1=W3GS байт, 2=meta JSON {joiners,primarySid}, 3=тоглоом дууссан.
+ *   register-д "nocap":1 → хост өөрөө бичиж байгаа тул relay энэ тоглоомыг ДАВХАР бичихгүй.
  * Handshake-ийн дараах байтууд = түүхий WC3 траффик (splice-д дамжина).
  */
 'use strict';
@@ -131,6 +137,59 @@ function capReport(gameId, cap) {
   } catch (e) { log('capReport алдаа: ' + e.message); }
 }
 
+// ── ХОСТ-ТАЛЫН бичлэг хүлээн авах (Ш3) — файл нэр/meta формат relay-ийн бичлэгтэй ЯГ ИЖИЛ тул radarLive.js ба
+//    reportGame.js өөрчлөлтгүй ажиллана. RELAY_REPORT_KEY тохируулаагүй бол энэ суваг хаалттай.
+const crypto = require('crypto');
+const HC_KEY = process.env.RELAY_REPORT_KEY || '';
+const HC_IDLE_FINALIZE_MS = Number(process.env.HOSTCAP_IDLE_MS || 10 * 60 * 1000);   // хост тасраад эргэж ирээгүй бол
+const hostCaps = new Map();   // game -> { file, ws, bytes, joiners, primarySid, startedAt, capped, sock, idleTimer, done }
+function hostCapKey(game) { return crypto.createHmac('sha256', HC_KEY).update(String(game)).digest('hex').slice(0, 32); }
+function hostCapFinalize(game) {
+  const hc = hostCaps.get(game); if (!hc || hc.done) return;
+  hc.done = true; hostCaps.delete(game); clearTimeout(hc.idleTimer);
+  log(`host-capture дуусав game=${game.slice(0, 12)} bytes=${hc.bytes} joiners=${JSON.stringify(hc.joiners)}`);
+  const cap = { file: hc.file, bytes: hc.bytes, primarySid: hc.primarySid, joiners: hc.joiners, startedAt: hc.startedAt, capped: hc.capped };
+  try { hc.ws.end(() => capReport(game, cap)); } catch { capReport(game, cap); }
+}
+function handleHostCapture(sock, msg, leftover) {
+  const game = String(msg.game || '');
+  if (!HC_KEY || !game || typeof msg.key !== 'string' || msg.key.length !== 32 ||
+      !crypto.timingSafeEqual(Buffer.from(msg.key), Buffer.from(hostCapKey(game)))) { log('capture: буруу key'); sock.destroy(); return; }
+  let hc = hostCaps.get(game);
+  if (!hc) {
+    try { fs.mkdirSync(CAP_DIR, { recursive: true }); } catch {}
+    const file = path.join(CAP_DIR, `${game}-${Date.now()}.w3gs`);
+    const ws = fs.createWriteStream(file); ws.on('error', () => {});
+    hc = { file, ws, bytes: 0, joiners: {}, primarySid: null, startedAt: Date.now(), capped: false, sock: null, idleTimer: null, done: false };
+    hostCaps.set(game, hc);
+    log('host-capture эхлэв game=' + game.slice(0, 12));
+  }
+  if (hc.sock && hc.sock !== sock) { try { hc.sock.destroy(); } catch {} }   // хуучин (тасарсан) холболт
+  hc.sock = sock; clearTimeout(hc.idleTimer);
+  try { sock.write(JSON.stringify({ t: 'capture_ok', offset: hc.bytes }) + '\n'); } catch {}
+  let buf = Buffer.from(leftover || []);
+  const onFrames = () => {
+    while (buf.length >= 5) {
+      const type = buf[0], len = buf.readUInt32LE(1);
+      if (len > 4 * 1024 * 1024) { sock.destroy(); return; }
+      if (buf.length < 5 + len) return;
+      const payload = buf.subarray(5, 5 + len); buf = buf.subarray(5 + len);
+      if (type === 1) {
+        if (!hc.capped) { hc.bytes += payload.length; if (hc.bytes > CAP_MAX_BYTES) hc.capped = true; else { try { hc.ws.write(Buffer.from(payload)); } catch {} } }
+      } else if (type === 2) {
+        try { const m = JSON.parse(payload.toString('utf8')); if (m && typeof m.joiners === 'object') hc.joiners = m.joiners; if (m && m.primarySid != null) hc.primarySid = String(m.primarySid); } catch {}
+      } else if (type === 3) { hostCapFinalize(game); try { sock.end(); } catch {} return; }
+    }
+  };
+  onFrames();
+  sock.on('data', (d) => { buf = Buffer.concat([buf, d]); onFrames(); });
+  sock.on('close', () => {
+    if (hc.done || hc.sock !== sock) return;
+    hc.sock = null;
+    hc.idleTimer = setTimeout(() => hostCapFinalize(game), HC_IDLE_FINALIZE_MS);   // эргэж холбогдвол цуцлагдана
+  });
+}
+
 // Socket-оос эхний newline хүртэлх JSON-ыг уншаад {msg, leftover}-ыг буцаана.
 function readHandshake(sock, cb) {
   let buf = Buffer.alloc(0);
@@ -179,7 +238,7 @@ const server = net.createServer((sock) => {
       if (!game) { sock.destroy(); return; }
       const old = hosts.get(game);
       if (old) { try { old.control.destroy(); } catch {} }
-      const h = { control: sock, name: String(msg.name || ''), sessions: new Map() };
+      const h = { control: sock, name: String(msg.name || ''), sessions: new Map(), nocap: !!msg.nocap };
       hosts.set(game, h);
       try { sock.write(JSON.stringify({ t: 'registered', game, relayPort: CFG.PORT, relayIp: CFG.PUBLIC_IP }) + '\n'); } catch {}
       log('host бүртгэгдлээ game=' + game.slice(0, 12) + ' name=' + h.name);
@@ -218,8 +277,11 @@ const server = net.createServer((sock) => {
       clearTimeout(s.timer); h.sessions.delete(sid);
       try { s.joiner.resume(); } catch {}
       splice(sock, s.joiner, leftover, s.leftover);
-      capAttach(game, sock, sid, s.joiner, s.leftover);   // PASSIVE tee — splice-ыг хөндөхгүй
+      if (!h.nocap) capAttach(game, sock, sid, s.joiner, s.leftover);   // PASSIVE tee — splice-ыг хөндөхгүй (nocap = хост өөрөө бичнэ)
       log('splice хийв game=' + game.slice(0, 12) + ' sid=' + sid);
+
+    } else if (t === 'capture') {
+      handleHostCapture(sock, msg, leftover);
 
     } else {
       sock.destroy();

@@ -72,6 +72,17 @@ if (RELAYS.length > 1 && process.env.NODE_ENV !== 'test') {
   setInterval(() => { checkRelays().catch(() => {}); }, 30 * 1000).unref?.();
   setTimeout(() => { checkRelays().catch(() => {}); }, 3000).unref?.();
 }
+// Ш3 (2026-09-28): ХОСТ-ТАЛЫН бичлэг — mesh (P2P) тоглолтод урсгал relay-ээр дамждаггүй тул хост клиент өөрөө бичиж
+// LAN_CAPTURE_RELAY ("ip:port", шинэ relay.js + RELAY_REPORT_KEY-тэй) руу урсгана. key = HMAC(RELAY_REPORT_KEY, token)[:32] —
+// зөвхөн /begin-ийн хариуд (хостод) очно, lobby payload-д ОРОХГҮЙ тул joiner хуурамч бичлэг илгээж чадахгүй.
+const CAPTURE_RELAY = (() => { const [ip, port] = String(process.env.LAN_CAPTURE_RELAY || '').split(':'); return ip ? { ip, port: Number(port || 7000) } : null; })();
+function captureFor(token) {
+  const k = process.env.RELAY_REPORT_KEY || '';
+  if (!CAPTURE_RELAY || !k) return null;
+  return { ip: CAPTURE_RELAY.ip, port: CAPTURE_RELAY.port, key: crypto.createHmac('sha256', k).update(String(token)).digest('hex').slice(0, 32) };
+}
+function isMeshIp(ip) { const p = String(ip || '').split('.').map(Number); return p.length === 4 && p[0] === 100 && p[1] >= 64 && p[1] <= 127 && p.every((x) => Number.isInteger(x) && x >= 0 && x <= 255); }
+
 // /begin-д хостод өгсөн relay-г токеноор санана → /announce joiner-уудад ЯГ ТЭР relay-г өгнө (failover дундуур зөрөхгүй)
 const beginRelay = new Map();   // token -> { ip, port, at }
 function rememberBegin(token, r) {
@@ -89,7 +100,11 @@ async function inRoom(userId, roomId) {
 }
 function gamesOf(roomId) { let m = roomGames.get(String(roomId)); if (!m) { m = new Map(); roomGames.set(String(roomId), m); } return m; }
 function gamePublic(g) {
-  return { game_token: g.token, relay_ip: g.relay_ip, relay_port: g.relay_port, gameinfo_b64: g.gameinfo_b64,
+  // endpoints (Ш3, клиент 2.9+): эхлээд шууд mesh, дараа нь relay. Хуучин клиент relay_ip/port-ыг л ашиглана.
+  const endpoints = [];
+  if (g.direct) endpoints.push({ type: 'direct', ip: g.direct.ip, port: g.direct.port });
+  endpoints.push({ type: 'relay', ip: g.relay_ip, port: g.relay_port });
+  return { game_token: g.token, relay_ip: g.relay_ip, relay_port: g.relay_port, gameinfo_b64: g.gameinfo_b64, endpoints,
            host_user_id: g.host_user_id, host_username: g.host_username, host_wc3_name: g.host_wc3_name, created_at: g.created_at };
 }
 
@@ -118,13 +133,13 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   const token = crypto.randomBytes(18).toString('hex');   // санамсаргүй, таамаглах боломжгүй → зөвхөн өрөөнд тарна
   const r = currentRelay();
   rememberBegin(token, r);
-  return res.json({ game_token: token, relay_ip: r.ip, relay_port: r.port, relay_key: RELAY_KEY });
+  return res.json({ game_token: token, relay_ip: r.ip, relay_port: r.port, relay_key: RELAY_KEY, capture: captureFor(token) });
 });
 
 // GAMEINFO зарлах / шинэчлэх → room:lan_lobby (зөвхөн өрөөнд)
 router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const roomId = String(req.params.id);
-  const { game_token, gameinfo_b64, host_wc3_name } = req.body || {};
+  const { game_token, gameinfo_b64, host_wc3_name, direct } = req.body || {};
   if (!relayConfigured()) return res.status(503).json({ error: 'LAN relay тохируулаагүй' });
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
   if (!game_token || !gameinfo_b64) return res.status(400).json({ error: 'game_token/gameinfo_b64 дутуу' });
@@ -135,6 +150,8 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const br = beginRelay.get(String(game_token)) || currentRelay();
   const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
+  // Хостын mesh шууд endpoint (100.64/10 л зөвшөөрнө — өөр хаяг руу joiner-уудыг чиглүүлэх боломжгүй)
+  if (direct && isMeshIp(direct.ip) && Number(direct.port) > 0 && Number(direct.port) < 65536) g.direct = { ip: String(direct.ip), port: Number(direct.port) };
   g.host_username = req.user.username || req.user.name || '';
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
   m.set(g.token, g);
@@ -208,4 +225,4 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
-module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay };
+module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor };

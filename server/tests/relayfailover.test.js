@@ -23,6 +23,7 @@ async function main() {
     PORT: String(port), JWT_SECRET: 'test-secret', NODE_ENV: 'test', SKIP_DB_MIGRATIONS: 'true',
     DISCORD_CLIENT_ID: 'x', DISCORD_CLIENT_SECRET: 'x', DISCORD_REDIRECT_URI: 'http://localhost/cb',
     LAN_RELAY_IP: '127.0.0.1', LAN_RELAY_PORT: String(pPort), LAN_RELAY_FALLBACKS: `localhost:${bPort}`,
+    LAN_CAPTURE_RELAY: '10.9.9.9:7000', RELAY_REPORT_KEY: 'rk-test',
   });
   clearSrc();
   installMockDb({ query: async (sql, params) => {
@@ -66,6 +67,19 @@ async function main() {
   await lan._checkRelays();
   assert.equal((await begin()).relay_port, pPort);
   console.log('PASS үндсэн сэргэвэл буцна');
+  // Ш3: /begin capture түлхүүр (HMAC), /announce direct → endpoints [direct, relay]; mesh биш IP хүлээхгүй
+  const crypto = require('node:crypto');
+  b = await begin();
+  assert.deepEqual(b.capture, { ip: '10.9.9.9', port: 7000, key: crypto.createHmac('sha256', 'rk-test').update(b.game_token).digest('hex').slice(0, 32) });
+  await fetch(`${base}/rooms/1/lan-host/announce`, { method: 'POST', headers: hdr, body: JSON.stringify({ game_token: b.game_token, gameinfo_b64: 'AAAA', direct: { ip: '100.64.0.9', port: 7000 } }) });
+  let gl = (await (await fetch(`${base}/rooms/1/lan-host`, { headers: hdr })).json()).games.find((x) => x.game_token === b.game_token);
+  assert.deepEqual(gl.endpoints, [{ type: 'direct', ip: '100.64.0.9', port: 7000 }, { type: 'relay', ip: '127.0.0.1', port: pPort }]);
+  assert.equal(JSON.stringify(gl).includes(b.capture.key), false, 'capture key lobby-д орохгүй');
+  const b2 = await begin();
+  await fetch(`${base}/rooms/1/lan-host/announce`, { method: 'POST', headers: hdr, body: JSON.stringify({ game_token: b2.game_token, gameinfo_b64: 'AAAA', direct: { ip: '8.8.8.8', port: 7000 } }) });
+  gl = (await (await fetch(`${base}/rooms/1/lan-host`, { headers: hdr })).json()).games.find((x) => x.game_token === b2.game_token);
+  assert.deepEqual(gl.endpoints.map((e) => e.type), ['relay'], 'mesh биш direct хүлээхгүй');
+  console.log('PASS Ш3: capture HMAC түлхүүр, endpoints [direct, relay], mesh-гүй IP татгалзана');
   primary2.close(); backup.close(); process.exit(0);
 }
 main().catch((e) => { console.error('FAIL', e); process.exit(1); });
