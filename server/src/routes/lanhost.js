@@ -32,11 +32,52 @@ async function syncRoomStatus(roomId) {
   } catch (e) { /* статус синк алдаа — эмзэг биш */ }
 }
 
-// Relay сервер (public IP) — платформ хостод зааж өгнө. MVP: нэг relay (датаком).
-const RELAY_IP = process.env.LAN_RELAY_IP || '';
-const RELAY_PORT = Number(process.env.LAN_RELAY_PORT || 7000);
+// Relay серверүүд (public IP) — платформ хостод зааж өгнө.
+// 2026-09-28: олон relay + автомат failover. LAN_RELAY_IP/PORT = үндсэн; LAN_RELAY_FALLBACKS="ip:port,ip:port" = нөөц.
+// Сервер relay бүрийг 30с тутам TCP-ээр шалгана; үндсэн нь 3 удаа дараалан хариу өгөхгүй бол ШИНЭ тоглолтууд
+// дараагийн эрүүл relay-г авна (эхэлсэн тоглолт өөрийн relay-дээ үлдэнэ). Бүгд унасан бол үндсэнийг өгнө.
 const RELAY_KEY = process.env.LAN_RELAY_KEY || '';   // MVP: заавал биш (game_token = таамаглашгүй, өрөө-хамрах тусгаарлалт)
-function relayConfigured() { return !!RELAY_IP; }
+function parseRelays() {
+  const out = [];
+  const add = (ip, port) => { ip = String(ip || '').trim(); port = Number(port || 7000); if (ip && !out.some((r) => r.ip === ip && r.port === port)) out.push({ ip, port, fails: 0, ok: true, checkedAt: 0 }); };
+  add(process.env.LAN_RELAY_IP, process.env.LAN_RELAY_PORT);
+  for (const part of String(process.env.LAN_RELAY_FALLBACKS || '').split(',')) { const [ip, port] = part.split(':'); add(ip, port); }
+  return out;
+}
+const RELAYS = parseRelays();
+const RELAY_IP = RELAYS[0]?.ip || '';          // хуучин экспорт/тестүүдэд
+const RELAY_PORT = RELAYS[0]?.port || 7000;
+const FAILS_TO_DOWN = 3;
+function relayConfigured() { return RELAYS.length > 0; }
+function currentRelay() { return RELAYS.find((r) => r.fails < FAILS_TO_DOWN) || RELAYS[0] || null; }
+function probeRelay(r, timeoutMs = 4000) {
+  return new Promise((resolve) => {
+    const sock = require('net').connect({ host: r.ip, port: r.port });
+    const done = (ok) => { try { sock.destroy(); } catch {} resolve(ok); };
+    sock.setTimeout(timeoutMs, () => done(false));
+    sock.once('connect', () => done(true));
+    sock.once('error', () => done(false));
+  });
+}
+async function checkRelays() {
+  for (const r of RELAYS) {
+    const ok = await probeRelay(r);
+    const wasUp = r.fails < FAILS_TO_DOWN;
+    r.fails = ok ? 0 : r.fails + 1; r.ok = ok; r.checkedAt = Date.now();
+    const isUp = r.fails < FAILS_TO_DOWN;
+    if (wasUp !== isUp) console.warn(`[LAN] relay ${r.ip}:${r.port} ${isUp ? 'ДАХИН АМЬД' : 'УНАСАН'} → одоогийн relay ${currentRelay()?.ip}`);
+  }
+}
+if (RELAYS.length > 1 && process.env.NODE_ENV !== 'test') {
+  setInterval(() => { checkRelays().catch(() => {}); }, 30 * 1000).unref?.();
+  setTimeout(() => { checkRelays().catch(() => {}); }, 3000).unref?.();
+}
+// /begin-д хостод өгсөн relay-г токеноор санана → /announce joiner-уудад ЯГ ТЭР relay-г өгнө (failover дундуур зөрөхгүй)
+const beginRelay = new Map();   // token -> { ip, port, at }
+function rememberBegin(token, r) {
+  beginRelay.set(token, { ip: r.ip, port: r.port, at: Date.now() });
+  if (beginRelay.size > 5000) { const cut = Date.now() - 6 * 3600 * 1000; for (const [k, v] of beginRelay) if (v.at < cut) beginRelay.delete(k); }
+}
 
 // Санах ой дахь идэвхтэй тоглоомууд: roomId -> Map<token, game>
 const roomGames = new Map();
@@ -75,7 +116,9 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   if (!relayConfigured()) return res.status(503).json({ error: 'LAN relay тохируулаагүй' });
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
   const token = crypto.randomBytes(18).toString('hex');   // санамсаргүй, таамаглах боломжгүй → зөвхөн өрөөнд тарна
-  return res.json({ game_token: token, relay_ip: RELAY_IP, relay_port: RELAY_PORT, relay_key: RELAY_KEY });
+  const r = currentRelay();
+  rememberBegin(token, r);
+  return res.json({ game_token: token, relay_ip: r.ip, relay_port: r.port, relay_key: RELAY_KEY });
 });
 
 // GAMEINFO зарлах / шинэчлэх → room:lan_lobby (зөвхөн өрөөнд)
@@ -89,7 +132,8 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const m = gamesOf(roomId);
   const existing = m.get(String(game_token));
   if (existing && String(existing.host_user_id) !== String(req.user.id)) return res.status(409).json({ error: 'Токен өөр хэрэглэгчийнх' });
-  const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: RELAY_IP, relay_port: RELAY_PORT, created_at: Date.now() };
+  const br = beginRelay.get(String(game_token)) || currentRelay();
+  const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
   g.host_username = req.user.username || req.user.name || '';
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
@@ -164,4 +208,4 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
-module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken };
+module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay };
