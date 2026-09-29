@@ -238,6 +238,7 @@ async function runMigrations(db) {
   `);
   // Кланууд (2026-09-30): clans, clan_members, clan_requests, rooms.clan_id — routes/clans.js ensureTables (idempotent)
   await require('../routes/clans').ensureTables();
+  await require('../routes/maps').ensureTables();   // Map-ын сан (bytea)
 }
 
 module.exports = { runMigrations };

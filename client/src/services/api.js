@@ -238,6 +238,7 @@ async function deleteStreamer(id) {
 
 module.exports = {
   request,
+  getClient,
   SERVER_URL,
   friendlyError,
   changePassword,

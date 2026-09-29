@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="gx.css" />
   <link rel="stylesheet" href="gx-clans.css" />
+  <link rel="stylesheet" href="gx-maps.css" />
   <link rel="stylesheet" href="gx-fix.css" />
   <script src="gx-boot.js"></script>
 </head>
@@ -835,7 +836,22 @@
         <div class="gx-head-actions"><button type="button" class="btn btn-primary btn-with-icon" id="gx-add-game"><svg class="btn-icon-svg"><use href="#gx-i-folder"/></svg>Тоглоом нэмэх</button></div>
       </div>
       <div class="gx-stats" id="gx-games-stats"></div>
+      <section class="gx-wc3" id="gx-wc3"></section>
+      <h3 class="gx-sec-h">Бүртгэсэн тоглоомууд</h3>
       <div class="gx-games-grid" id="gx-games-grid"></div>
+      <div class="gx-maps-head">
+        <div><h3 class="gx-sec-h">Map-ын сан</h3><p class="gx-sub">Хэрэгтэй map-уудаа платформоос шууд татаж WC3-ийн Maps\Download хавтас руу суулгана. Өрөөнд орохоос өмнө map-аа татсан бол LAN тоглоом хурдан эхэлнэ.</p></div>
+        <div class="gx-head-actions">
+          <button type="button" class="btn btn-sm" id="gx-maps-folder"><svg class="btn-icon-svg"><use href="#gx-i-folder"/></svg>Map хавтас нээх</button>
+          <button type="button" class="btn btn-primary btn-sm hidden" id="gx-maps-add">+ Map нэмэх</button>
+        </div>
+      </div>
+      <div class="gx-maps-bar">
+        <label class="gx-search"><svg><use href="#gx-i-search"/></svg><input id="gx-maps-q" type="text" placeholder="Map хайх…" autocomplete="off" /></label>
+        <div class="gx-seg" id="gx-maps-cats"></div>
+      </div>
+      <div id="gx-maps-list" class="gx-maps-list"></div>
+      <div id="gx-map-modal" class="gx-modal hidden" role="dialog" aria-modal="true"><div class="gx-modal-box"><button type="button" class="gx-x gx-modal-x" data-gx-close>✕</button><div id="gx-map-modal-body"></div></div></div>
     </div>
 
 
@@ -1584,5 +1600,6 @@
   <script src="radar.js"></script>
   <script src="gx.js"></script>
   <script src="gx-clans.js"></script>
+  <script src="gx-maps.js"></script>
 </body>
 </html>

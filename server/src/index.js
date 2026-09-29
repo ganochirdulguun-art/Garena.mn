@@ -101,7 +101,8 @@ app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
 app.use('/discord-servers', discordServerRoutes);
 const clanRoutes = require('./routes/clans');
-app.use('/clans', clanRoutes.router);              // Кланууд (2026-09-30): Lord/Admin/Member, хүсэлт, кланы өрөө
+app.use('/clans', clanRoutes.router);
+app.use('/maps', require('./routes/maps').router);   // Map-ын сан (2026-09-30): WC3 custom map татах/оруулах              // Кланууд (2026-09-30): Lord/Admin/Member, хүсэлт, кланы өрөө
 app.use('/streamers', streamerRoutes);
 app.use('/admin/api/bot', botRoutes.adminRouter);     // админ: бот хостын хяналт (C2) + мэдэгдлийн лог (B4)
 app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)

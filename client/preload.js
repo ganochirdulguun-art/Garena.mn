@@ -160,5 +160,14 @@ contextBridge.exposeInMainWorld('api', {
 
   // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
+  // Map-ын сан (2026-09-30)
+  wc3Info:        ()     => ipcRenderer.invoke('maps:wc3Info'),
+  mapsLocal:      (files) => ipcRenderer.invoke('maps:local', files),
+  mapsDownload:   (m)    => ipcRenderer.invoke('maps:download', m),
+  mapsDownloadMany: (ms) => ipcRenderer.invoke('maps:downloadMany', ms),
+  mapsOpenFolder: ()     => ipcRenderer.invoke('maps:openFolder'),
+  mapsPickFile:   ()     => ipcRenderer.invoke('maps:pickFile'),
+  mapsUpload:     (meta) => ipcRenderer.invoke('maps:upload', meta),
+  onMapsProgress: (cb)   => ipcRenderer.on('maps:progress', (_, d) => cb(d)),
   openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
 });

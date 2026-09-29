@@ -38,10 +38,18 @@
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
-    getAd: async () => null, meshStatus: async () => ({ state: 'Running', ip: '100.64.0.1' }), getQR: async () => ({}),
+    getAd: async () => null,
+    wc3Info: async () => ({ primary: { exe: 'C:\Program Files (x86)\Warcraft 3\war3.exe', exists: true, version: '1, 26, 0, 6401', is126: true, mapsDir: 'C:\Program Files (x86)\Warcraft 3\Maps\Downloads' } }),
+    mapsLocal: async () => ({ files: { 'DotA v6.74c LoD v5e.w3x': { size: 1, sha256: 'a'.repeat(64) }, 'DotA IMBA v3.73.4b.w3x': { size: 1, sha256: 'old' } } }), meshStatus: async () => ({ state: 'Running', ip: '100.64.0.1' }), getQR: async () => ({}),
     request: async (method, path) => {
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
+      if (P === '/maps') return { can_upload: true, categories: ['DotA', 'LoD', 'IMBA', 'Melee', 'Tower Defense', 'RPG', 'Custom'], maps: [
+        { id: 1, name: 'DotA LoD', version: 'v6.74c v5e', category: 'LoD', description: 'Legends of DotA — Garena.mn тэмцээний албан map', filename: 'DotA v6.74c LoD v5e.w3x', size: 8115000, sha256: 'a'.repeat(64), downloads: 412, featured: true },
+        { id: 2, name: 'DotA LoD', version: 'v6.85i', category: 'LoD', description: 'LoD шинэ хувилбар', filename: 'DotA v6.85i LoD (1).w3x', size: 7707000, sha256: 'b'.repeat(64), downloads: 133 },
+        { id: 3, name: 'DotA IMBA', version: 'v3.73.4b', category: 'IMBA', description: 'IMBA fun горим', filename: 'DotA IMBA v3.73.4b.w3x', size: 8158000, sha256: 'c'.repeat(64), downloads: 97 },
+        { id: 4, name: 'Fight of Characters', version: '9.1a (Asia)', category: 'Custom', description: 'Anime баатруудын тулаан', filename: 'Fight_of_Characters9.1a(Asia).w3x', size: 8378000, sha256: 'd'.repeat(64), downloads: 58 },
+      ] };
       const clanA = { id: 1, name: 'Mongol Lords', tag: 'MNL', description: 'DotA LoD клан · долоо хоног бүр дотоод тэмцээн', kind: 'player', join_mode: 'request', member_count: 18, owner_name: 'VitoCorleone', role: 'lord', pending_count: 2 };
       const clanB = { id: 2, name: 'LoD Mongolia', tag: 'LOD', description: 'Garena.mn Discord серверийн клан', kind: 'discord', join_mode: 'request', member_count: 342, owner_name: 'Billionaire', invite_url: 'https://discord.gg/x' };
       const clanC = { id: 3, name: 'Night Owls', tag: 'OWL', description: 'Шөнийн тоглогчид', kind: 'player', join_mode: 'open', member_count: 9, owner_name: 'Eboshdee' };

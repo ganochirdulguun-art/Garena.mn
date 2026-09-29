@@ -664,6 +664,52 @@ function configuredGamePaths() {
     .filter((p) => typeof p === 'string' && p.trim());
 }
 
+// ── Map-ын сан (2026-09-30): WC3 хувилбар, Maps\Download, татах/оруулах — бүгд async ──
+const mapsService = require('./src/services/maps');
+let _mapsPicked = null;   // зөвхөн maps:pickFile-аар сонгосон файлыг upload хийнэ
+async function wc3Primary() { return (await mapsService.wc3Info(configuredGamePaths())).primary; }
+ipcMain.handle('maps:wc3Info', () => mapsService.wc3Info(configuredGamePaths()));
+ipcMain.handle('maps:local', async (_e, files) => {
+  const p = await wc3Primary();
+  return { mapsDir: p?.mapsDir || null, files: await mapsService.localStatus(p?.mapsDir, files) };
+});
+ipcMain.handle('maps:download', async (e, m) => {
+  const p = await wc3Primary();
+  try {
+    return await mapsService.download({ client: apiService.getClient(), id: m?.id, filename: m?.filename, sha256: m?.sha256, mapsDir: p?.mapsDir,
+      onProgress: (pct) => { try { e.sender.send('maps:progress', { id: m?.id, pct }); } catch {} } });
+  } catch (err) { throw apiError(err); }
+});
+ipcMain.handle('maps:downloadMany', async (e, maps) => {
+  const p = await wc3Primary();
+  try {
+    return await mapsService.downloadMany({ client: apiService.getClient(), maps: (Array.isArray(maps) ? maps : []).slice(0, 50), mapsDir: p?.mapsDir,
+      onProgress: (id, pct) => { try { e.sender.send('maps:progress', { id, pct }); } catch {} } });
+  } catch (err) { throw apiError(err); }
+});
+ipcMain.handle('maps:openFolder', async () => {
+  const p = await wc3Primary(); if (!p?.mapsDir) return false;
+  await fs.promises.mkdir(p.mapsDir, { recursive: true }).catch(() => {});
+  return shell.openPath(p.mapsDir);
+});
+ipcMain.handle('maps:pickFile', async () => {
+  const r = await dialog.showOpenDialog(mainWindow, { title: 'Map файл сонгох', filters: [{ name: 'Warcraft III map', extensions: ['w3x', 'w3m'] }], properties: ['openFile'] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const st = await fs.promises.stat(r.filePaths[0]);
+  _mapsPicked = r.filePaths[0];
+  return { filename: path.basename(_mapsPicked), size: st.size };
+});
+ipcMain.handle('maps:upload', async (_e, meta = {}) => {
+  if (!_mapsPicked) throw new Error('Эхлээд map файлаа сонгоно уу');
+  const buf = await fs.promises.readFile(_mapsPicked);
+  const q = new URLSearchParams({ filename: path.basename(_mapsPicked), name: String(meta.name || ''), version: String(meta.version || ''), category: String(meta.category || ''), description: String(meta.description || '') });
+  try {
+    const { data } = await apiService.getClient().post(`/maps/upload?${q}`, buf, { headers: { 'Content-Type': 'application/octet-stream' }, maxBodyLength: 40 * 1024 * 1024, timeout: 180000 });
+    _mapsPicked = null;
+    return data;
+  } catch (err) { throw apiError(err); }
+});
+
 ipcMain.handle('settings:get', () => {
   const s = readSettings();
   return migrateSettings(s);
