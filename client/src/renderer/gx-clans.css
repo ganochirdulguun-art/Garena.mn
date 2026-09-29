@@ -122,3 +122,10 @@ body.gx .gx-row.room-mine { border-color: var(--gx-line) !important; border-top-
 .gx-mem .clickable-name, .gx-req .clickable-name { color: var(--gx-text) !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .gx-mem-act .btn { height: 26px; padding: 0 8px; font-size: 11px !important; }
 .gx-reqs .dm-section-label { border: 0 !important; }
+
+/* Кланы зураг солих товч (Clan Lord) */
+.gx-clan-ico { position: relative; }
+.gx-ico-edit { position: absolute; right: -6px; bottom: -6px; width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--gx-surface); background: var(--gx-accent); color: #fff; display: grid; place-items: center; cursor: pointer; padding: 0; }
+.gx-ico-edit .btn-icon-svg { width: 14px; height: 14px; }
+.gx-clan-ico.big { overflow: visible; }
+.gx-clan-ico.big img { border-radius: 16px; }

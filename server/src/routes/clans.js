@@ -67,6 +67,8 @@ async function ensureTables() {
       );
       CREATE UNIQUE INDEX IF NOT EXISTS clan_requests_pending ON clan_requests(clan_id, user_id) WHERE status = 'pending';
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clan_id INTEGER REFERENCES clans(id) ON DELETE SET NULL;
+      ALTER TABLE clans ADD COLUMN IF NOT EXISTS icon_data BYTEA;
+      ALTER TABLE clans ADD COLUMN IF NOT EXISTS icon_mime VARCHAR(20);
     `);
   } catch (e) { console.error('[Migration] clans:', e.message); }
 }
@@ -110,7 +112,8 @@ function bad(res, code, error, extra) { return res.status(code).json({ error, ..
 
 async function loadClan(id) {
   const r = await db.query(`
-    SELECT c.*, u.username AS owner_name,
+    SELECT c.id, c.name, c.tag, c.description, c.kind, c.discord_server_id, c.guild_id, c.invite_url, c.icon_url, c.join_mode, c.owner_id, c.created_at,
+      u.username AS owner_name,
       (SELECT COUNT(*) FROM clan_members m WHERE m.clan_id = c.id)::int AS member_count
     FROM clans c LEFT JOIN users u ON u.id = c.owner_id WHERE c.id = $1`, [id]);
   return r.rows[0] || null;
@@ -233,7 +236,7 @@ router.patch('/:id', auth, async (req, res) => {
     if (req.body?.join_mode !== undefined) { vals.push(req.body.join_mode === 'open' ? 'open' : 'request'); sets.push(`join_mode = $${vals.length}`); }
     if (!sets.length) return bad(res, 400, 'Өөрчлөх зүйл алга');
     vals.push(req.params.id);
-    const r = await db.query(`UPDATE clans SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING *`, vals);
+    const r = await db.query(`UPDATE clans SET ${sets.join(', ')} WHERE id = $${vals.length} RETURNING id, name, tag, description, join_mode, icon_url`, vals);
     return res.json(r.rows[0] || {});
   } catch (e) { console.error('[clans] patch', e.message); return bad(res, 500, 'Server error'); }
 });
@@ -250,6 +253,33 @@ router.delete('/:id', auth, async (req, res) => {
     notify(mem.rows.map((x) => x.user_id), { clan_id: Number(req.params.id), deleted: true });
     return res.json({ ok: true });
   } catch (e) { console.error('[clans] delete', e.message); return bad(res, 500, 'Server error'); }
+});
+
+// ── Кланы зураг (лого) — Lord эсвэл эзэн оруулна: { image: data:image/png|jpeg|webp;base64 ≤ 1MB } ──
+router.post('/:id/icon', auth, async (req, res) => {
+  if (!await dbOk()) return bad(res, 503, 'Service temporarily unavailable');
+  try {
+    const role = await roleOf(req.params.id, req.user.id);
+    if (role !== 'lord' && !await isStaff(req.user)) return bad(res, 403, 'Зөвхөн Clan Lord кланы зургийг солино');
+    const { parseImageDataUrl } = require('./roomBg');
+    const img = parseImageDataUrl(req.body?.image, 1024 * 1024);
+    if (!img) return bad(res, 400, 'JPG/PNG/WebP зураг, 1MB-с ихгүй байх ёстой');
+    const base = `${req.protocol}://${req.get('host')}`;
+    const url = `${base}/clans/${Number(req.params.id)}/icon?v=${Date.now().toString(36)}`;
+    await db.query('UPDATE clans SET icon_data = $1, icon_mime = $2, icon_url = $3 WHERE id = $4', [img.buf, img.mime, url, req.params.id]);
+    return res.json({ ok: true, icon_url: url });
+  } catch (e) { console.error('[clans] icon', e.message); return bad(res, 500, 'Server error'); }
+});
+// Зургийг нээлттэй үйлчилнэ (<img> токен илгээдэггүй; кланы лого нууц биш)
+router.get('/:id/icon', async (req, res) => {
+  if (!await dbOk()) return res.status(503).end();
+  try {
+    const r = await db.query('SELECT icon_data, icon_mime FROM clans WHERE id = $1', [req.params.id]);
+    const row = r.rows[0];
+    if (!row?.icon_data) return res.status(404).end();
+    res.set({ 'Content-Type': row.icon_mime || 'image/png', 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+    return res.end(row.icon_data);
+  } catch { return res.status(500).end(); }
 });
 
 // ── Нэгдэх: open → шууд гишүүн; request → хүсэлт ──

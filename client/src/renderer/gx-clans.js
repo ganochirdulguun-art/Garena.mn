@@ -23,11 +23,31 @@
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.querySelectorAll('.gx-modal:not(.hidden)').forEach((m) => m.classList.add('hidden')); });
 
-  function clanIcon(c, big) {
+  function clanIcon(c, big, editable) {
     const cls = big ? 'gx-clan-ico big' : 'gx-clan-ico';
-    if (c.icon_url) return `<span class="${cls}"><img src="${esc(c.icon_url)}" alt=""></span>`;
-    return `<span class="${cls}" style="--gc:${gameTypeColor(c.tag || c.name)}">${esc(String(c.tag || '?').slice(0, 3).toUpperCase())}</span>`;
+    const tag = esc(String(c.tag || '?').slice(0, 3).toUpperCase());
+    const edit = editable ? '<button type="button" class="gx-ico-edit" data-clan-icon title="Кланы зураг солих"><svg class="btn-icon-svg"><use href="#ico-camera"/></svg></button>' : '';
+    // Зураг ачаалагдахгүй бол (жиш: Discord дүрс солигдсон) таг харуулна — доорх 'error' сонсогч
+    return `<span class="${cls}" style="--gc:${gameTypeColor(c.tag || c.name)}" data-tag="${tag}">${c.icon_url ? `<img src="${esc(c.icon_url)}" alt="">` : tag}${edit}</span>`;
   }
+  document.addEventListener('error', (e) => {
+    const img = e.target; if (!(img instanceof HTMLImageElement)) return;
+    const box = img.closest('.gx-clan-ico'); if (!box) return;
+    img.replaceWith(document.createTextNode(box.dataset.tag || '?'));
+  }, true);
+  // Кланы зураг оруулах (Clan Lord) — JPG/PNG/WebP ≤ 1MB
+  const iconInput = document.createElement('input');
+  iconInput.type = 'file'; iconInput.accept = 'image/jpeg,image/png,image/webp'; iconInput.style.display = 'none';
+  document.body.appendChild(iconInput);
+  iconInput.addEventListener('change', async () => {
+    const f = iconInput.files && iconInput.files[0]; iconInput.value = '';
+    if (!f || !curClan) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { toast('JPG/PNG/WebP зураг сонгоно уу', 'warning'); return; }
+    if (f.size > 1024 * 1024) { toast('Зураг 1MB-с бага байх ёстой', 'warning'); return; }
+    const dataUrl = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(f); });
+    await run(() => api('post', `/clans/${curClan.id}/icon`, { image: dataUrl }), 'Кланы зураг солигдлоо ✅');
+    openClan(curClan.id); loadMine();
+  });
   function kindBadge(c) { return c.kind === 'discord' ? '<span class="gx-kind discord">Discord сервер</span>' : '<span class="gx-kind">Тоглогчийн клан</span>'; }
   function actionBtn(c) {
     if (c.my_role) return `<span class="gx-role ${c.my_role}">${ROLE[c.my_role]}</span>`;
@@ -120,7 +140,7 @@
       <div class="gx-clan-hero">
         <div class="gx-clan-banner"></div>
         <div class="gx-clan-hero-row">
-          ${clanIcon(c, true)}
+          ${clanIcon(c, true, c.my_role === 'lord')}
           <div class="gx-clan-hero-text"><h2>${esc(c.name)} <span class="gx-tag">[${esc(c.tag)}]</span></h2>
             <div class="gx-clan-meta">${kindBadge(c)}<span>${c.member_count} гишүүн</span><span>Lord: ${esc(c.owner_name || '-')}</span><span>${c.join_mode === 'open' ? 'Нээлттэй элсэлт' : 'Хүсэлтээр элсэнэ'}</span></div></div>
           <div class="gx-clan-hero-act">
@@ -151,7 +171,7 @@
   // ── Үйлдлүүд ──
   async function run(fn, okMsg) { try { await fn(); if (okMsg) toast(okMsg, 'success'); } catch (e) { toast(errMsg(e), 'error'); } }
   document.addEventListener('click', async (e) => {
-    const el = e.target.closest('[data-clan-join],[data-clan-cancel],[data-clan-open],[data-clan-back],[data-clan-leave],[data-clan-delete],[data-clan-edit],[data-clan-room],[data-clan-add],[data-clan-kick],[data-clan-role],[data-req],[data-open-url]');
+    const el = e.target.closest('[data-clan-icon],[data-clan-join],[data-clan-cancel],[data-clan-open],[data-clan-back],[data-clan-leave],[data-clan-delete],[data-clan-edit],[data-clan-room],[data-clan-add],[data-clan-kick],[data-clan-role],[data-req],[data-open-url]');
     if (!el) return;
     if (el.dataset.clanJoin) {
       e.stopPropagation();
@@ -172,6 +192,7 @@
       await run(() => api('delete', `/clans/${c.id}`), 'Клан устгагдлаа'); closeDetail(); loadMine(); loadRooms?.(); return;
     }
     if (el.hasAttribute('data-clan-edit')) { openEdit(c); return; }
+    if (el.hasAttribute('data-clan-icon')) { iconInput.click(); return; }
     if (el.hasAttribute('data-clan-room')) { openClanRoomForm(c.id); return; }
     if (el.hasAttribute('data-clan-add')) {
       const v = ($('gx-addmem-input')?.value || '').trim(); if (!v) return;
