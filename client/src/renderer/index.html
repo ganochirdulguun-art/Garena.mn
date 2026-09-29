@@ -8,10 +8,14 @@
   <title>Garena.mn</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Noto+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="gx.css" />
+  <link rel="stylesheet" href="gx-clans.css" />
+  <link rel="stylesheet" href="gx-fix.css" />
+  <script src="gx-boot.js"></script>
 </head>
-<body>
+<body class="gx">
 
   <!-- SVG icon тодорхойлолт -->
   <svg class="hidden">
@@ -156,6 +160,41 @@
         <path d="M8 7h8"/>
         <path d="M8 11h6"/>
       </symbol>
+
+      <!-- ═══ GX (2026-09-30) шинэ дизайны icon-ууд ═══ -->
+      <symbol id="gx-i-lobby" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+      <symbol id="gx-i-games" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M6 12h4"/><path d="M8 10v4"/><path d="M15 13h.01"/><path d="M18 11h.01"/></symbol>
+      <symbol id="gx-i-msg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="gx-i-trophy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a3 3 0 0 0 3 3"/><path d="M17 6h3a3 3 0 0 1-3 3"/></symbol>
+      <symbol id="gx-i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.07 4.93A10 10 0 1 0 22 12"/><path d="M16.24 7.76A6 6 0 1 0 18 12"/><circle cx="12" cy="12" r="2"/><path d="m13.4 10.6 5.7-5.7"/></symbol>
+      <symbol id="gx-i-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></symbol>
+      <symbol id="gx-i-discord" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 5.5c-1.8 2.8-2.5 6.3-2 10.4 2.1 1.6 4.2 2.5 6.2 2.8l1.3-2.1 1.3 2.1c2-.3 4.1-1.2 6.2-2.8.5-4.1-.2-7.6-2-10.4a17 17 0 0 0-3.8-1.1l-.7 1.3a14 14 0 0 0-2 0l-.7-1.3a17 17 0 0 0-3.8 1.1Z"/><path d="M9.5 13h.01"/><path d="M14.5 13h.01"/></symbol>
+      <symbol id="gx-i-live" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="m10 9 5 2.5-5 2.5V9Z" fill="currentColor" stroke="none"/><path d="M8 21h8"/><path d="M12 17v4"/></symbol>
+      <symbol id="gx-i-crown" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.5 4L12 4l5.5 7L22 7l-2 12H4L2 7Z"/></symbol>
+      <symbol id="gx-i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+      <symbol id="gx-i-help" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
+      <symbol id="gx-i-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+      <symbol id="gx-i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="gx-i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+      <symbol id="gx-i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+      <symbol id="gx-i-friends" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M19 8v6M22 11h-6"/></symbol>
+      <symbol id="gx-i-party" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5 3 6V3h3l11.5 11.5"/><path d="m13 19 6-6"/><path d="m16 16 4 4"/><path d="m19 21 2-2"/><path d="M14.5 6.5 18 3h3v3l-3.5 3.5"/><path d="m5 14 4 4"/><path d="m7 17-3 3"/><path d="m3 19 2 2"/></symbol>
+      <symbol id="gx-i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></symbol>
+      <symbol id="gx-i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></symbol>
+      <symbol id="gx-i-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+      <symbol id="gx-i-host" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8 4 3 5-6 5 6 4-3-2 10H5L3 8Z"/></symbol>
+      <symbol id="gx-i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7"/><path d="M18.5 14a6.5 6.5 0 0 1 3 6"/></symbol>
+      <symbol id="gx-i-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+      <symbol id="gx-i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="gx-i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 3H2l8 9.5V19l4 2v-8.5L22 3Z"/></symbol>
+      <symbol id="gx-i-bolt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8Z"/></symbol>
+      <symbol id="gx-i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+      <symbol id="gx-i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></symbol>
+      <symbol id="gx-i-gem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12l4 6-10 12L2 9Z"/><path d="M2 9h20"/><path d="m12 21 4-12-4-6-4 6Z"/></symbol>
+      <symbol id="gx-i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></symbol>
+      <symbol id="gx-i-more" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></symbol>
+      <symbol id="gx-i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></symbol>
+      <symbol id="gx-i-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m5.6 5.6 12.8 12.8"/></symbol>
     </defs>
   </svg>
 
@@ -261,70 +300,69 @@
 
   <!-- ② Үндсэн хуудас -->
   <div id="page-main" class="page">
-    <!-- Дээд баннер + табууд (мокап №2 — DotA lobby бүтэц, sidebar байхгүй) -->
-    <div class="mf-rail mf-top" aria-hidden="true"></div>
-    <header class="topbanner">
-      <button type="button" class="brand" data-goto-tab="lobby" title="Өрөөнүүд">
-        <span class="brand-logo" aria-hidden="true"><img src="logo.png" alt="" /></span>
-        <span class="brand-text">
-          <strong>GARENA.MN</strong>
-          <span>Монгол gameranger платформ</span>
-        </span>
+    <!-- ═══ GX shell (2026-09-30): зүүн цэс · дээд мөр · агуулга · баруун самбар (GameRanger X маяг) ═══ -->
+    <aside class="gx-side" id="gx-side">
+      <button type="button" class="gx-me" data-goto-tab="profile" title="Миний профайл">
+        <span class="gx-me-av"><img id="gx-me-avatar" alt="" class="hidden" /><svg><use href="#ico-nav-profile"/></svg><i class="gx-dot on"></i></span>
+        <span class="gx-me-text"><b id="gx-me-name">…</b><small><span id="gx-me-level">LV 1</span><span id="gx-me-tier" class="gx-tier-pill hidden"></span></small></span>
+        <span class="gx-me-gem" title="Diamond"><svg><use href="#gx-i-gem"/></svg><b id="gx-me-dia" data-diamonds>0</b></span>
       </button>
-      <!-- Баруун тал = рекламны орон зай (сервер /config → ad: {image, link, text}; хоосон бол placeholder) -->
-      <div id="ad-slot" class="ad-slot" title="Рекламны орон зай">
-        <span class="ad-label">Реклам</span>
-        <span class="ad-text">Энд таны реклам байрлана</span>
+      <nav class="gx-nav" aria-label="Үндсэн цэс">
+        <button type="button" class="nav-btn gx-nav-i c-cyan" data-tab="lobby"><svg><use href="#gx-i-lobby"/></svg><span>Өрөөнүүд</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-green" data-tab="games"><svg><use href="#gx-i-games"/></svg><span>Тоглоомууд</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-blue" data-tab="chat" title="Нийтийн чат ба найзууд"><svg><use href="#gx-i-msg"/></svg><span>Мессеж</span><span id="chat-badge-nav" class="gx-badge nav-badge nav-badge-inline hidden">0</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-violet" data-tab="clans" title="Кланууд ба Discord серверүүд"><svg><use href="#gx-i-shield"/></svg><span>Кланууд</span><span id="gx-clan-badge" class="gx-badge hidden">0</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-amber" data-tab="ranked" title="Ranked — тоглонгоо Diamond олборло"><svg><use href="#gx-i-trophy"/></svg><span>Ranked</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-pink" data-tab="warkey" title="Garena.mn WarKey (Ctrl+F6)"><svg><use href="#gx-i-key"/></svg><span>WarKey</span></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="radar" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="discord" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="streamers" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="ranking" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="profile" tabindex="-1" aria-hidden="true"></button>
+        <button type="button" class="nav-btn hidden-tab" data-tab="room" tabindex="-1" aria-hidden="true"></button>
+      </nav>
+      <!-- Одоогийн өрөө (GRX-ийн ногоон карт) — room-tab-current-ээс толилно -->
+      <button type="button" id="gx-cur-room" class="gx-cur-room hidden" title="Өрөөний цонх нээх">
+        <svg><use href="#gx-i-play"/></svg><span><b id="gx-cur-room-name"></b><small id="gx-cur-room-meta"></small></span>
+      </button>
+      <div class="gx-side-fill"></div>
+      <div class="gx-brandcard" aria-hidden="true">
+        <span class="gx-brand-logo"><img src="logo.png" alt="" /></span>
+        <span class="gx-brand-word">Garena<em>.mn</em></span>
       </div>
-    </header>
-    <div class="mf-rail" aria-hidden="true"></div>
-    <nav class="maintabs" aria-label="Үндсэн цэс">
-      <button type="button" class="nav-btn maintab" data-tab="discord"><svg class="btn-icon-svg"><use href="#ico-nav-discord"/></svg><span class="nav-label">Discord</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="chat" title="Нийтийн чат — бүх онлайн хэрэглэгч"><svg class="btn-icon-svg"><use href="#ico-nav-chat"/></svg><span class="nav-label">Нийтийн чат</span><span id="chat-badge-nav" class="nav-badge nav-badge-inline hidden">0</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="settings" data-settings-jump="games"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9h12a4 4 0 0 1 4 4v2a3 3 0 0 1-5.5 1.7L15 15H9l-1.5 1.7A3 3 0 0 1 2 15v-2a4 4 0 0 1 4-4z"/><path d="M7 12v2M6 13h2M16 12.5h.01M18 14h.01"/></svg><span class="nav-label">Тоглоом</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="lobby"><svg class="btn-icon-svg"><use href="#ico-nav-rooms"/></svg><span class="nav-label">Өрөөнүүд</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="room"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span class="nav-label">Өрөө</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="warkey" title="Garena.mn WarKey — тоглоом дотроо skill/item товчоо тааруулна (Ctrl+F6)"><span class="nav-icon nav-icon-text" aria-hidden="true">⌨</span><span class="nav-label">WarKey</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="ranked" title="Ranked — тоглонгоо Diamond олборло"><span class="nav-icon nav-icon-text" aria-hidden="true">🏆</span><span class="nav-label">Ranked</span></button>
-      <button type="button" class="nav-btn maintab" data-tab="radar" title="Радар — дууссан тоглолтын hero хөдөлгөөн, kill-ийн симуляц"><span class="nav-icon nav-icon-text" aria-hidden="true">📡</span><span class="nav-label">Радар</span></button>
-      <span class="maintabs-spacer"></span>
-      <span class="conn">
-        <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон">
-          <span class="connection-status-dot" aria-hidden="true"></span>
+      <div class="gx-side-bottom">
+        <button type="button" class="nav-btn gx-nav-i c-gold" data-tab="premium"><svg><use href="#gx-i-crown"/></svg><span>Premium</span></button>
+        <button type="button" class="nav-btn gx-nav-i c-violet" data-tab="settings" data-settings-jump="games"><svg><use href="#gx-i-gear"/></svg><span>Тохиргоо</span></button>
+        <button type="button" class="gx-nav-i c-pink" id="gx-help"><svg><use href="#gx-i-help"/></svg><span>Тусламж</span></button>
+        <button type="button" class="gx-nav-i c-danger" id="gx-logout"><svg><use href="#gx-i-out"/></svg><span>Гарах</span></button>
+      </div>
+      <div class="gx-side-status">
+        <span class="conn">
+          <span id="connection-status" class="connection-status online" title="Холбогдсон" aria-label="Холбогдсон"><span class="connection-status-dot" aria-hidden="true"></span></span>
+          <span class="conn-label">Холбогдсон</span>
         </span>
-        <span class="conn-label">Холбогдсон</span>
-      </span>
-      <!-- Хуучин табууд: UI-д харагдахгүй, гэхдээ showTab() эвдрэхгүй -->
-      <button type="button" class="nav-btn hidden-tab" data-tab="ranking" tabindex="-1" aria-hidden="true"></button>
-      <button type="button" class="nav-btn hidden-tab" data-tab="streamers" tabindex="-1" aria-hidden="true"></button>
-      <button type="button" class="nav-btn hidden-tab" data-tab="profile" tabindex="-1" aria-hidden="true"></button>
-      <span hidden>
-        <button type="button" id="btn-sidebar-toggle" class="btn btn-icon-only sidebar-toggle" aria-expanded="true">
-          <svg class="btn-icon-svg"><use id="sidebar-toggle-icon" href="#ico-sidebar-collapse"/></svg>
-        </button>
-      </span>
-    </nav>
-    <div class="mf-rail" aria-hidden="true"></div>
-    <div class="fire-sparks" aria-hidden="true">
-      <span style="--x:6%;--s:3px;--d:8s;--delay:-1s;--drift:34px;--o:.55"></span>
-      <span style="--x:14%;--s:2px;--d:10s;--delay:-7s;--drift:-26px;--o:.45"></span>
-      <span style="--x:23%;--s:4px;--d:9s;--delay:-3s;--drift:42px;--o:.62"></span>
-      <span style="--x:32%;--s:2px;--d:11s;--delay:-5s;--drift:-38px;--o:.5"></span>
-      <span style="--x:43%;--s:3px;--d:7s;--delay:-2s;--drift:24px;--o:.7"></span>
-      <span style="--x:55%;--s:2px;--d:12s;--delay:-9s;--drift:-44px;--o:.42"></span>
-      <span style="--x:64%;--s:4px;--d:8.5s;--delay:-4s;--drift:30px;--o:.6"></span>
-      <span style="--x:72%;--s:2px;--d:10.5s;--delay:-6s;--drift:-22px;--o:.5"></span>
-      <span style="--x:81%;--s:3px;--d:9.5s;--delay:-8s;--drift:48px;--o:.58"></span>
-      <span style="--x:90%;--s:2px;--d:12.5s;--delay:-4.5s;--drift:-36px;--o:.44"></span>
-      <span style="--x:96%;--s:4px;--d:7.5s;--delay:-2.5s;--drift:18px;--o:.64"></span>
-    </div>
+      </div>
+      <button type="button" id="btn-sidebar-toggle" class="gx-collapse" aria-expanded="true"><svg><use id="sidebar-toggle-icon" href="#ico-sidebar-collapse"/></svg><span>Цэс хураах</span></button>
+    </aside>
 
+    <section class="gx-main">
+      <header class="gx-top">
+        <button type="button" class="gx-top-brand brand" data-goto-tab="lobby" title="Өрөөнүүд">
+          <span class="brand-logo" aria-hidden="true"><img src="logo.png" alt="" /></span>
+          <span class="gx-top-word">Garena<em>.mn</em></span>
+        </button>
+        <div id="ad-slot" class="ad-slot" title="Рекламны орон зай"><span class="ad-label">Реклам</span><span class="ad-text">Энд таны реклам байрлана</span></div>
+        <span class="gx-top-fill"></span>
+        <button type="button" id="gx-theme" class="gx-chip" title="Цайвар / бараан горим"><svg class="gx-ico-sun"><use href="#gx-i-sun"/></svg><svg class="gx-ico-moon"><use href="#gx-i-moon"/></svg><span id="gx-theme-label">Цайвар</span></button>
+        <label class="gx-search"><svg><use href="#gx-i-search"/></svg><input id="gx-search" type="text" placeholder="Өрөө, тоглогч хайх…  (Ctrl+K)" autocomplete="off" /></label>
+      </header>
+      <div class="gx-content" id="gx-content">
 
     <!-- Lobby tab -->
     <div id="tab-lobby" class="tab active">
       <div class="tab-header lobby-header">
         <div class="lobby-title-group">
-          <h2>Нээлттэй өрөөнүүд</h2>
+          <h2>Өрөөнүүд</h2>
           <div class="online-bar">
             <span class="online-dot"></span>
             <span id="online-count">0</span> тоглогч онлайн
@@ -345,7 +383,7 @@
       </div>
 
       <div class="lobby-filters lobby-control-bar">
-        <input id="room-search" type="text" placeholder="🔍 Өрөө хайх..." class="input input-sm" />
+        <input id="room-search" type="text" placeholder="Өрөө, хост хайх…" class="input input-sm" />
         <select id="room-filter-type" class="input input-sm">
           <option value="">Бүх төрөл</option>
         </select>
@@ -362,6 +400,9 @@
         <input id="room-name" type="text" placeholder="Өрөөний нэр (жиш: Battle #5)" class="input" />
         <select id="room-type" class="input" title="Тоглоомын төрөл сонгох">
           <option value="">— Тоглоом сонгоно уу —</option>
+        </select>
+        <select id="room-clan" class="input hidden" title="Хэн нэгдэх вэ">
+          <option value="">🌐 Нийтийн өрөө — бүгд харна</option>
         </select>
         <select id="room-mode" class="input" title="Тоглоомын горим">
           <option value="">— Горим (заавал биш) —</option>
@@ -715,6 +756,144 @@
       <p class="bank-note">Diamond бол платформын доторх оноо: Silver/Gold гишүүнчлэл, бэлэглэлтэд зарцуулна; платформ мөнгөөр буцаан авахгүй, бэлэн мөнгөөр наймаалцахыг дэмжихгүй.</p>
     </div>
 
+
+    <!-- ═══ Premium таб (GX, 2026-09-30) — GameRanger X-ийн төлөвлөгөөний хуудас маяг ═══ -->
+    <div id="tab-premium" class="tab gx-premium">
+      <div class="gx-prem-hero">
+        <div class="gx-prem-title"><span>Garena.mn</span> <em>Premium</em></div>
+        <div class="gx-prem-box"><small>ОДООГИЙН ГИШҮҮНЧЛЭЛ</small><div><span id="membership-current" class="tier-badge tier-bronze">Bronze</span><span id="membership-until" class="hint"></span></div></div>
+        <div class="gx-prem-box"><small>DIAMOND ҮЛДЭГДЭЛ</small><div><b class="gx-prem-dia" data-diamonds>💎 0</b><button type="button" class="gx-link" data-goto-tab="profile">Түүх · шилжүүлэг</button></div></div>
+      </div>
+
+      <h2 class="gx-prem-h">Төлөвлөгөөгөө сонго</h2>
+      <div class="gx-seg gx-pay-seg" role="group" aria-label="Төлбөрийн хэлбэр">
+        <button type="button" class="on" data-pay="qpay">QPay (₮)</button>
+        <button type="button" data-pay="diamonds">Diamond 💎</button>
+        <span class="gx-seg-note">1 сар = 30 хоног · дахин авбал хугацаа нэмэгдэнэ</span>
+      </div>
+      <select id="membership-pay-with" class="gx-hidden-select" aria-hidden="true" tabindex="-1">
+        <option value="qpay">QPay</option>
+        <option value="diamonds">Diamond</option>
+      </select>
+
+      <div class="gx-plans tier-grid">
+        <div class="gx-plan tier-card" data-tier="bronze">
+          <div class="gx-plan-ico"><svg><use href="#gx-i-games"/></svg></div>
+          <h3>Bronze</h3>
+          <div class="gx-plan-price"><b>0₮</b><span>үргэлж үнэгүй</span></div>
+          <button type="button" class="gx-plan-btn ghost" disabled>Одоогийн төлөвлөгөө</button>
+          <div class="gx-plan-lims"><div><small>Найз</small><b>50</b></div><div><small>Өрөө</small><b>∞</b></div><div><small>Ranked</small><b>✓</b></div></div>
+          <ul class="gx-plan-perks"><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Өрөө үүсгэх, өрөөнд нэгдэх</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>LAN relay + шууд mesh холболт</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Ranked тоглолт, 💎 олборлолт</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Нийтийн чат, найз, DM</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>50 найз хүртэл</span></li></ul>
+        </div>
+        <div class="gx-plan tier-card silver" data-tier="silver">
+          <div class="gx-plan-flag">ЭХНИЙ ТӨЛБӨРТ</div>
+          <div class="gx-plan-ico"><svg><use href="#gx-i-bolt"/></svg></div>
+          <h3>Silver</h3>
+          <div class="gx-plan-price"><b data-price-qpay="20,000₮" data-price-dia="800 💎">20,000₮</b><span>/ сар</span></div>
+          <button type="button" class="gx-plan-btn" data-buy-tier="silver">Silver сонгох</button>
+          <div class="gx-plan-lims"><div><small>Найз</small><b>100</b></div><div><small>Эффект</small><b>4</b></div><div><small>Хүрээ</small><b>Neon</b></div></div>
+          <ul class="gx-plan-perks"><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Bronze-ийн бүх боломж</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Хөдөлгөөнт neon аватарын хүрээ</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Нэрийн эффект: градиент, neon, солонго, toon</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Эффект өрөө, DM, нийтийн чатад харагдана</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>100 найз хүртэл</span></li></ul>
+        </div>
+        <div class="gx-plan tier-card gold" data-tier="gold">
+          <div class="gx-plan-flag">ХАМГИЙН ЭРЭЛТТЭЙ</div>
+          <div class="gx-plan-ico"><svg><use href="#gx-i-crown"/></svg></div>
+          <h3>Gold</h3>
+          <div class="gx-plan-price"><b data-price-qpay="40,000₮" data-price-dia="1,500 💎">40,000₮</b><span>/ сар</span></div>
+          <button type="button" class="gx-plan-btn" data-buy-tier="gold">Gold сонгох</button>
+          <div class="gx-plan-lims"><div><small>Найз</small><b>200</b></div><div><small>Клан</small><b>✓</b></div><div><small>Аватар</small><b>GIF</b></div></div>
+          <ul class="gx-plan-perks"><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Silver-ийн бүх боломж</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>🛡 Клан байгуулах — Clan Lord болж, зөвхөн гишүүдэд зориулсан lobby</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Хөдөлгөөнт GIF аватар</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Алтан хүрээ + нэрийн эффект</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>Өөрийн өрөөний дэвсгэр зураг</span></li><li><svg class="gx-ck"><use href="#gx-i-check"/></svg><span>200 найз хүртэл</span></li></ul>
+        </div>
+      </div>
+
+      <div class="gx-prem-grid2">
+        <section class="gx-card">
+          <h3>Нэрийн эффект</h3>
+          <p class="hint">Сонгосон эффект таны нэр гарах бүх газарт харагдана.</p>
+          <div id="fx-picker" class="fx-picker" role="group" aria-label="Нэрийн эффект">
+            <button type="button" class="fx-btn" data-fx="solid">Энгийн</button>
+            <button type="button" class="fx-btn name-fx-gradient" data-fx="gradient">Градиент</button>
+            <button type="button" class="fx-btn name-fx-neon" data-fx="neon">Neon</button>
+            <button type="button" class="fx-btn name-fx-rainbow" data-fx="rainbow">Солонго</button>
+            <button type="button" class="fx-btn name-fx-toon" data-fx="toon">Toon</button>
+          </div>
+          <p id="fx-lock-note" class="fx-lock-note">Нэрийн эффект Silver / Gold гишүүдэд нээгдэнэ.</p>
+        </section>
+        <section class="gx-card gx-faq">
+          <h3>Түгээмэл асуулт</h3>
+          <details><summary>Гишүүнчлэлээ хэзээ ч зогсоож болох уу?</summary><p>Автомат сунгалт байхгүй. 30 хоног дуусахад Bronze руу буцна, та дахин авах эсэхээ өөрөө шийднэ.</p></details>
+          <details><summary>Ямар аргаар төлөх вэ?</summary><p>QPay-аар Монголын бүх банкны аппаас QR уншуулж төлнө. Эсвэл Ranked тоглолтоор олборлосон Diamond 💎-оороо авч болно.</p></details>
+          <details><summary>Diamond яаж олох вэ?</summary><p>🏆 Ranked өрөөний хүчинтэй хожил бүр +2 💎, 10 ranked тоглолтын блокт ≥5 хожвол +30 💎, тоглосон цаг бүрт 2 💎.</p></details>
+          <details><summary>Төлбөр баталгаажаагүй бол?</summary><p>Төлбөрийн цонхны «Төлбөр шалгах» товчийг дарна. Асуудал үргэлжилбэл Discord серверээр эзэнтэй холбогдоно уу.</p></details>
+        </section>
+      </div>
+    </div>
+
+    <!-- ═══ Тоглоомууд таб (GX) — GRX-ийн Games номын сан маяг: статистик + тоглоомын картууд ═══ -->
+    <div id="tab-games" class="tab gx-games">
+      <div class="gx-page-head">
+        <div><h2>Тоглоомууд</h2><p id="gx-games-sub" class="gx-sub">…</p></div>
+        <div class="gx-head-actions"><button type="button" class="btn btn-primary btn-with-icon" id="gx-add-game"><svg class="btn-icon-svg"><use href="#gx-i-folder"/></svg>Тоглоом нэмэх</button></div>
+      </div>
+      <div class="gx-stats" id="gx-games-stats"></div>
+      <div class="gx-games-grid" id="gx-games-grid"></div>
+    </div>
+
+
+    <!-- ═══ Кланууд таб (GX, 2026-09-30) — Миний клан · Кланууд · Discord серверүүд (gx-clans.js) ═══ -->
+    <div id="tab-clans" class="tab gx-clans">
+      <div class="gx-page-head">
+        <div><h2>Кланууд</h2><p class="gx-sub">Кланаараа нэгдэж, зөвхөн гишүүдэд зориулсан өрөөнд тогло</p></div>
+        <div class="gx-head-actions"><button type="button" class="btn btn-primary btn-with-icon" id="gx-clan-create"><svg class="btn-icon-svg"><use href="#gx-i-crown"/></svg>Клан байгуулах</button></div>
+      </div>
+      <div class="gx-subtabs" role="tablist">
+        <button type="button" class="on" data-clan-tab="mine">Миний клан</button>
+        <button type="button" data-clan-tab="discover">Кланууд</button>
+        <button type="button" data-clan-tab="discord">Discord серверүүд</button>
+      </div>
+      <section class="gx-clan-panel on" data-clan-panel="mine"><div id="gx-clan-mine"></div></section>
+      <section class="gx-clan-panel" data-clan-panel="discover">
+        <label class="gx-search gx-search-wide"><svg><use href="#gx-i-search"/></svg><input id="gx-clan-q" type="text" placeholder="Клан хайх (нэр, таг)…" autocomplete="off" /></label>
+        <div id="gx-clan-list" class="gx-clan-grid"></div>
+      </section>
+      <section class="gx-clan-panel" data-clan-panel="discord">
+        <div class="gx-card gx-dclan-cta">
+          <div><h3>Discord серверээ клан болго</h3><p class="hint">Бүртгэсэн Discord серверээ клан болгосноор зөвхөн серверийн гишүүд кланы lobby-д орж, өрөө үүсгэн тоглоно. Clan Lord ба админууд гишүүдийн хүсэлтийг баталж, нэмж, хасна. GOLD гишүүнчлэл шаардлагатай.</p></div>
+          <button type="button" class="btn btn-primary" id="gx-dclan-make">Клан болгох</button>
+        </div>
+      <!-- Сервер нэмэх форм -->
+      <div id="discord-server-form" class="card community-form hidden mb-16">
+        <h3 class="mb-8">Шинэ Discord сервер нэмэх</h3>
+        <input id="ds-name"        type="text" placeholder="Серверийн нэр"           class="input" />
+        <input id="ds-invite-url"  type="url"  placeholder="https://discord.gg/..."  class="input" />
+        <p class="meta hint" style="margin:4px 0 8px">💡 Discord дээр урилга үүсгэхдээ "Expire after: <b>Never</b>" сонгоно уу — энгийн урилга 7 хоногт дуусдаг тул хүлээж авахгүй.</p>
+        <input id="ds-description" type="text" placeholder="Тайлбар (заавал биш)"    class="input" />
+        <p id="ds-form-error" class="form-error"></p>
+        <div class="form-actions mt-8">
+          <button type="button" id="btn-ds-submit" class="btn btn-primary">Нэмэх</button>
+          <button type="button" id="btn-ds-cancel"  class="btn">Болих</button>
+        </div>
+      </div>
+
+      <div id="discord-servers-list" class="rooms-grid">
+        <p class="empty-text">Ачааллаж байна...</p>
+      </div>
+      </section>
+      <div id="gx-clan-detail" class="gx-clan-detail hidden"></div>
+    </div>
+
+    <!-- Кланы modal (байгуулах) -->
+    <div id="gx-clan-modal" class="gx-modal hidden" role="dialog" aria-modal="true">
+      <div class="gx-modal-box">
+        <button type="button" class="gx-x gx-modal-x" data-gx-close>✕</button>
+        <div id="gx-clan-modal-body"></div>
+      </div>
+    </div>
+    <!-- Lobby мэдээлэл modal + баруун товчны цэс -->
+    <div id="gx-info-modal" class="gx-modal hidden" role="dialog" aria-modal="true">
+      <div class="gx-modal-box"><button type="button" class="gx-x gx-modal-x" data-gx-close>✕</button><div id="gx-info-body"></div></div>
+    </div>
+    <div id="gx-ctx" class="gx-ctx hidden" role="menu"></div>
+
     <div id="tab-profile" class="tab">
       <div class="tab-header section-header">
         <div class="section-title-group">
@@ -820,47 +999,6 @@
           <p class="bank-note">Diamond-оо найздаа бэлэглэж шилжүүлж болно (цагт 30 хүртэл, 1–50,000 💎); Silver/Gold гишүүнчлэлээ 💎-оор авна. Diamond бол платформын доторх оноо — платформ мөнгөөр буцаан авахгүй, бэлэн мөнгөөр наймаалцахыг дэмжихгүй.</p>
         </section>
 
-        <!-- Гишүүнчлэл -->
-        <section class="card profile-membership-card">
-          <div class="membership-head">
-            <h3 class="mb-0">Premium гишүүнчлэл</h3>
-            <span id="membership-current" class="tier-badge tier-bronze">Bronze</span>
-            <span id="membership-until" class="hint"></span>
-          </div>
-          <div class="tier-grid">
-            <div class="tier-card" data-tier="bronze">
-              <div class="tier-head"><span class="tier-badge tier-bronze">Bronze</span><span class="tier-price">Үнэгүй</span></div>
-              <ul><li>Өрөө үүсгэх, өрөөнд нэгдэх</li><li>50 найз хүртэл</li></ul>
-            </div>
-            <div class="tier-card" data-tier="silver">
-              <div class="tier-head"><span class="tier-badge tier-silver">Silver</span><span class="tier-price">20,000₮ <small>/ сар · эсвэл 800 💎</small></span></div>
-              <ul><li>Хөдөлгөөнт neon аватарын хүрээ</li><li>Нэрийн эффект (neon / солонго) — өрөө, DM, нийтийн чатад</li><li>100 найз хүртэл</li></ul>
-              <button type="button" class="btn btn-primary" data-buy-tier="silver">Silver авах</button>
-            </div>
-            <div class="tier-card" data-tier="gold">
-              <div class="tier-head"><span class="tier-badge tier-gold">Gold</span><span class="tier-price">40,000₮ <small>/ сар · эсвэл 1500 💎</small></span></div>
-              <ul><li>Хөдөлгөөнт GIF аватар</li><li>Алтан хүрээ + нэрийн эффект</li><li>Өөрийн өрөөний дэвсгэр зураг</li><li>200 найз хүртэл</li></ul>
-              <button type="button" class="btn btn-primary" data-buy-tier="gold">Gold авах</button>
-            </div>
-          </div>
-          <div class="membership-pay-row">
-            <span>Төлбөрийн хэлбэр:</span>
-            <select id="membership-pay-with" class="input input-sm">
-              <option value="qpay">QPay (QR) — 20,000₮ / 40,000₮</option>
-              <option value="diamonds">Diamond — 800 💎 / 1500 💎</option>
-            </select>
-            <span class="hint hint-no-margin">1 сар = 30 хоног. Ижил түвшин дахин авбал хугацаа дээр нь нэмэгдэнэ.</span>
-          </div>
-          <h3 class="mt-8">Нэрийн эффект</h3>
-          <div id="fx-picker" class="fx-picker" role="group" aria-label="Нэрийн эффект">
-            <button type="button" class="fx-btn" data-fx="solid">Энгийн</button>
-            <button type="button" class="fx-btn name-fx-gradient" data-fx="gradient">Градиент</button>
-            <button type="button" class="fx-btn name-fx-neon" data-fx="neon">Neon</button>
-            <button type="button" class="fx-btn name-fx-rainbow" data-fx="rainbow">Солонго</button>
-            <button type="button" class="fx-btn name-fx-toon" data-fx="toon">Toon</button>
-          </div>
-          <p id="fx-lock-note" class="fx-lock-note">Нэрийн эффект Silver / Gold гишүүдэд нээгдэнэ — сонгосон эффект таны нэр гарах газар бүрт (өрөө, DM, нийтийн чат) харагдана.</p>
-        </section>
       </div>
     </div>
 
@@ -1017,23 +1155,8 @@
           <span class="section-subtitle">Монгол Warcraft community серверүүдийн урилга холбоос</span>
         </div>
       </div>
-      <!-- Сервер нэмэх форм -->
-      <div id="discord-server-form" class="card community-form hidden mb-16">
-        <h3 class="mb-8">Шинэ Discord сервер нэмэх</h3>
-        <input id="ds-name"        type="text" placeholder="Серверийн нэр"           class="input" />
-        <input id="ds-invite-url"  type="url"  placeholder="https://discord.gg/..."  class="input" />
-        <p class="meta hint" style="margin:4px 0 8px">💡 Discord дээр урилга үүсгэхдээ "Expire after: <b>Never</b>" сонгоно уу — энгийн урилга 7 хоногт дуусдаг тул хүлээж авахгүй.</p>
-        <input id="ds-description" type="text" placeholder="Тайлбар (заавал биш)"    class="input" />
-        <p id="ds-form-error" class="form-error"></p>
-        <div class="form-actions mt-8">
-          <button type="button" id="btn-ds-submit" class="btn btn-primary">Нэмэх</button>
-          <button type="button" id="btn-ds-cancel"  class="btn">Болих</button>
-        </div>
-      </div>
+      <p class="hint">Discord серверүүд одоо «Кланууд» хэсэгт байрлана.</p>
 
-      <div id="discord-servers-list" class="rooms-grid">
-        <p class="empty-text">Ачааллаж байна...</p>
-      </div>
     </div>
     <!-- Streamers tab -->
     <div id="tab-streamers" class="tab">
@@ -1060,7 +1183,19 @@
         <p class="empty-text">Ачааллаж байна...</p>
       </div>
     </div>
-  <div class="mf-rail mf-bottom" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <aside class="gx-rail" aria-label="Туслах самбар">
+      <button type="button" class="gx-rail-i" data-drawer="friends" title="Найзууд"><svg><use href="#gx-i-friends"/></svg><span id="gx-rail-req" class="gx-badge hidden">0</span></button>
+      <button type="button" class="gx-rail-i" data-drawer="online" title="Онлайн тоглогчид"><svg><use href="#gx-i-users"/></svg></button>
+      <button type="button" class="gx-rail-i" data-drawer="party" title="Party — удахгүй"><svg><use href="#gx-i-party"/></svg></button>
+    </aside>
+    <aside class="gx-drawer" id="gx-drawer" aria-hidden="true">
+      <div class="gx-drawer-head"><h3 id="gx-drawer-title">Найзууд</h3><button type="button" class="gx-x" id="gx-drawer-close" title="Хаах">✕</button></div>
+      <div class="gx-drawer-body" id="gx-drawer-body"></div>
+      <div class="gx-drawer-soon hidden" id="gx-drawer-soon"><div class="gx-soon-ico"><svg><use href="#gx-i-party"/></svg></div><b>Хөгжүүлэлт явагдаж байна</b><p>Найзуудтайгаа нэг баг болж хамт өрөөнд орох «Party» удахгүй нэмэгдэнэ.</p></div>
+    </aside>
   </div>
 
   <!-- ③ Өрөөний дотор -->
@@ -1447,5 +1582,7 @@
   <script src="app.js"></script>
   <script src="warkey.js"></script>
   <script src="radar.js"></script>
+  <script src="gx.js"></script>
+  <script src="gx-clans.js"></script>
 </body>
 </html>

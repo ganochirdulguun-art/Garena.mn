@@ -100,6 +100,8 @@ app.use('/rooms', roomRoutes);
 app.use('/stats', statsRoutes);
 app.use('/social', socialRoutes);
 app.use('/discord-servers', discordServerRoutes);
+const clanRoutes = require('./routes/clans');
+app.use('/clans', clanRoutes.router);              // Кланууд (2026-09-30): Lord/Admin/Member, хүсэлт, кланы өрөө
 app.use('/streamers', streamerRoutes);
 app.use('/admin/api/bot', botRoutes.adminRouter);     // админ: бот хостын хяналт (C2) + мэдэгдлийн лог (B4)
 app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)
@@ -189,6 +191,7 @@ setIO(io);
 roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 // Social router-т io дамжуулах (friend request мэдэгдэлд хэрэг)
 socialRoutes.setIO(io);
+clanRoutes.setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);

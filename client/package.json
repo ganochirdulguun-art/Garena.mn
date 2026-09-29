@@ -50,7 +50,9 @@
       "!**/*.log",
       "!build-*.log",
       "!**/*.tmp",
-      "!resources/*.msi"
+      "!resources/*.msi",
+      "!dev/**",
+      "!src/renderer/_pv-*.html"
     ],
     "publish": {
       "provider": "github",

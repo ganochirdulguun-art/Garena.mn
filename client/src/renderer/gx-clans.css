@@ -1,0 +1,124 @@
+/* ═══════════════════════ КЛАНУУД (gx-clans.js) ═══════════════════════ */
+.gx-subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--gx-line); margin: 0 0 18px; }
+.gx-subtabs button { padding: 11px 16px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--gx-text-2); font: 700 13.5px var(--gx-font); cursor: pointer; margin-bottom: -1px; }
+.gx-subtabs button:hover { color: var(--gx-text); }
+.gx-subtabs button.on { color: var(--gx-accent); border-bottom-color: var(--gx-accent); }
+.gx-clan-panel { display: none; }
+.gx-clan-panel.on { display: block; }
+#tab-clans.detail-open .gx-clan-panel, #tab-clans.detail-open .gx-subtabs, #tab-clans.detail-open > .gx-page-head { display: none; }
+.gx-clan-detail.hidden { display: none; }
+.gx-search-wide { width: 100%; max-width: 520px; margin-bottom: 16px; background: var(--gx-surface); }
+.gx-clan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; }
+.gx-clan-card { display: flex; align-items: center; gap: 14px; padding: 16px; background: var(--gx-surface); border: 1px solid var(--gx-line); border-radius: 14px; box-shadow: var(--gx-shadow); cursor: pointer; transition: border-color .15s, transform .15s; }
+.gx-clan-card:hover { border-color: var(--gx-line-2); transform: translateY(-1px); }
+.gx-clan-ico { width: 52px; height: 52px; border-radius: 14px; flex: none; display: grid; place-items: center; overflow: hidden; font: 900 15px var(--gx-font); color: #fff; background: linear-gradient(135deg, var(--gc, #e11d2e), color-mix(in srgb, var(--gc, #e11d2e) 50%, #000)); }
+.gx-clan-ico.big { width: 84px; height: 84px; border-radius: 20px; font-size: 22px; border: 4px solid var(--gx-surface); box-shadow: var(--gx-shadow); }
+.gx-clan-ico img { width: 100%; height: 100%; object-fit: cover; }
+.gx-clan-card-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.gx-clan-card-top { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.gx-clan-card-top b { font-size: 15px; color: var(--gx-text); }
+.gx-tag { font: 800 12px var(--gx-font); color: var(--gx-accent); }
+.gx-kind { font: 700 10.5px var(--gx-font); padding: 2px 7px; border-radius: 6px; background: var(--gx-surface-3); color: var(--gx-text-2); }
+.gx-kind.discord { background: rgba(88, 101, 242, .14); color: #5865f2; }
+.gx-clan-card-main p { margin: 0; font-size: 12.5px; color: var(--gx-text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gx-clan-card-main small { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--gx-text-3); }
+.gx-clan-card-main small svg { width: 13px; height: 13px; }
+.gx-pend { color: var(--gx-accent); }
+.gx-role { font: 800 10.5px var(--gx-font); padding: 3px 8px; border-radius: 6px; white-space: nowrap; background: var(--gx-surface-3); color: var(--gx-text-2); }
+.gx-role.lord { background: rgba(250, 204, 21, .2); color: #b45309; }
+.gx-role.admin { background: var(--gx-blue-soft); color: var(--gx-blue); }
+html[data-gx-theme="dark"] .gx-role.lord { color: #fcd34d; }
+.gx-row-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.gx-row-btns.end { justify-content: flex-end; margin-top: 16px; }
+.gx-dclan-cta { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; background: linear-gradient(120deg, rgba(88, 101, 242, .1), transparent 70%), var(--gx-surface) !important; }
+.gx-dclan-cta p { margin: 0; max-width: 720px; line-height: 1.5; }
+.gx-clan-detail .gx-back { margin-bottom: 14px; }
+.gx-clan-hero { background: var(--gx-surface); border: 1px solid var(--gx-line); border-radius: 18px; box-shadow: var(--gx-shadow); overflow: hidden; margin-bottom: 16px; padding-bottom: 16px; }
+.gx-clan-banner { height: 110px; background: radial-gradient(120% 160% at 100% 0%, rgba(124, 58, 237, .55), transparent 55%), linear-gradient(110deg, #141726, #3b1220 60%, #e11d2e); }
+.gx-clan-hero-row { display: flex; align-items: flex-end; gap: 16px; padding: 0 22px; margin-top: -40px; flex-wrap: wrap; }
+.gx-clan-hero-text { flex: 1; min-width: 240px; padding-bottom: 4px; }
+.gx-clan-hero-text h2 { font-size: 24px !important; margin: 0 0 6px !important; }
+.gx-clan-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--gx-text-3); font-weight: 600; }
+.gx-clan-hero-act { display: flex; gap: 8px; padding-bottom: 6px; flex-wrap: wrap; }
+.gx-clan-desc { margin: 12px 22px 2px; color: var(--gx-text-2); font-size: 13.5px; line-height: 1.55; }
+.gx-clan-cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+.gx-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.gx-card-head h3 { margin: 0 !important; }
+.gx-clan-cols .gx-group { box-shadow: none; margin: 0; }
+.gx-clan-cols .gx-row { grid-template-columns: minmax(140px, 2fr) minmax(70px, 1fr) 20px minmax(90px, 1fr) 62px 96px; }
+.gx-clan-cols .gx-c-ping, .gx-clan-cols .gx-c-act { display: none; }
+.gx-lockbox { display: grid; justify-items: center; gap: 6px; padding: 30px; text-align: center; color: var(--gx-text-2); border: 1px dashed var(--gx-line-2); border-radius: 12px; }
+.gx-lockbox svg { width: 28px; height: 28px; color: var(--gx-text-3); }
+.gx-lockbox b { color: var(--gx-text); }
+.gx-addmem { display: flex; gap: 8px; margin-bottom: 12px; }
+.gx-addmem .input { flex: 1; }
+.gx-reqs { margin-bottom: 12px; padding: 4px 10px 10px; border-radius: 12px; background: var(--gx-accent-soft); }
+.gx-req { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid var(--gx-line); font-size: 13px; }
+.gx-req:first-of-type { border-top: 0; }
+.gx-req small { color: var(--gx-text-3); }
+.gx-req-act { margin-left: auto; display: flex; gap: 6px; }
+.gx-mems { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.gx-mem { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; flex-wrap: wrap; }
+.gx-mem:hover { background: var(--gx-surface-2); }
+.gx-mem .clickable-name { font-weight: 600; font-size: 13.5px; color: var(--gx-text); }
+.gx-mem-av { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; background: var(--gx-surface-3); color: var(--gx-text-2); font: 800 13px var(--gx-font); flex: none; }
+.gx-mem-av img { width: 100%; height: 100%; object-fit: cover; }
+.gx-mem-act { margin-left: auto; display: flex; gap: 4px; opacity: 0; transition: opacity .12s; }
+.gx-mem:hover .gx-mem-act { opacity: 1; }
+.gx-host-ico { width: 15px; height: 15px; color: #d97706; }
+.gx-clan-chip { display: inline-block; margin-right: 6px; padding: 1px 6px; border-radius: 5px; font: 800 10px var(--gx-font); vertical-align: 1px; background: rgba(124, 58, 237, .14); color: #7c3aed; }
+html[data-gx-theme="dark"] .gx-clan-chip { color: #c4b5fd; }
+.gx-gi.clan { background: linear-gradient(135deg, #7c3aed, #3b0764); font-size: 13px; }
+.gx-gi.sm { width: 16px; height: 16px; border-radius: 4px; display: inline-block; margin-right: 6px; vertical-align: -3px; }
+@media (max-width: 1200px) { .gx-clan-cols { grid-template-columns: 1fr; } .gx-clan-grid { grid-template-columns: 1fr; } }
+
+/* ── GX modal ── */
+.gx-modal { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 20px; background: rgba(10, 12, 20, .5); backdrop-filter: blur(3px); }
+.gx-modal.hidden { display: none !important; }
+.gx-modal-box { position: relative; width: min(520px, 94vw); max-height: 92vh; overflow: auto; padding: 22px 24px; border-radius: 16px; background: var(--gx-surface); border: 1px solid var(--gx-line); box-shadow: var(--gx-shadow-lg); color: var(--gx-text); animation: gxIn .16s ease; }
+.gx-modal-x { position: absolute; top: 12px; right: 12px; }
+.gx-modal-title { font-size: 19px; font-weight: 800; margin: 0 0 16px; padding-right: 30px; }
+.gx-form { display: grid; gap: 12px; }
+.gx-form label { display: grid; gap: 6px; }
+.gx-form label.hidden { display: none; }
+.gx-form label > span { font: 700 12px var(--gx-font); color: var(--gx-text-2); }
+.gx-form .input { width: 100%; }
+.gx-kind-seg { display: flex; margin-bottom: 14px; }
+.gx-kind-seg button { flex: 1; justify-content: center; }
+.gx-upsell { display: grid; justify-items: center; gap: 10px; text-align: center; padding: 6px 4px; }
+.gx-upsell h3 { font-size: 18px; margin: 4px 0 0; }
+.gx-upsell p { margin: 0; color: var(--gx-text-2); font-size: 13.5px; line-height: 1.55; }
+.gx-kvs { border-top: 1px solid var(--gx-line); }
+.gx-kv { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 2px; border-bottom: 1px solid var(--gx-line); font-size: 13.5px; }
+.gx-kv span { color: var(--gx-text-2); }
+.gx-kv b { font-weight: 700; color: var(--gx-text); text-align: right; display: inline-flex; align-items: center; }
+.gx-warn { color: var(--gx-amber); }
+#gx-info-modal .dm-section-label { margin-top: 12px; }
+
+/* ── Баруун товчны цэс ── */
+.gx-ctx { position: fixed; z-index: 80; min-width: 220px; padding: 6px; border-radius: 12px; background: var(--gx-surface); border: 1px solid var(--gx-line); box-shadow: var(--gx-shadow-lg); }
+.gx-ctx.hidden { display: none; }
+.gx-ctx hr { border: 0; border-top: 1px solid var(--gx-line); margin: 5px 4px; }
+.gx-ctx-i { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 11px; border: 0; border-radius: 8px; background: none; color: var(--gx-text); font: 600 13px var(--gx-font); cursor: pointer; text-align: left; }
+.gx-ctx-i svg { width: 16px; height: 16px; color: var(--gx-text-3); }
+.gx-ctx-i:hover { background: var(--gx-surface-2); }
+.gx-ctx-i.accent { color: var(--gx-blue); } .gx-ctx-i.accent svg { color: var(--gx-blue); }
+.gx-ctx-i.danger { color: var(--gx-red); } .gx-ctx-i.danger svg { color: var(--gx-red); }
+.gx-ctx-i.danger:hover { background: var(--gx-red-soft); }
+
+/* Discord серверүүд (кланы дотор) */
+#tab-clans #discord-servers-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+#tab-clans .discord-server-card, #tab-clans .room-card { background: var(--gx-surface) !important; border: 1px solid var(--gx-line) !important; border-radius: 14px !important; box-shadow: var(--gx-shadow) !important; color: var(--gx-text) !important; }
+#tab-clans .discord-server-card strong { color: var(--gx-text); }
+#tab-clans .discord-meta-counts, #tab-clans .room-card p { color: var(--gx-text-2) !important; }
+
+/* ── Засвар: мөрийн өргөн, hero, гишүүд ── */
+body.gx .gx-row { min-width: 0 !important; width: auto !important; }
+body.gx .gx-row.room-mine { border-color: var(--gx-line) !important; border-top-color: transparent !important; }
+.gx-clan-hero-row { align-items: center; margin-top: 0; padding-top: 0; }
+.gx-clan-hero-row .gx-clan-ico.big { margin-top: -42px; align-self: flex-start; }
+.gx-clan-hero-text { padding-top: 12px; }
+.gx-mem { flex-wrap: nowrap; }
+.gx-mem .clickable-name, .gx-req .clickable-name { color: var(--gx-text) !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.gx-mem-act .btn { height: 26px; padding: 0 8px; font-size: 11px !important; }
+.gx-reqs .dm-section-label { border: 0 !important; }

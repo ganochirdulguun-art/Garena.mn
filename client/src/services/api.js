@@ -39,8 +39,8 @@ async function getMyRoom() {
   return data;
 }
 
-async function createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked }) {
-  const { data } = await getClient().post('/rooms', { name, max_players, game_type, password, description, game_mode, background_url, ranked: !!ranked });
+async function createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked, clan_id }) {
+  const { data } = await getClient().post('/rooms', { name, max_players, game_type, password, description, game_mode, background_url, ranked: !!ranked, clan_id: clan_id || null });
   return data;
 }
 

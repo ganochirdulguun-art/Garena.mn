@@ -236,6 +236,8 @@ async function runMigrations(db) {
     -- Хоосон/туршилтын capture (< 2 тоглогч эсвэл < 60 с) жагсаалтыг бохирдуулахгүй — эхлэх бүрд цэвэрлэнэ
     DELETE FROM radar_games WHERE game_time_sec < 60 OR jsonb_array_length(players) < 2;
   `);
+  // Кланууд (2026-09-30): clans, clan_members, clan_requests, rooms.clan_id — routes/clans.js ensureTables (idempotent)
+  await require('../routes/clans').ensureTables();
 }
 
 module.exports = { runMigrations };

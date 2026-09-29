@@ -10,6 +10,7 @@ try { db = require('../config/db'); } catch { db = null; }
 
 const allowInMemoryFallback = process.env.NODE_ENV !== 'production';
 const router = express.Router();
+const clans = require('./clans');
 
 async function dbOk() {
   if (!db) return false;
@@ -81,21 +82,26 @@ function findUserRoom(userId) {
 router.get('/', optAuth, async (req, res) => {
   if (await dbOk()) {
     try {
+      // Кланы өрөө (clan_id) — зөвхөн тухайн кланы гишүүдэд харагдана (2026-09-30)
+      const myClans = await clans.memberClanIds(req.user?.id);
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
-          r.status, r.has_password, r.zerotier_network_id, r.playing_since,
+          r.status, r.has_password, r.zerotier_network_id, r.playing_since, r.created_at,
+          r.clan_id, c.name AS clan_name, c.tag AS clan_tag,
           COUNT(rp.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
         FROM rooms r
         JOIN users u ON r.host_id = u.id
+        LEFT JOIN clans c ON c.id = r.clan_id
         LEFT JOIN room_players rp ON r.id = rp.room_id
         LEFT JOIN users u2 ON rp.user_id = u2.id
         WHERE r.status IN ('waiting','playing')
-        GROUP BY r.id, u.username
+          AND (r.clan_id IS NULL OR r.clan_id = ANY($1::int[]))
+        GROUP BY r.id, u.username, c.name, c.tag
         ORDER BY r.created_at DESC
-      `);
+      `, [myClans]);
       return res.json(result.rows.map((row) => ({ ...row, members: row.members || [] })));
     } catch (e) {
       console.error(e);
@@ -142,6 +148,11 @@ router.post('/', strictAuth, async (req, res) => {
   const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '', ranked = false } = req.body;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
   if (!game_type) return res.status(400).json({ error: 'Game type is required' });
+  // Кланы өрөө — зөвхөн тухайн кланы гишүүн үүсгэнэ
+  const clanId = req.body?.clan_id ? Number(req.body.clan_id) : null;
+  if (clanId && !await clans.clanAccess(req.user.id, clanId)) {
+    return res.status(403).json({ error: 'Зөвхөн кланы гишүүд кланы өрөө үүсгэнэ', code: 'CLAN_ONLY' });
+  }
 
   // Өрөөний дэвсгэр зураг — зөвхөн GOLD, зөвхөн https зураг (≤500 тэмдэгт)
   let bgUrl = String(background_url || '').trim().slice(0, 500);
@@ -173,10 +184,10 @@ router.post('/', strictAuth, async (req, res) => {
       }
 
       const result = await db.query(
-        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url, ranked)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url, ranked, clan_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          RETURNING *`,
-        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl, ranked === true || ranked === 'true' || ranked === 1]
+        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl, ranked === true || ranked === 'true' || ranked === 1, clanId]
       );
 
       const room = result.rows[0];
@@ -238,6 +249,9 @@ router.post('/:id/join', strictAuth, async (req, res) => {
       const room = roomResult.rows[0];
       if (!room) return res.status(404).json({ error: 'Room not found' });
       if (room.status === 'done') return res.status(400).json({ error: 'Room is closed' });
+      if (room.clan_id && !await clans.clanAccess(userId, room.clan_id)) {
+        return res.status(403).json({ error: 'Энэ бол кланы өрөө — зөвхөн кланы гишүүд нэгдэнэ', code: 'CLAN_ONLY', clan_id: room.clan_id });
+      }
 
       const already = await db.query(
         `SELECT r.id FROM rooms r
@@ -626,7 +640,7 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
         SELECT r.id, COUNT(rp.user_id) AS player_count
         FROM rooms r
         LEFT JOIN room_players rp ON r.id = rp.room_id
-        WHERE r.status='waiting' AND r.has_password=FALSE AND r.game_type=$1
+        WHERE r.status='waiting' AND r.has_password=FALSE AND r.clan_id IS NULL AND r.game_type=$1
         GROUP BY r.id
         HAVING COUNT(rp.user_id) < r.max_players
         ORDER BY player_count DESC

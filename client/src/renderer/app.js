@@ -1424,7 +1424,8 @@ document.getElementById('btn-submit-room').onclick = async () => {
   if (hasPass && !password) { showToast('Нууц үг оруулна уу', 'warning'); return; }
   async function _doCreateRoom() {
     const background_url = (document.getElementById('room-bg')?.value || '').trim();
-    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked });
+    const clan_id = Number(document.getElementById('room-clan')?.value || 0) || null;   // Кланы өрөө (2.9.1)
+    const room = await window.api.createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked, clan_id });
     document.getElementById('create-room-form').style.display = 'none';
     document.getElementById('room-name').value = '';
     document.getElementById('room-desc').value = '';
@@ -4843,7 +4844,8 @@ init();
     });
     // Үндсэн хуудас гарах бүрт Найзууд цонхыг хамт нээнэ (үндсэн цонхны хажууд наалдана)
     const _showPageMain = showPage;
-    showPage = function (id) { _showPageMain(id); if (id === 'page-main') window.api.notifyMainShown?.(); };
+    // GX (2.9.1): найзууд баруун самбарт шигтгэгдсэн тул тусдаа цонхыг автоматаар нээхгүй (самбараас гараар нээж болно)
+    showPage = function (id) { _showPageMain(id); if (id === 'page-main' && !document.body.classList.contains('gx')) window.api.notifyMainShown?.(); };
     // Реклам (сервер /config → ad)
     (async () => {
       try {
@@ -4886,7 +4888,7 @@ init();
   // Найзуудын тусдаа цонх (хуучин товч — байхгүй байж болно)
   document.getElementById('btn-open-friends-main')?.addEventListener('click', () => window.api.openFriendsWindow?.());
   // Холболтын текст
-  const connLabel = document.querySelector('.maintabs .conn-label');
+  const connLabel = document.querySelector('.maintabs .conn-label, .gx-side-status .conn-label');
   if (connLabel) {
     const st = document.getElementById('connection-status');
     new MutationObserver(() => {
