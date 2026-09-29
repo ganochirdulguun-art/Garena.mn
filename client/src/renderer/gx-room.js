@@ -14,16 +14,7 @@
   if (q.get('mode') === 'room' && inFrame) {
     document.documentElement.classList.add('gx-embedded');
     const post = (type, extra) => { try { window.parent.postMessage({ gx: true, type, roomId: q.get('roomId'), ...(extra || {}) }, '*'); } catch {} };
-    // Толгойд «Буцах» товч
-    const head = document.querySelector('#page-room .room-header');
-    if (head && !document.getElementById('gx-room-back')) {
-      const b = document.createElement('button');
-      b.type = 'button'; b.id = 'gx-room-back'; b.className = 'btn btn-sm gx-room-back';
-      b.innerHTML = '<svg class="btn-icon-svg"><use href="#gx-i-left"/></svg>Лобби';
-      b.title = 'Лобби руу буцах (өрөөнөөс гарахгүй)';
-      b.addEventListener('click', () => post('back'));
-      head.insertBefore(b, head.firstChild);
-    }
+    // «Лобби» товчийг gx-roomui.js үүсгэнэ (GameRanger X-ийн lobby толгой)
     return;
   }
 
@@ -81,5 +72,8 @@
   // Гарах (logout) → өрөөний frame-ийг хаана
   const _sp = showPage;
   showPage = function (id) { if (id === 'page-login') closeFrame(); _sp(id); };
+  // Өрөөний таб идэвхтэй үед агуулгын padding-гүй (бүтэн талбай)
+  const _st = showTab;
+  showTab = function (name) { _st(name); document.body.classList.toggle('gx-roomview-on', name === 'roomview'); };
   window.gxRoom = { openRoom, closeFrame, get roomId() { return frameRoomId; } };
 })();

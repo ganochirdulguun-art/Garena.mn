@@ -1,0 +1,82 @@
+/* ═══════════════════════ ӨРӨӨНИЙ ХУУДАС — GameRanger X lobby бүтэц (gx-roomui.js) ═══════════════════════ */
+body.gx #page-room.active { display: flex !important; flex-direction: column; height: 100vh; overflow: hidden; background: var(--gx-bg) !important; }
+body.gx #page-room .gxr-old { display: none !important; }
+.gxr { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.gxr-bar { display: flex; align-items: center; gap: 10px; padding: 12px 18px; background: var(--gx-surface); border-bottom: 1px solid var(--gx-line); flex: none; }
+.gxr-back { color: var(--gx-accent) !important; border-color: var(--gx-accent-line) !important; }
+.gxr-back.hidden-keep { display: none !important; }
+.gxr-title { display: contents; }
+.gxr-title #room-title { font: 800 17px var(--gx-font) !important; color: var(--gx-accent) !important; margin: 0 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 38vw; }
+.gxr-pill { font: 700 11px var(--gx-font); padding: 3px 9px; border-radius: 7px; background: var(--gx-green-soft); color: var(--gx-green); border: 1px solid color-mix(in srgb, var(--gx-green) 30%, transparent); white-space: nowrap; }
+.gxr-pill[data-kind="lock"] { background: var(--gx-amber-soft); color: var(--gx-amber); border-color: color-mix(in srgb, var(--gx-amber) 30%, transparent); }
+.gxr-pill[data-kind="clan"] { background: rgba(124, 58, 237, .12); color: #7c3aed; border-color: rgba(124, 58, 237, .3); }
+.gxr-game #room-badge { font: 700 11px var(--gx-font) !important; padding: 3px 9px !important; border-radius: 7px !important; color: #fff !important; }
+.gxr-fill { flex: 1; }
+#gxr-actions { display: flex; gap: 8px; }
+.gxr-danger { height: 34px !important; }
+.gxr-danger .btn-icon-svg { width: 14px; height: 14px; }
+.gxr-start { height: 34px !important; padding: 0 16px !important; }
+.gxr-start:disabled { opacity: .55; cursor: default; filter: grayscale(.3); box-shadow: none !important; }
+.gxr-start .btn-icon-svg { width: 13px; height: 13px; }
+
+.gxr-grid { flex: 1; min-height: 0; display: grid; gap: 14px; padding: 14px 18px 18px;
+  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "left game conn" "left chat chat"; }
+.gxr-card { background: var(--gx-surface); border: 1px solid var(--gx-line); border-radius: 14px; box-shadow: var(--gx-shadow); min-height: 0; min-width: 0; }
+.gxr-card > h3 { display: flex; align-items: center; gap: 8px; margin: 0; padding: 14px 16px 10px; font: 700 14px var(--gx-font) !important; color: var(--gx-text); border-bottom: 1px solid var(--gx-line); }
+.gxr-card > h3 .btn-icon-svg { width: 16px; height: 16px; color: var(--gx-text-2); }
+.gxr-left { grid-area: left; display: flex; flex-direction: column; overflow: hidden; }
+.gxr-game-card { grid-area: game; padding-bottom: 10px; }
+.gxr-conn { grid-area: conn; overflow: auto; }
+.gxr-chat { grid-area: chat; display: flex; flex-direction: column; overflow: hidden; }
+
+.gxr-tabs { display: flex; border-bottom: 1px solid var(--gx-line); }
+.gxr-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 12px 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--gx-text-2); font: 700 13px var(--gx-font); cursor: pointer; margin-bottom: -1px; }
+.gxr-tabs button .btn-icon-svg { width: 15px; height: 15px; }
+.gxr-tabs button.on { color: var(--gx-accent); border-bottom-color: var(--gx-accent); }
+.gxr-pane { display: none; flex: 1; min-height: 0; overflow: auto; padding: 10px; }
+.gxr-pane.on { display: block; }
+#gxr-players #members-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+#gxr-players #members-list li { display: flex !important; align-items: center; gap: 8px; padding: 9px 12px !important; border-radius: 11px !important; background: var(--gx-surface-2) !important; border: 1px solid var(--gx-line) !important; color: var(--gx-text) !important; font-size: 13.5px; }
+#gxr-players #members-list li.me { border-color: var(--gx-accent-line) !important; }
+#gxr-players #members-list .member-info { flex: 1; min-width: 0; font-weight: 600; }
+#gxr-players #members-list .btn { height: 26px; padding: 0 8px; font-size: 11px !important; }
+#gxr-players #btn-invite-friends { width: 100%; margin-top: 10px; }
+.gxr-info { display: grid; gap: 2px; margin-bottom: 12px; }
+#gxr-settings #max-players-row { display: flex !important; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 2px; }
+#gxr-settings #max-players-row.hidden { display: none !important; }
+.gxr-kv { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; font-size: 13px; }
+.gxr-pane .gxr-kv { padding: 8px 2px; border-bottom: 1px solid var(--gx-line); }
+.gxr-kv span { color: var(--gx-text-2); }
+.gxr-kv b { color: var(--gx-text); font-weight: 700; text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gxr-howto { margin: 6px 16px 0; padding-top: 8px; border-top: 1px solid var(--gx-line); font-size: 12.5px; color: var(--gx-text-2); }
+.gxr-howto summary { display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 700; color: var(--gx-text); list-style: none; }
+.gxr-howto summary .btn-icon-svg { width: 14px; height: 14px; color: var(--gx-blue); }
+.gxr-howto p { margin: 6px 0 0; line-height: 1.6; }
+.gxr-conn-state { margin-left: auto; font: 800 10.5px var(--gx-font); letter-spacing: .06em; padding: 3px 8px; border-radius: 6px; background: var(--gx-surface-3); color: var(--gx-text-2); text-transform: uppercase; }
+.gxr-conn-state[data-state="hosting"], .gxr-conn-state[data-state="live"] { background: var(--gx-green-soft); color: var(--gx-green); }
+#gxr-conn-body { padding: 12px 14px; }
+#gxr-conn-body .lan-host-panel { margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; }
+#gxr-conn-body .lan-host-head { display: none !important; }
+#gxr-conn-body #btn-lan-host, #gxr-conn-body #btn-ipg-host { display: none !important; }
+#gxr-conn-body .lan-host-actions { display: flex; gap: 8px; }
+#gxr-conn-body .lan-games-list { margin-top: 8px; display: grid; gap: 6px; }
+#gxr-conn-body .lan-game-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 10px; background: var(--gx-surface-2); border: 1px solid var(--gx-line); font-size: 13px; color: var(--gx-text); }
+#gxr-conn-body .lan-join-btn { height: 30px; padding: 0 12px; border-radius: 8px; border: 0; background: var(--gx-grad); color: #fff; font: 700 12px var(--gx-font); cursor: pointer; }
+#gxr-conn-body .lan-join-btn.joined { background: var(--gx-green-soft); color: var(--gx-green); }
+#gxr-conn-body .lan-hint, #gxr-conn-body .hint { color: var(--gx-text-3); font-size: 12.5px; line-height: 1.5; }
+.gxr-chat-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.gxr-chat-body #chat-messages { flex: 1; min-height: 0; overflow: auto; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; padding: 12px 16px; }
+.gxr-chat-body .chat-input-row { border: 0 !important; border-top: 1px solid var(--gx-line) !important; border-radius: 0 0 14px 14px !important; }
+@media (max-width: 860px) {
+  .gxr-grid { grid-template-columns: minmax(230px, 280px) minmax(0, 1fr); grid-template-areas: "left game" "left conn" "left chat"; grid-template-rows: auto auto minmax(0, 1fr); }
+}
+.gxr-tabs button b { font-weight: 800; }
+#gxr-actions .btn { display: inline-flex !important; align-items: center; gap: 6px; width: auto !important; }
+#gxr-actions .btn[style*="none"] { display: none !important; }
+.gxr-chat-body .chat-input-row { display: flex !important; width: 100% !important; grid-area: auto !important; align-self: stretch !important; gap: 8px; padding: 12px 14px !important; margin: 0 !important; }
+.gxr-chat-body .chat-input-row .input { flex: 1; width: auto !important; }
+body.gx.gx-roomview-on #gx-content { padding: 0 !important; overflow: hidden !important; }
+html.gx-embedded body.gx #page-room .gxr-grid { padding: 14px; }
+body.gx #page-room.active { padding: 0 !important; animation: none !important; }

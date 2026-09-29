@@ -120,7 +120,8 @@ router.get('/mine', optAuth, async (req, res) => {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
-          r.status, r.has_password, r.zerotier_network_id, r.playing_since,
+          r.status, r.has_password, r.zerotier_network_id, r.playing_since, r.clan_id,
+          (SELECT c.tag FROM clans c WHERE c.id = r.clan_id) AS clan_tag,
           COUNT(rp2.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp2.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
