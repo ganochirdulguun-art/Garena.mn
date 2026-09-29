@@ -184,6 +184,9 @@ async function runStartupMigrations() {
   } catch (e) {
     console.error('[Migration]', e.message);
   }
+  // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); }
+  catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
 // Rooms router-т io дамжуулах (kick/close event илгээхэд хэрэг)

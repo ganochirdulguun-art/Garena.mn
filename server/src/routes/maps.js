@@ -46,7 +46,7 @@ async function ensureTables() {
     `);
   } catch (e) { console.error('[Migration] maps:', e.message); }
 }
-if (process.env.SKIP_DB_MIGRATIONS !== 'true') ensureTables();
+// Хүснэгтүүдийг зөвхөн db/migrate.js дараалан үүсгэнэ (модуль ачаалахад зэрэг ажиллуулбал 'deadlock detected', 2026-09-30)
 
 async function isStaff(user) {
   if (adminMW.isOwnerUser(user)) return true;

@@ -237,6 +237,7 @@ async function runMigrations(db) {
     DELETE FROM radar_games WHERE game_time_sec < 60 OR jsonb_array_length(players) < 2;
   `);
   // Кланууд (2026-09-30): clans, clan_members, clan_requests, rooms.clan_id — routes/clans.js ensureTables (idempotent)
+  // Кланууд, Map-ын сан — өмнөх алхам унасан ч үүсгэхийг оролдоно (ensureTables дотроо алдаагаа барина)
   await require('../routes/clans').ensureTables();
   await require('../routes/maps').ensureTables();   // Map-ын сан (bytea)
 }

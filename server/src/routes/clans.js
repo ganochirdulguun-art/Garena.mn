@@ -70,7 +70,7 @@ async function ensureTables() {
     `);
   } catch (e) { console.error('[Migration] clans:', e.message); }
 }
-if (process.env.SKIP_DB_MIGRATIONS !== 'true') ensureTables();
+// Хүснэгтүүдийг зөвхөн db/migrate.js дараалан үүсгэнэ (модуль ачаалахад зэрэг ажиллуулбал 'deadlock detected', 2026-09-30)
 
 function isPlatformStaff(user) { return adminMW.isOwnerUser(user); }
 async function isStaff(user) {
