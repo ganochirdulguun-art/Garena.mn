@@ -24,3 +24,19 @@ body.gx #page-room #btn-invite-friends { width: 100%; }
 body.gx .login-link { position: static !important; transform: none !important; }
 body.gx #btn-qr-toggle { justify-self: center; }
 body.gx .btn-discord::before, body.gx .btn-discord::after { display: none !important; }
+
+/* ── Нийтийн чат (хуучин Garena-гийн цагаан текст → цайвар дэвсгэрт уусаж байсан, 2.9.1) ── */
+body.gx .msg.gl { padding: 3px 2px; line-height: 1.55; color: var(--gx-text); }
+body.gx .msg.gl .msg-bubble { background: none !important; border: 0 !important; padding: 0 !important; box-shadow: none !important; }
+body.gx .gl .g-time { color: var(--gx-blue) !important; font-weight: 600; font-size: 12px; }
+body.gx .gl .g-name { color: var(--gx-text) !important; font-weight: 700; }
+body.gx .gl.me .g-name { color: var(--gx-accent) !important; }
+body.gx .gl .g-text { color: var(--gx-text) !important; }
+body.gx .gl.me .g-text { color: var(--gx-text-2) !important; }
+body.gx .gl.sys .g-text { color: var(--gx-text-3) !important; font-style: italic; }
+body.gx .gl.info .g-text { color: var(--gx-amber) !important; }
+body.gx .gl .g-name.name-fx-gradient, body.gx .gl .g-name.name-fx-rainbow { color: transparent !important; }
+body.gx .gl .g-x { opacity: .5; }
+body.gx .chat-input-row { border-top: 1px solid var(--gx-line) !important; }
+body.gx .dm-section-label { border-bottom: 0 !important; }
+body.gx .dm-section-label::after, body.gx .dm-section-label::before { display: none !important; }

@@ -24,16 +24,19 @@ function fileVersion(p) {
       (err, out) => resolve(err ? null : String(out || '').trim() || null));
   });
 }
-function isWc3Exe(p) { return /war3|frozen throne|warcraft/i.test(path.basename(String(p || ''))); }
+function isWc3Exe(p) { return /war3|frozen throne|warcraft|wc3/i.test(path.basename(String(p || ''))); }
 
 async function wc3Info(exePaths) {
   const list = [];
   for (const exe of exePaths) {
-    if (!exe || !isWc3Exe(exe)) continue;
+    if (!exe) continue;
     const dir = path.dirname(exe);
+    // Нэрээр (war3/wc3/...) ЭСВЭЛ хавтсанд Game.dll / war3.exe байвал WC3 гэж үзнэ (WC3-Window.exe, WC3-OpenGL.exe г.м.)
+    if (!isWc3Exe(exe) && !(await exists(path.join(dir, 'Game.dll'))) && !(await exists(path.join(dir, 'war3.exe')))) continue;
     const ok = await exists(exe);
     const gameDll = path.join(dir, 'Game.dll');
-    const version = ok ? (await fileVersion(await exists(gameDll) ? gameDll : exe)) : null;
+    const hasDll = await exists(gameDll);
+    const version = hasDll ? await fileVersion(gameDll) : (ok ? await fileVersion(exe) : null);   // 1.26-д жинхэнэ хувилбар Game.dll-д
     // WC3 1.26-ийн стандарт нь Maps\Download; зарим суулгацад Maps\Downloads байдаг — байгааг нь ашиглана
     const dl = path.join(dir, 'Maps', 'Download'), dls = path.join(dir, 'Maps', 'Downloads');
     const mapsDir = (await exists(dl)) ? dl : (await exists(dls)) ? dls : dl;

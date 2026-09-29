@@ -28,6 +28,7 @@
       <div class="gx-wc3-main"><b>Warcraft III: The Frozen Throne ${ok ? '<span class="gx-st open">Суулгасан</span>' : '<span class="gx-st full">Файл олдсонгүй</span>'}
         ${p.version ? `<span class="gx-st ${v126 ? 'open' : 'playing'}">${esc(p.version.replace(/,\s*/g, '.'))}${v126 ? ' · 1.26a ✓' : ' · 1.26a санал болгоно'}</span>` : ''}</b>
         <p class="gx-mono">${esc(p.exe)}</p>
+        ${ok ? '' : '<p class="gx-warn">⚠ Бүртгэсэн exe файл олдсонгүй (нэр нь өөрчлөгдсөн байж магадгүй). Тоглоом эхлүүлэхэд алдаа гарна — «Тоглоом нэмэх»-ээр war3.exe-ээ дахин сонгоно уу.</p>'}
         <p>Map хавтас: <span class="gx-mono">${esc(p.mapsDir)}</span></p></div>
       <div class="gx-wc3-act"><button type="button" class="btn btn-sm" id="gx-wc3-folder"><svg class="btn-icon-svg"><use href="#gx-i-folder"/></svg>Хавтас нээх</button></div>`;
     $('gx-wc3-folder')?.addEventListener('click', openFolder);

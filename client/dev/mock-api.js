@@ -77,6 +77,7 @@
     if (q.get('drawer')) window.gx?.openDrawer(q.get('drawer'));
     if (q.get('create')) document.getElementById('btn-create-room')?.click();
     if (q.get('select')) { selectedRoomId = q.get('select'); renderFilteredRooms(); }
+    if (q.get('chat')) { showTab('chat'); [['Bibi','gg wp'],['Uka','Өрөө нээлээ, орцгоо'],['FaSi','@VitoCorleone ирлээ']].forEach(([u,t],i)=>appendLobbyMessage({ userId: 30+i, username: u, text: t, time: Date.now()-i*6e4 })); appendLobbyMessage({ userId: 1, username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: Date.now() }); }
     if (q.get('clantab')) document.querySelector(`[data-clan-tab="${q.get('clantab')}"]`)?.click();
     if (q.get('clan')) window.gxClans?.openClan(q.get('clan'));
     if (q.get('info')) window.gxClans?.showLobbyInfo(roomsCache[q.get('info')]);
