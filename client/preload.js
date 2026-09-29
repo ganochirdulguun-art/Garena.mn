@@ -160,6 +160,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
+  // GX: өрөө үндсэн цонхонд шигтгэгдэнэ (main → room:embed)
+  onRoomEmbed:    (cb)   => ipcRenderer.on('room:embed', (_, q) => cb(q)),
   // CS 1.6 / Quake III (2026-09-30)
   ipGameKind:     (gameType) => ipcRenderer.invoke('ipgame:kind', gameType),
   ipGameHost:     (o)    => ipcRenderer.invoke('ipgame:host', o),

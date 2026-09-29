@@ -20,7 +20,7 @@
       box.innerHTML = `<div class="gx-wc3-ico"><svg><use href="#gx-i-games"/></svg></div>
         <div class="gx-wc3-main"><b>Warcraft III: The Frozen Throne бүртгэгдээгүй</b>
         <p>Компьютер дээрээ суулгасан Warcraft III-ийн <code>war3.exe</code> эсвэл <code>Frozen Throne.exe</code>-г нэмнэ. Платформ 1.26a хувилбарыг танина. Тоглоомыг өөрийг нь Blizzard-ийн зохиогчийн эрхийн улмаас платформ тараахгүй.</p></div>
-        <div class="gx-wc3-act"><button type="button" class="btn btn-primary" data-gx-click="btn-add-game">war3.exe нэмэх</button></div>`;
+        <div class="gx-wc3-act"><button type="button" class="btn" data-open-url="https://shop.battle.net/product/warcraft-iii-reforged">Албан ёсоор авах</button><button type="button" class="btn btn-primary" data-gx-click="btn-add-game">war3.exe нэмэх</button></div>`;
       return;
     }
     const ok = p.exists; const v126 = p.is126;

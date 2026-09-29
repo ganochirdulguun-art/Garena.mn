@@ -83,11 +83,20 @@ const dmWindows = new Map(); // userId -> BrowserWindow
 
 // Event-ийг бүх цонх руу илгээх — өрөөний цонх тусдаа BrowserWindow тул
 // зөвхөн mainWindow руу илгээвэл өрөөний logic (currentRoom) хүлээж авдаггүй
-function broadcastToWindows(channel, data) {
-  BrowserWindow.getAllWindows().forEach((win) => {
-    if (!win.isDestroyed()) win.webContents.send(channel, data);
-  });
+// GX (2.9.2): өрөө үндсэн цонхны iframe-д шигтгэгддэг тул дэд frame бүрт ч илгээнэ (preload subframe-д ажиллана)
+function sendToAllFrames(win, channel, data) {
+  if (!win || win.isDestroyed()) return;
+  let sent = false;
+  try {
+    for (const f of win.webContents.mainFrame.framesInSubtree) { try { f.send(channel, data); sent = true; } catch {} }
+  } catch {}
+  if (!sent) { try { win.webContents.send(channel, data); } catch {} }
 }
+function broadcastToWindows(channel, data) {
+  BrowserWindow.getAllWindows().forEach((win) => sendToAllFrames(win, channel, data));
+}
+// Өрөөг үндсэн цонхонд (GameRanger X шиг) шигтгэх эсэх — settings.roomWindowMode === 'separate' бол хуучин тусдаа цонх
+function roomEmbedded() { try { return readSettings().roomWindowMode !== 'separate'; } catch { return true; } }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -100,6 +109,7 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
+      nodeIntegrationInSubFrames: true,   // GX: шигтгэсэн өрөөний iframe-д preload (window.api) ажиллана
       nodeIntegration: false, backgroundThrottling: false, },
     frame: true,
     autoHideMenuBar: true,
@@ -583,8 +593,8 @@ ipcMain.handle('auth:unlinkDiscord', async () => {
 // Replay watcher — тоглоом дуусахад renderer руу мэдэгдэх
 // Өрөөний цонх нээлттэй бол түүнд (хэрэглэгч тэнд байгаа), үгүй бол main цонхонд
 replayService.onResult((data) => {
-  const target = (roomWindow && !roomWindow.isDestroyed()) ? roomWindow : mainWindow;
-  target?.webContents.send('game:result', data);
+  if (roomWindow && !roomWindow.isDestroyed()) roomWindow.webContents.send('game:result', data);
+  else sendToAllFrames(mainWindow, 'game:result', data);   // шигтгэсэн өрөө (iframe) эсвэл үндсэн цонх
 });
 
 // Өрөөний гишүүдийг replay service-д дамжуулах (player matching)
@@ -778,6 +788,17 @@ ipcMain.handle('settings:removeGame', async (_, id) => {
 
 // Өрөөний шинэ цонх нээх
 ipcMain.handle('room:openWindow', (event, roomData) => {
+  // GX: үндсэн цонхны агуулгад шигтгэнэ — renderer iframe үүсгэнэ (өрөөний логик ижил index.html?mode=room)
+  if (roomEmbedded() && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('room:embed', {
+      mode: 'room', roomId: String(roomData.id), roomName: roomData.name, gameType: roomData.gameType,
+      isHost: roomData.isHost ? '1' : '0', hostId: String(roomData.hostId || ''), status: roomData.status || '',
+      maxPlayers: String(roomData.maxPlayers || roomData.max_players || ''), backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
+    });
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    return { embedded: true };
+  }
   if (roomWindow && !roomWindow.isDestroyed()) {
     roomWindow.focus();
     return;
