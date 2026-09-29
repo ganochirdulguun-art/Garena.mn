@@ -160,6 +160,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),
+  // CS 1.6 / Quake III (2026-09-30)
+  ipGameKind:     (gameType) => ipcRenderer.invoke('ipgame:kind', gameType),
+  ipGameHost:     (o)    => ipcRenderer.invoke('ipgame:host', o),
+  ipGameJoin:     (o)    => ipcRenderer.invoke('ipgame:join', o),
+  ipGameMyIp:     ()     => ipcRenderer.invoke('ipgame:myIp'),
   // Map-ын сан (2026-09-30)
   wc3Info:        ()     => ipcRenderer.invoke('maps:wc3Info'),
   mapsLocal:      (files) => ipcRenderer.invoke('maps:local', files),

@@ -710,6 +710,32 @@ ipcMain.handle('maps:upload', async (_e, meta = {}) => {
   } catch (err) { throw apiError(err); }
 });
 
+// ── IP-ээр холбогддог тоглоом (CS 1.6 / Quake III, 2026-09-30 Ш1) — mesh IP + listen сервер / +connect ──
+const ipGames = require('./src/services/ipgames');
+function findGame(gameType) { const s = migrateSettings(readSettings()); return (s.games || []).find((g) => g.name === gameType) || null; }
+ipcMain.handle('ipgame:kind', (_e, gameType) => { const g = findGame(gameType); return g ? ipGames.kindOf(g) : null; });
+async function myMeshIp() {
+  try { const st = meshService.installed() ? await meshService.status() : meshService.last(); return st?.state === 'Running' && st.ip ? st.ip : null; } catch { return null; }
+}
+ipcMain.handle('ipgame:host', async (_e, { gameType, map, maxPlayers } = {}) => {
+  const g = findGame(gameType); const kind = g && ipGames.kindOf(g);
+  if (!kind) throw new Error('Энэ өрөөний тоглоом CS 1.6 / Quake III биш эсвэл тохируулагдаагүй');
+  const ip = await myMeshIp();
+  if (!ip) throw new Error('Mesh холбогдоогүй байна — Тохиргоо → Апп → «Дахин холбох»');
+  const port = ipGames.KINDS[kind].port;
+  await ipGames.launch(g, ipGames.hostArgs(kind, { map, maxPlayers, port }));
+  return { kind, ip, port, map: map || ipGames.KINDS[kind].defaultMap };
+});
+ipcMain.handle('ipgame:join', async (_e, { gameType, ip, port } = {}) => {
+  const g = findGame(gameType); const kind = g && ipGames.kindOf(g);
+  if (!kind) throw new Error('Энэ тоглоомыг тохируулаагүй байна (Тохиргоо → Тоглоом)');
+  if (!ipGames.isMeshIp(ip)) throw new Error('Буруу серверийн хаяг');
+  if (!await myMeshIp()) throw new Error('Mesh холбогдоогүй байна — Тохиргоо → Апп → «Дахин холбох»');
+  await ipGames.launch(g, ipGames.joinArgs(kind, { ip, port }));
+  return true;
+});
+ipcMain.handle('ipgame:myIp', () => myMeshIp());
+
 ipcMain.handle('settings:get', () => {
   const s = readSettings();
   return migrateSettings(s);

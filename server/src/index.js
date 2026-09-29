@@ -94,7 +94,9 @@ app.use(apiLimiter);
 // REST Routes
 app.use('/auth', authRoutes);
 app.use('/rooms', botRoutes.roomRouter);   // бот хост (/rooms/:id/bot-host) — roomRoutes-оос ӨМНӨ
-app.use('/rooms', lanHostRoutes.router);   // тоглогч-хост LAN (/rooms/:id/lan-host) — roomRoutes-оос ӨМНӨ
+app.use('/rooms', lanHostRoutes.router);
+const ipServerRoutes = require('./routes/ipserver');
+app.use('/rooms', ipServerRoutes.router);       // CS 1.6 / Quake III: хостын mesh IP-г өрөөнд зарлах (/rooms/:id/ipserver)   // тоглогч-хост LAN (/rooms/:id/lan-host) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', require('./routes/roomBg').router);   // дэвсгэр зураг upload/serve (/rooms/background) — roomRoutes-оос ӨМНӨ
 app.use('/rooms', roomRoutes);
 app.use('/stats', statsRoutes);
@@ -199,6 +201,7 @@ clanRoutes.setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);
+ipServerRoutes.setIO(io);
 tierSync.start();
 // Diamond 💎 шилжүүлэг / олголтын мэдэгдэл (diamonds:received, membership:updated)
 membershipRoutes.setIO(io);

@@ -1320,6 +1320,16 @@
             </div>
             <div id="lan-games-list" class="lan-games-list"></div>
           </div>
+          <!-- CS 1.6 / Quake III (2026-09-30, Ш1): хост listen сервер нээж mesh IP-ээ зарлана, бусад нь +connect (gx-ipgame.js) -->
+          <div id="ip-game-panel" class="lan-host-panel ip-game-panel hidden">
+            <div class="lan-host-head"><span class="lan-host-title" id="ipg-title">🎯 Сервер</span><span id="ipg-state" class="lan-host-state" data-state="idle">БЭЛЭН</span></div>
+            <p id="ipg-text" class="hint"></p>
+            <div id="ipg-host-row" class="ipg-host-row hidden">
+              <input id="ipg-map" type="text" class="input input-sm" maxlength="40" placeholder="Map" />
+              <button type="button" id="btn-ipg-host" class="btn btn-primary">Сервер нээх</button>
+            </div>
+            <div id="ipg-server" class="ipg-server hidden"></div>
+          </div>
           <div class="room-action-row">
             <button type="button" id="btn-close-room" class="btn btn-danger btn-block btn-with-icon" title="Өрөөг хаах">
               <svg class="btn-icon-svg"><use href="#ico-close"/></svg>
@@ -1601,5 +1611,6 @@
   <script src="gx.js"></script>
   <script src="gx-clans.js"></script>
   <script src="gx-maps.js"></script>
+  <script src="gx-ipgame.js"></script>
 </body>
 </html>

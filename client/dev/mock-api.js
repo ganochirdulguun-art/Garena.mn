@@ -39,11 +39,14 @@
     getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
     getAd: async () => null,
+    ipGameKind: async (t) => (/counter|cs/i.test(String(t)) ? 'cs16' : /quake/i.test(String(t)) ? 'q3' : null),
+    ipGameHost: async () => ({ kind: 'cs16', ip: '100.64.0.1', port: 27015, map: 'de_dust2' }),
     wc3Info: async () => ({ primary: { exe: 'C:\Program Files (x86)\Warcraft 3\war3.exe', exists: true, version: '1, 26, 0, 6401', is126: true, mapsDir: 'C:\Program Files (x86)\Warcraft 3\Maps\Downloads' } }),
     mapsLocal: async () => ({ files: { 'DotA v6.74c LoD v5e.w3x': { size: 1, sha256: 'a'.repeat(64) }, 'DotA IMBA v3.73.4b.w3x': { size: 1, sha256: 'old' } } }), meshStatus: async () => ({ state: 'Running', ip: '100.64.0.1' }), getQR: async () => ({}),
     request: async (method, path) => {
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
+      if (/\/ipserver$/.test(P)) return q.get('srv') ? { server: { host_user_id: '2', host_username: 'Billionaire', kind: 'cs16', label: 'Counter-Strike 1.6', ip: '100.64.0.4', port: 27015, map: 'de_dust2' } } : { server: null };
       if (P === '/maps') return { can_upload: true, categories: ['DotA', 'LoD', 'IMBA', 'Melee', 'Tower Defense', 'RPG', 'Custom'], maps: [
         { id: 1, name: 'DotA LoD', version: 'v6.74c v5e', category: 'LoD', description: 'Legends of DotA — Garena.mn тэмцээний албан map', filename: 'DotA v6.74c LoD v5e.w3x', size: 8115000, sha256: 'a'.repeat(64), downloads: 412, featured: true },
         { id: 2, name: 'DotA LoD', version: 'v6.85i', category: 'LoD', description: 'LoD шинэ хувилбар', filename: 'DotA v6.85i LoD (1).w3x', size: 7707000, sha256: 'b'.repeat(64), downloads: 133 },

@@ -117,6 +117,9 @@
   function initials(t) {
     const s = String(t || '');
     if (/imba/i.test(s)) return 'IM';
+    if (/counter|cstrike|cs|hl\.exe|^hl$/i.test(s)) return 'CS';
+    if (/quake|ioq3|q3/i.test(s)) return 'Q3';
+    if (/red alert|ra2?/i.test(s)) return 'RA';
     if (/frozen|warcraft|w3|dota/i.test(s)) return 'W3';
     return s.replace(/[^A-Za-zА-Яа-яӨөҮү0-9 ]/g, '').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
   }

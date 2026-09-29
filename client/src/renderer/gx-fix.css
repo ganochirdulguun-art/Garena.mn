@@ -40,3 +40,16 @@ body.gx .gl .g-x { opacity: .5; }
 body.gx .chat-input-row { border-top: 1px solid var(--gx-line) !important; }
 body.gx .dm-section-label { border-bottom: 0 !important; }
 body.gx .dm-section-label::after, body.gx .dm-section-label::before { display: none !important; }
+
+/* ── CS 1.6 / Quake III сервер самбар (gx-ipgame.js) ── */
+body.gx.ipgame-room #lan-host-panel { display: none !important; }
+.ipg-host-row { display: flex; gap: 8px; margin-top: 10px; }
+.ipg-host-row .input { flex: 1; }
+.ipg-server { margin-top: 10px; display: grid; gap: 10px; }
+.ipg-srv { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--gx-green-soft); color: var(--gx-text); font-size: 13px; }
+.ipg-srv small { display: block; font: 600 11.5px Consolas, monospace; color: var(--gx-text-3); margin-top: 2px; }
+.ipg-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gx-green); box-shadow: 0 0 0 4px rgba(22,163,74,.18); flex: none; }
+.ipg-acts { display: flex; gap: 8px; }
+.ipg-acts .btn-block { width: 100%; height: 40px; }
+/* Өрөөний цонхны бараан давхарга (хуучин ::before) — зөвхөн хэрэглэгчийн дэвсгэр зурагтай үед */
+body.gx #page-room:not(.has-custom-bg)::before { display: none !important; }
