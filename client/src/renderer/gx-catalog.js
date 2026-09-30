@@ -42,8 +42,8 @@
         : `<button type="button" class="btn btn-primary btn-sm" data-gx-click="btn-add-game" title="Компьютер дээрээ суулгасан exe-ээ сонгоно">Тоглоом нэмэх</button><button type="button" class="btn btn-sm" data-open-url="${esc(c.buy)}" title="Албан ёсоор худалдаж авах">Авах</button>`;
     return `<article class="gxc ${c.status === 'soon' ? 'soon' : ''}">
       <div class="gxc-cover ${c.cls}">
-        <span class="gxc-art"></span>
-        <span class="gxc-title">${esc(c.short)}</span><span class="gxc-mark">${esc(c.mark)}</span>
+        <img class="gxc-img" src="covers/${c.id}.jpg" alt="${esc(c.title)}" loading="lazy" draggable="false" />
+        <span class="gxc-shade"></span>
         ${inst ? '<span class="gxc-tag ok">Суулгасан</span>' : c.status === 'soon' ? '<span class="gxc-tag soon">Удахгүй</span>' : ''}
         <button type="button" class="gxc-fav ${fav ? 'on' : ''}" data-fav="${c.id}" title="Дуртай">${fav ? '★' : '☆'}</button>
         <span class="gxc-stats"><span><svg><use href="#gx-i-users"/></svg>${players}</span><span><svg><use href="#gx-i-lobby"/></svg>${rooms.length}</span></span>

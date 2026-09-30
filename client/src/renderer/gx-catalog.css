@@ -42,3 +42,12 @@
 .cv-ra2 .gxc-art { background: radial-gradient(60% 45% at 60% 30%, rgba(220, 38, 38, .7), transparent 70%), linear-gradient(175deg, #7f1d1d 0%, #3f3f46 55%, #18181b 100%); }
 .cv-ra2 .gxc-art::after { background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 18px); }
 .cv-ra2 .gxc-mark { color: #fecaca; }
+
+/* Албан ёсны cover зураг (2.9.6) */
+.gxc-cover { padding: 0; background: #0b0c13; }
+.gxc-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; transition: transform .35s ease; }
+.gxc:hover .gxc-img { transform: scale(1.04); }
+.gxc-shade { position: absolute; inset: auto 0 0 0; height: 34%; z-index: -1; background: linear-gradient(transparent, rgba(0, 0, 0, .78)); }
+.gxc-stats { top: auto; bottom: 10px; left: 12px; }
+.gxc-cover { aspect-ratio: 5 / 7; }
+.gxc-img { object-position: center top; }
