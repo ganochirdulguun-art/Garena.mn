@@ -289,5 +289,21 @@
   selectedRoomId = null;   // GRX шиг: эхэндээ бүтэн өргөнтэй жагсаалт, өрөө сонгоход л дэлгэрэнгүй самбар
   if (Object.keys(roomsCache || {}).length) renderFilteredRooms();
   setTimeout(() => { syncMe(); if (Object.keys(roomsCache || {}).length) renderFilteredRooms(); }, 400);
+  // ── Шууд холболт (mesh) төлөв — зүүн цэсэнд; идэвхгүй бол дарахад суулгаж/холбоно (UAC нэг удаа) ──
+  function meshUi(st) {
+    const b = $('gx-mesh'); if (!b || !st) return;
+    const on = st.state === 'Running' && !!st.ip;
+    const busy = st.state === 'Installing' || st.state === 'Starting';
+    b.dataset.state = on ? 'on' : busy ? 'busy' : 'off';
+    $('gx-mesh-text').textContent = on ? 'Шууд холболт идэвхтэй' : busy ? 'Холбогдож байна…' : st.state === 'ForeignTailnet' ? 'Шууд холболт: өөр Tailscale' : 'Шууд холболт идэвхжүүлэх';
+  }
+  window.api?.onMeshStatus?.(meshUi);
+  window.api?.meshStatus?.().then(meshUi).catch(() => {});
+  $('gx-mesh')?.addEventListener('click', async () => {
+    const b = $('gx-mesh'); if (b.dataset.state === 'on') { showToast('Шууд холболт идэвхтэй — mesh-тэй тоглогчидтой хамгийн бага ping-ээр холбогдоно', 'success'); return; }
+    if (!await showConfirm('Шууд холболт идэвхжүүлэх', 'Тоглогчидтой серверээр дамжилгүй шууд (Монгол дотор ~10мс) холбогдоно. Windows нэг удаа «Энэ апп өөрчлөлт хийхийг зөвшөөрөх үү?» гэж асуухад «Yes/Тийм» дарна уу. Энэ нь Tailscale (албан ёсны, аюулгүй VPN) суулгалт юм.')) return;
+    meshUi({ state: 'Starting' });
+    try { meshUi(await window.api.meshEnsure()); } catch {}
+  });
   window.gx = { renderGames, openDrawer, closeDrawer, setTheme, gxRow };
 })();

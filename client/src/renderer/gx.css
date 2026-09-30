@@ -729,3 +729,12 @@ body.gx .stat label { font: 700 11px var(--gx-font) !important; text-transform: 
 body.gx tr, body.gx tbody tr { background: transparent !important; }
 body.gx .diamond-amount { font: 800 26px var(--gx-font) !important; color: var(--gx-text) !important; -webkit-text-fill-color: currentColor !important; background: none !important; text-shadow: none !important; }
 body.gx .rank-badge { background: var(--gx-surface-3) !important; color: var(--gx-text-2) !important; border: 0 !important; box-shadow: none !important; }
+
+/* Шууд холболт (mesh) төлөв — зүүн цэс */
+.gx-mesh { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 6px; padding: 7px 10px; border: 1px solid var(--gx-side-line); border-radius: 9px; background: rgba(255,255,255,.03); color: var(--gx-side-text); font: 700 11.5px var(--gx-font); cursor: pointer; text-align: left; }
+.gx-mesh i { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex: none; box-shadow: 0 0 0 3px rgba(245,158,11,.18); }
+.gx-mesh[data-state="on"] { color: #86efac; border-color: rgba(34,197,94,.3); }
+.gx-mesh[data-state="on"] i { background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,.18); }
+.gx-mesh[data-state="off"] { color: #fcd34d; border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.08); }
+.gx-mesh:hover { background: rgba(255,255,255,.06); }
+#page-main.sidebar-collapsed .gx-mesh span { display: none; }

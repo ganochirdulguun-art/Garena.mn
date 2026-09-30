@@ -1111,7 +1111,7 @@ ipcMain.handle('streamers:openUrl', async (_, url) => {
 
 // ── Mesh (Tailscale ↔ Headscale) ──────────────────────────────────────────
 let _meshLoginServer = null;   // сервер /config → mesh.login_server (null = mesh унтраалттай)
-async function meshEnsure() {
+async function meshEnsure(force = false) {
   if (!authService.getToken()) return meshService.last();   // нэвтрээгүй бол хүлээнэ
   if (!_meshLoginServer) {
     try { const { data } = await axios.get(`${apiService.SERVER_URL}/config`, { timeout: 10000 }); _meshLoginServer = data?.mesh?.login_server || null; } catch {}
@@ -1120,13 +1120,14 @@ async function meshEnsure() {
   return meshService.ensure({
     loginServer: _meshLoginServer,
     msiPath,
+    force,
     getAuthKey: () => apiService.request('post', '/mesh/authkey'),
     report: (rec) => apiService.request('post', '/mesh/report', rec),
     onStatus: (st) => broadcastToWindows('mesh:status', st),
   });
 }
 ipcMain.handle('mesh:status', async () => { try { if (meshService.installed()) await meshService.status(); } catch {} return meshService.last(); });
-ipcMain.handle('mesh:ensure', async () => { try { return await meshEnsure(); } catch (e) { return { ...meshService.last(), error: e.message }; } });
+ipcMain.handle('mesh:ensure', async () => { try { return await meshEnsure(true); } catch (e) { return { ...meshService.last(), error: e.message }; } });
 
 // Firewall + сүлжээ тохиргоо (тусдаа товчноос) — ZeroTier хасагдсан, зөвхөн галт хана
 ipcMain.handle('firewall:setup', async () => {

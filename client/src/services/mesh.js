@@ -113,7 +113,7 @@ async function ensure(ctx) {
     if (!ctx.loginServer) return set({ state: 'Disabled', error: null });
     let st = await status();
     if (!st.installed) {
-      if (Date.now() - _declinedAt < DECLINE_TTL_MS) return set({ state: 'NotInstalled', error: 'declined' });
+      if (!ctx.force && Date.now() - _declinedAt < DECLINE_TTL_MS) return set({ state: 'NotInstalled', error: 'declined' });   // гараар дарвал (force) дахин асууна
       const r = await install(ctx.msiPath);
       if (!r.ok) { if (r.error === 'declined') _declinedAt = Date.now(); return set({ state: 'NotInstalled', error: r.error }); }
       st = await status();

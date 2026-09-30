@@ -484,6 +484,19 @@ function _probeTcp(ip, port, ms) {
     s.setTimeout(ms, () => done(false)); s.once('connect', () => done(true)); s.once('error', () => done(false));
   });
 }
+// TCP холболтын хугацаагаар (≈ RTT) замыг хэмжинэ: 3 оролдлогын хамгийн бага, амжилтгүй бол null
+function _rttTcp(ip, port, ms) {
+  return new Promise((resolve) => {
+    const t0 = process.hrtime.bigint(); const s = net.connect(Number(port), ip); let fin = false;
+    const done = (ok) => { if (fin) return; fin = true; try { s.destroy(); } catch {} resolve(ok ? Math.max(1, Math.round(Number(process.hrtime.bigint() - t0) / 1e6)) : null); };
+    s.setTimeout(ms, () => done(false)); s.once('connect', () => done(true)); s.once('error', () => done(false));
+  });
+}
+async function _bestRtt(ip, port) {
+  let best = null;
+  for (let i = 0; i < 3; i++) { const r = await _rttTcp(ip, port, 1500); if (r != null && (best == null || r < best)) best = r; }
+  return best;
+}
 function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoints }) {
   stopLanJoin();
   stopBotBridge(); stopHost(); stopFinder();   // 6112-ийг булаах бусад socket-уудыг цэвэрлэнэ
@@ -497,11 +510,19 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoi
   const d = (Array.isArray(endpoints) ? endpoints : []).find((e) => e && e.type === 'direct' && isMeshIp(e.ip) && e.port);
   if (d) {
     state.direct = { ip: String(d.ip), port: Number(d.port) };
-    _probeTcp(state.direct.ip, state.direct.port, 1500).then((ok) => {
-      state.useDirect = ok;
-      bblog(`LAN join: шууд (mesh) ${state.direct.ip} ${ok ? 'ХОЛБОГДОНО ✅' : 'боломжгүй → relay'}`);
-      if (ok) { clearInterval(state.latTimer); state.latTimer = startRelayLatencyProbe(state.direct.ip, state.direct.port, 'join-direct'); }
-    });
+    // 2.9.8: mesh нь заримдаа шууд биш DERP (Hong Kong ~150мс)-ээр явдаг → relay-ээс удаан байж болно.
+    // Хоёр замын TCP RTT-г (3 удаа, хамгийн бага) хэмжиж ХУРДАН замыг сонгоно; 10с, 30с-д дахин хэмжинэ
+    // (Tailscale DERP-ээс шууд холболт руу хожуу шилжиж болно). Шийдвэр зөвхөн ШИНЭ WC3 холболтод нөлөөлнө.
+    const decide = async (tag) => {
+      if (!state.running) return;
+      const [dr, rr] = await Promise.all([_bestRtt(state.direct.ip, state.direct.port), _bestRtt(state.relayIp, state.relayPort)]);
+      const prev = state.useDirect;
+      state.useDirect = dr != null && (rr == null || dr <= rr + 5);
+      state.pathRtt = { direct: dr, relay: rr };
+      bblog(`LAN join [${tag}]: mesh=${dr == null ? '×' : dr + 'мс'} relay=${rr == null ? '×' : rr + 'мс'} → ${state.useDirect ? 'ШУУД (mesh) ✅' : 'relay'}`);
+      if (state.useDirect !== prev) { clearInterval(state.latTimer); state.latTimer = state.useDirect ? startRelayLatencyProbe(state.direct.ip, state.direct.port, 'join-direct') : startRelayLatencyProbe(state.relayIp, state.relayPort, 'join'); }
+    };
+    decide('эхлэл'); setTimeout(() => decide('10с'), 10000); setTimeout(() => decide('30с'), 30000);
   }
   const local = Buffer.from(pkt);
   local.writeUInt16LE(lp, local.length - 2);   // GAMEINFO-ийн порт талбарыг локал proxy порт болгоно
