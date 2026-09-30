@@ -240,6 +240,7 @@ async function runMigrations(db) {
   // Кланууд, Map-ын сан — өмнөх алхам унасан ч үүсгэхийг оролдоно (ensureTables дотроо алдаагаа барина)
   await require('../routes/clans').ensureTables();
   await require('../routes/maps').ensureTables();   // Map-ын сан (bytea)
+  await require('../routes/banner').ensureTables(); // профайлын дэвсгэр
 }
 
 module.exports = { runMigrations };

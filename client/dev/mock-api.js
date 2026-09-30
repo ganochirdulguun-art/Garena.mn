@@ -8,7 +8,7 @@
     id: 1, username: 'VitoCorleone', discord_username: 'VitoCorleone', tierbot_tier: '1-1',
     avatar_url: '', tier: q.get('tier') || 'gold', membership_until: new Date(now + 20 * 864e5).toISOString(),
     diamonds: 2480, xp: 5320, level: 17, next_level_xp: 7000, block_games: 6, block_wins: 4,
-    play_seconds_total: 184000, play_next_diamond_sec: 1400, name_effect: 'neon', is_owner: true, unlimited_diamonds: false,
+    play_seconds_total: 184000, play_next_diamond_sec: 1400, name_effect: 'neon', is_owner: true, unlimited_diamonds: false, banner_ver: q.get('banner') ? 1 : null,
   };
   const M = (id, name, tier) => ({ id, name, tier });
   const rooms = [
@@ -73,6 +73,7 @@
   const fakeSock = () => { const h = {}; const s = { connected: true, on: (e, f) => { (h[e] = h[e] || []).push(f); if (e === 'connect') setTimeout(f, 50); return s; }, off: () => s, emit: () => s, disconnect: noop, io: { on: noop } }; return s; };
   window.io = fakeSock;
   window.__PREVIEW__ = true;
+  window.__BANNER_TEST__ = q.get('banner') ? '/covers/wc3.jpg' : null;
   // ?theme=dark|light, ?tab=<name>, ?drawer=friends, ?create=1 — урьдчилан харах туслах
   try { if (q.get('theme')) { localStorage.setItem('gx_theme', q.get('theme')); document.documentElement.dataset.gxTheme = q.get('theme'); } } catch {}
   window.addEventListener('load', () => setTimeout(() => {

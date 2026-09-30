@@ -745,6 +745,15 @@ ipcMain.handle('ipgame:join', async (_e, { gameType, ip, port } = {}) => {
   return true;
 });
 ipcMain.handle('ipgame:myIp', () => myMeshIp());
+// Профайлын дэвсгэр (GOLD, 2026-09-30): renderer файлын байтыг өгнө → серверт raw илгээнэ
+ipcMain.handle('profile:uploadBanner', async (_e, bytes) => {
+  const buf = Buffer.from(bytes || []);
+  if (!buf.length || buf.length > 5 * 1024 * 1024) throw new Error('Зураг 5MB-с ихгүй байх ёстой');
+  try {
+    const { data } = await apiService.getClient().post('/profile/banner', buf, { headers: { 'Content-Type': 'application/octet-stream' }, maxBodyLength: 6 * 1024 * 1024, timeout: 120000 });
+    return data;
+  } catch (err) { throw apiError(err); }
+});
 
 ipcMain.handle('settings:get', () => {
   const s = readSettings();

@@ -62,3 +62,21 @@ html.gx-embedded body.gx #page-room .room-layout { padding: 16px 18px; }
 .gx-room-back { margin-right: 10px; flex: none; }
 html.gx-embedded body.gx #page-room .room-header { justify-content: flex-start; }
 html.gx-embedded body.gx #page-room .room-header-actions { margin-left: auto; }
+
+/* ── Профайлын дэвсгэр (GOLD, gx-banner.js) ── */
+body.gx .profile-summary-card.has-banner { position: relative; }
+.gx-banner { position: absolute; left: 0; right: 0; top: 0; height: 128px; z-index: 1; overflow: hidden; border-radius: 12px 12px 0 0; }
+.gx-banner-img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.gx-banner.has-img .gx-banner-img { display: block; }
+.gx-banner.busy::after { content: 'Оруулж байна…'; position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0,0,0,.45); color: #fff; font: 700 13px var(--gx-font); }
+.gx-banner-acts { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; }
+.gx-banner-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 8px; border: 0; background: rgba(0,0,0,.45); color: #fff; font: 700 12px var(--gx-font); cursor: pointer; backdrop-filter: blur(6px); }
+.gx-banner-btn:hover { background: rgba(0,0,0,.65); }
+.gx-banner-btn .btn-icon-svg { width: 14px; height: 14px; }
+.gx-banner-btn.ghost { padding: 0 10px; }
+.gx-banner-btn.hidden { display: none; }
+body.gx .profile-summary-card.has-banner .profile-identity { z-index: 2; }
+.gx-pop-banner { display: none; width: calc(100% + 72px); margin: -36px -36px 14px; height: 120px; object-fit: cover; border-radius: 16px 16px 0 0; }
+.gx-pop-banner.on { display: block; }
+body.gx .profile-summary-card.has-banner #profile-name { text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 2px 12px rgba(255,255,255,.7); }
+html[data-gx-theme="dark"] body.gx .profile-summary-card.has-banner #profile-name { text-shadow: 0 2px 10px rgba(0,0,0,.85); }

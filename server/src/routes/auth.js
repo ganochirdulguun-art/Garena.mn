@@ -561,6 +561,7 @@ router.get('/me', authMW, async (req, res) => {
           block_games: row.block_games || 0, block_wins: row.block_wins || 0,
           play_seconds_total: row.play_seconds_total || 0, play_next_diamond_sec: require('../services/playtime').secToNextDiamond(row.play_seconds_total || 0),
           is_owner: isOwner, is_admin: isAdmin, unlimited_diamonds: isOwner,
+          banner_ver: await require('./banner').bannerVer(req.user.id),
         });
       }
     } catch (e) {

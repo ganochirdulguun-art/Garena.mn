@@ -104,7 +104,8 @@ app.use('/social', socialRoutes);
 app.use('/discord-servers', discordServerRoutes);
 const clanRoutes = require('./routes/clans');
 app.use('/clans', clanRoutes.router);
-app.use('/maps', require('./routes/maps').router);   // Map-ын сан (2026-09-30): WC3 custom map татах/оруулах              // Кланууд (2026-09-30): Lord/Admin/Member, хүсэлт, кланы өрөө
+app.use('/maps', require('./routes/maps').router);
+app.use('/profile', require('./routes/banner').router);   // Профайлын дэвсгэр (GOLD, 2026-09-30)   // Map-ын сан (2026-09-30): WC3 custom map татах/оруулах              // Кланууд (2026-09-30): Lord/Admin/Member, хүсэлт, кланы өрөө
 app.use('/streamers', streamerRoutes);
 app.use('/admin/api/bot', botRoutes.adminRouter);     // админ: бот хостын хяналт (C2) + мэдэгдлийн лог (B4)
 app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олгох, гишүүнчлэл өгөх, дэвтэр (adminRoutes-оос ӨМНӨ)
@@ -187,7 +188,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
