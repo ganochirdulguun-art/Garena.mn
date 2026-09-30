@@ -42,7 +42,7 @@
     ipGameKind: async (t) => (/counter|cs/i.test(String(t)) ? 'cs16' : /quake/i.test(String(t)) ? 'q3' : null),
     ipGameHost: async () => ({ kind: 'cs16', ip: '100.64.0.1', port: 27015, map: 'de_dust2' }),
     wc3Info: async () => ({ primary: { exe: 'C:\Program Files (x86)\Warcraft 3\war3.exe', exists: true, version: '1, 26, 0, 6401', is126: true, mapsDir: 'C:\Program Files (x86)\Warcraft 3\Maps\Downloads' } }),
-    mapsLocal: async () => ({ files: { 'DotA v6.74c LoD v5e.w3x': { size: 1, sha256: 'a'.repeat(64) }, 'DotA IMBA v3.73.4b.w3x': { size: 1, sha256: 'old' } } }), meshStatus: async () => ({ state: 'Running', ip: '100.64.0.1' }), getQR: async () => ({}),
+    mapsLocal: async () => ({ files: { 'DotA v6.74c LoD v5e.w3x': { size: 1, sha256: 'a'.repeat(64) }, 'DotA IMBA v3.73.4b.w3x': { size: 1, sha256: 'old' } } }), meshStatus: async () => (q.get('mesh') === 'off' ? { state: 'NotInstalled', error: 'needs-consent' } : { state: 'Running', ip: '100.64.0.1' }), meshEnsure: async () => ({ state: 'NotInstalled', error: 'declined' }), getQR: async () => ({}),
     request: async (method, path) => {
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
@@ -77,12 +77,13 @@
   // ?theme=dark|light, ?tab=<name>, ?drawer=friends, ?create=1 — урьдчилан харах туслах
   try { if (q.get('theme')) { localStorage.setItem('gx_theme', q.get('theme')); document.documentElement.dataset.gxTheme = q.get('theme'); } } catch {}
   window.addEventListener('load', () => setTimeout(() => {
+    if (q.get('noconfirm')) showConfirm = async () => false;
     if (q.get('tab')) showTab(q.get('tab'));
     if (q.get('drawer')) window.gx?.openDrawer(q.get('drawer'));
     if (q.get('create')) document.getElementById('btn-create-room')?.click();
     if (q.get('select')) { selectedRoomId = q.get('select'); renderFilteredRooms(); }
     if (q.get('chat')) { showTab('chat'); [['Bibi','gg wp'],['Uka','Өрөө нээлээ, орцгоо'],['FaSi','@VitoCorleone ирлээ']].forEach(([u,t],i)=>appendLobbyMessage({ userId: 30+i, username: u, text: t, time: Date.now()-i*6e4 })); appendLobbyMessage({ userId: 1, username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: Date.now() }); appendLobbyMessage({ userId: 41, username: 'Тэмүүжин Бат', text: 'Сайн, @VitoCorleone өрөөнд ор. @Uka чи бас', time: Date.now()+1000, replyTo: { username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: String(Date.now()) } }, true); document.querySelector('#lobby-chat-messages .msg.other .msg-reply')?.click(); const li=document.getElementById('lobby-chat-input'); if (li && q.get('mention')) { li.value='@Тэ'; li.dispatchEvent(new Event('input')); } }
-    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); }, 900);
+    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); try { renderMembers([{ id: 1, name: 'VitoCorleone', tier: '1-1', mesh: true }, { id: 2, name: 'Billionaire', tier: '2-3', mesh: false }, { id: 3, name: 'Eboshdee', mesh: true }]); } catch {} }, 900);
     if (q.get('room')) window.gxRoom?.openRoom({ mode: 'room', roomId: '11', roomName: 'dota lod 6.74v5e', gameType: 'Warcraft III: The Frozen Throne', isHost: '1', hostId: '1', maxPlayers: '10', theme: q.get('theme') || '' });
     if (q.get('clantab')) document.querySelector(`[data-clan-tab="${q.get('clantab')}"]`)?.click();
     if (q.get('clan')) window.gxClans?.openClan(q.get('clan'));

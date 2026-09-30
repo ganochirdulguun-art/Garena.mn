@@ -136,3 +136,21 @@ body.gx .gx-side-fill .gx-side-ad:hover { box-shadow: 0 10px 30px rgba(0,0,0,.5)
 #page-main.sidebar-collapsed .gx-side-fill .gx-side-ad { display: none; }
 @media (max-width: 1150px) { body.gx .gx-side-fill .gx-side-ad { display: none; } }
 #gx-side.ad-tight .gx-brandcard { display: none; }
+
+/* ── Шууд холболтын сануулга + өрөөний тэмдэг (2.9.11) ── */
+.gx-mesh-banner { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 10px 12px 10px 14px; border: 1px solid rgba(217,119,6,.35); border-radius: 12px; background: var(--gx-amber-soft, rgba(217,119,6,.13)); color: var(--gx-text, #141726); font: 500 13px/1.45 var(--gx-font); }
+.gx-mesh-banner .mb-ico { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--gx-amber, #d97706); color: #fff; font-size: 16px; }
+.gx-mesh-banner .mb-text { flex: 1; min-width: 0; }
+.gx-mesh-banner .mb-go { flex: none; white-space: nowrap; }
+.gx-mesh-banner .mb-x { flex: none; width: 28px; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--gx-text-3, #8a90a5); cursor: pointer; }
+.gx-mesh-banner .mb-x:hover { background: rgba(0,0,0,.06); }
+@keyframes gxMeshPulse { 0%, 100% { box-shadow: 0 0 0 3px rgba(245,158,11,.18); } 50% { box-shadow: 0 0 0 6px rgba(245,158,11,.05); } }
+.gx-mesh[data-state="off"] i { animation: gxMeshPulse 1.8s ease-in-out infinite; }
+.mesh-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; font: 700 10.5px/1.5 var(--gx-font, sans-serif); vertical-align: 1px; }
+.mesh-badge.on { background: var(--gx-green-soft, rgba(22,163,74,.12)); color: var(--gx-green, #16a34a); }
+.mesh-badge.off { background: var(--gx-amber-soft, rgba(217,119,6,.13)); color: var(--gx-amber, #d97706); }
+#confirm-message { white-space: pre-line; }
+/* Шигтгэсэн өрөө нээлттэй үед тууз өрөөний дээр багтана (өрөө үлдсэн өндрийг эзэлнэ) */
+body.gx #gx-content:has(#tab-roomview.active) { display: flex; flex-direction: column; }
+body.gx #gx-content:has(#tab-roomview.active) > .gx-mesh-banner { flex: none; margin: 10px 16px 0; }
+body.gx #gx-content:has(#tab-roomview.active) > #tab-roomview.active { flex: 1; min-height: 0; height: auto !important; }

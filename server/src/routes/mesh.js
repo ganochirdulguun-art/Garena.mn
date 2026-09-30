@@ -21,6 +21,14 @@ const meshByUser = new Map();
 const lastKeyAt = new Map();
 
 function meshOf(userId) { return meshByUser.get(String(userId)) || null; }
+// Өрөөний жагсаалтын «⚡ шууд» тэмдэг: сүүлийн 2 цагт mesh IP мэдэгдсэн (клиент 30 мин тутам report хийдэг)
+const MESH_FRESH_MS = 2 * 60 * 60 * 1000;
+function hasMesh(userId) { const r = meshOf(userId); return !!(r && r.ip && Date.now() - r.at < MESH_FRESH_MS); }
+function noteMeshIp(userId, ip) {
+  if (!userId || !isMeshIp(ip)) return;
+  const uid = String(userId); const prev = meshByUser.get(uid) || {};
+  meshByUser.set(uid, { ...prev, ip: String(ip), state: prev.state || 'Running', at: Date.now() });
+}
 function isMeshIp(ip) {
   // Tailscale CGNAT муж 100.64.0.0/10 (100.64.0.0 – 100.127.255.255)
   const p = String(ip || '').split('.').map(Number);
@@ -71,4 +79,4 @@ router.get('/status', authMiddleware, (req, res) => {
 });
 
 router._fetch = undefined;   // тест: mock fetch тавьж болно
-module.exports = { router, meshOf, isMeshIp, meshConfigured, loginServer: () => HS_URL || null };
+module.exports = { router, meshOf, hasMesh, noteMeshIp, isMeshIp, meshConfigured, loginServer: () => HS_URL || null };

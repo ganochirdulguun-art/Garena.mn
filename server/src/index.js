@@ -313,6 +313,7 @@ function membersArray(roomId) {
   const readySet = roomReady[roomId] || new Set();
   return [...roomMembers[roomId].entries()].map(([name, id]) => ({
     id, name, ready: readySet.has(id), tier: userTierById.get(String(id)) || null,
+    mesh: meshRoutes.hasMesh(id),   // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг
   }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)
@@ -682,7 +683,15 @@ io.on('connection', (socket) => {
   // Тоглогчийн relay сүлжээний чанар (RTT/loss) — өрөөнийхөнд broadcast (аль тоглогч
   // гацааж байгааг харах). WC3 lockstep тул нэг муу холболт бүгдийг гацаадаг.
   // Клиентийн mesh (Tailscale) IP — Ш3-д хостын endpoint баталгаажуулалтад (100.64/10 биш бол үл тоох)
-  socket.on('mesh:ip', (ip) => { if (meshRoutes.isMeshIp(ip)) socket.data.meshIp = String(ip); });
+  socket.on('mesh:ip', (ip) => {
+    if (!meshRoutes.isMeshIp(ip)) return;
+    const had = meshRoutes.hasMesh(socket.user?.id);
+    socket.data.meshIp = String(ip);
+    meshRoutes.noteMeshIp(socket.user?.id, ip);
+    // Өрөөнд байхдаа шинээр идэвхжүүлбэл тэмдэг шууд шинэчлэгдэнэ
+    const rid = socket.data.roomId;
+    if (!had && rid && roomMembers[rid]) io.to(String(rid)).emit('room:members', membersArray(rid));
+  });
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
     if (!roomId) return;

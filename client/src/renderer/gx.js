@@ -296,14 +296,44 @@
     const busy = st.state === 'Installing' || st.state === 'Starting';
     b.dataset.state = on ? 'on' : busy ? 'busy' : 'off';
     $('gx-mesh-text').textContent = on ? 'Шууд холболт идэвхтэй' : busy ? 'Холбогдож байна…' : st.state === 'ForeignTailnet' ? 'Шууд холболт: өөр Tailscale' : 'Шууд холболт идэвхжүүлэх';
+    // Байнгын туузан сануулга (2.9.11): идэвхгүй бүх хугацаанд контентын дээд талд; ✕ = зөвхөн энэ удаад нуух
+    const quiet = on || busy || ['ForeignTailnet', 'Disabled'].includes(st.state) || !st.state;
+    meshBanner(!quiet);
+    // Апп эхэлж анх «идэвхжүүлээгүй» мэдээ ирэхэд тайлбартай цонх — сесс бүрд нэг удаа
+    if (!quiet && st.state === 'NotInstalled' && !meshAsked) { meshAsked = true; setTimeout(() => askMesh(false), 1500); }
+  }
+  let meshAsked = false, bannerHidden = false;
+  function meshBanner(show) {
+    let el = $('gx-mesh-banner');
+    if (!show || bannerHidden) { el?.remove(); return; }
+    if (el) return;
+    const host = $('gx-content'); if (!host) return;
+    el = document.createElement('div');
+    el.id = 'gx-mesh-banner'; el.className = 'gx-mesh-banner'; el.setAttribute('role', 'status');
+    el.innerHTML = '<span class="mb-ico">⚡</span><span class="mb-text"><b>Шууд холболт идэвхгүй байна.</b> Одоо тоглолт серверээр (Сингапур) дамжиж ping ~100–200мс болно. Идэвхжүүлбэл Монгол доторх тоглогчидтой <b>~10мс</b>.</span><button type="button" class="btn btn-primary mb-go">Идэвхжүүлэх</button><button type="button" class="mb-x" title="Энэ удаад нуух" aria-label="Нуух">✕</button>';
+    el.querySelector('.mb-go').addEventListener('click', () => askMesh(true));
+    el.querySelector('.mb-x').addEventListener('click', () => { bannerHidden = true; el.remove(); });
+    host.insertBefore(el, host.firstChild);
+  }
+  async function askMesh(fromClick) {
+    const b = $('gx-mesh'); if (b?.dataset.state === 'on' || b?.dataset.state === 'busy') return;
+    const ok = await showConfirm('⚡ Шууд холболт идэвхжүүлэх',
+      'Тоглогчидтой серверээр дамжилгүй ШУУД холбогдоно — Монгол дотор ping ~10мс (одоо Сингапураар ~100–200мс).\n\n'
+      + 'Дараагийн алхамд Windows «Энэ апп өөрчлөлт хийхийг зөвшөөрөх үү?» гэж асуухад «Yes / Тийм» дарна уу. Энэ нь нэг л удаа асууна.\n\n'
+      + 'Суулгах зүйл: Tailscale — албан ёсны, аюулгүй сүлжээний програм (зөвхөн Garena.mn тоглогчидтой холбогдоно).');
+    if (!ok) { if (!fromClick) showToast('Дараа нь зүүн доод «Шууд холболт идэвхжүүлэх» товчоор идэвхжүүлж болно', 'info', 5000); return; }
+    meshUi({ state: 'Starting' });
+    let st; try { st = await window.api.meshEnsure(); } catch {}
+    if (st) meshUi(st);
+    if (st?.state === 'Running' && st.ip) showToast('⚡ Шууд холболт идэвхжлээ!', 'success', 5000);
+    else if (st?.error === 'declined') showToast('Windows-ын зөвшөөрөл дээр «Yes» дараагүй тул идэвхжсэнгүй. Дахин оролдоно уу.', 'warning', 7000);
+    else if (st) showToast(`Шууд холболт идэвхжсэнгүй: ${st.error || st.state}`, 'warning', 7000);
   }
   window.api?.onMeshStatus?.(meshUi);
   window.api?.meshStatus?.().then(meshUi).catch(() => {});
   $('gx-mesh')?.addEventListener('click', async () => {
     const b = $('gx-mesh'); if (b.dataset.state === 'on') { showToast('Шууд холболт идэвхтэй — mesh-тэй тоглогчидтой хамгийн бага ping-ээр холбогдоно', 'success'); return; }
-    if (!await showConfirm('Шууд холболт идэвхжүүлэх', 'Тоглогчидтой серверээр дамжилгүй шууд (Монгол дотор ~10мс) холбогдоно. Windows нэг удаа «Энэ апп өөрчлөлт хийхийг зөвшөөрөх үү?» гэж асуухад «Yes/Тийм» дарна уу. Энэ нь Tailscale (албан ёсны, аюулгүй VPN) суулгалт юм.')) return;
-    meshUi({ state: 'Starting' });
-    try { meshUi(await window.api.meshEnsure()); } catch {}
+    askMesh(true);
   });
   window.gx = { renderGames, openDrawer, closeDrawer, setTheme, gxRow };
 })();

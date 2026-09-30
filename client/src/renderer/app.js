@@ -338,6 +338,10 @@ async function connectSocket() {
   // Өрөөний чатын түүх
   socket.on('room:history', (msgs) => {
     msgs.forEach(msg => appendMessage(msg));
+    // Өрөөнд ороход шууд холболтгүй бол сануулна (2.9.11)
+    if (window._meshState && !(window._meshState.state === 'Running' && window._meshState.ip) && !['ForeignTailnet', 'Disabled'].includes(window._meshState.state)) {
+      appendSysMsg('⚠ Таны «Шууд холболт» идэвхгүй — тоглолт серверээр (Сингапур) дамжиж ping ~100мс+ болно. Үндсэн цонхны зүүн доод «Шууд холболт идэвхжүүлэх»-ийг дарж Монгол дотор ~10мс болгоорой.');
+    }
   });
 
   // Typing indicator (DM)
@@ -584,11 +588,13 @@ async function init() {
   window.api.onNetLatency?.((d) => { try { socket?.emit('net:report', d); } catch {} });
   // Mesh (Tailscale) төлөв: тохиргооны дэлгэцэд харуулна + mesh IP-гээ серверт socket-оор мэдэгдэнэ (Ш3-д хостын endpoint)
   const renderMesh = (st) => {
-    const el = document.getElementById('mesh-status'); if (!el || !st) return;
-    const m = { Running: st.ip ? `холбогдсон · ${st.ip}` : 'холбогдож байна…', NotInstalled: st.error === 'declined' ? 'суулгалтыг зөвшөөрөөгүй' : 'суугаагүй', NeedsLogin: 'нэвтрэх шаардлагатай', Disabled: 'унтраалттай', ForeignTailnet: 'өөр Tailscale сүлжээ (хөндөхгүй)', TooOld: 'хуучин Tailscale', Stopped: 'зогссон' };
+    if (st) window._meshState = st;
+    const el = document.getElementById('mesh-status');
+    if (st?.ip) { try { socket?.emit('mesh:ip', st.ip); } catch {} }
+    if (!el || !st) return;
+    const m = { Running: st.ip ? `холбогдсон · ${st.ip}` : 'холбогдож байна…', NotInstalled: st.error === 'declined' ? 'суулгалтыг зөвшөөрөөгүй' : st.error === 'needs-consent' ? 'идэвхжүүлээгүй' : 'суугаагүй', NeedsLogin: 'нэвтрэх шаардлагатай', Disabled: 'унтраалттай', ForeignTailnet: 'өөр Tailscale сүлжээ (хөндөхгүй)', TooOld: 'хуучин Tailscale', Stopped: 'зогссон' };
     el.textContent = (m[st.state] || st.state || '—') + (st.error && st.state !== 'NotInstalled' ? ` (${st.error})` : '');
     el.style.color = st.state === 'Running' && st.ip ? 'var(--ok, #4caf50)' : '';
-    if (st.ip) { try { socket?.emit('mesh:ip', st.ip); } catch {} }
   };
   window.api.onMeshStatus?.(renderMesh);
   window.api.meshStatus?.().then(renderMesh).catch(() => {});
@@ -1873,6 +1879,14 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 });
 
 // ── Тоглогчдын жагсаалт ──────────────────────────────────
+// Шууд холболтын тэмдэг (2.9.11): ⚡ шууд = mesh идэвхтэй; relay = Сингапураар (~100мс+). Хуучин сервер mesh талбаргүй → юу ч харуулахгүй.
+function meshBadge(m) {
+  if (!m || typeof m !== 'object' || m.mesh === undefined) return '';
+  return m.mesh
+    ? '<span class="mesh-badge on" title="Шууд холболт идэвхтэй — Монгол дотор ~10мс">⚡ шууд</span>'
+    : '<span class="mesh-badge off" title="Шууд холболт идэвхгүй — серверээр (Сингапур) дамжина, ping өндөр. Зүүн доод «Шууд холболт идэвхжүүлэх»">relay</span>';
+}
+
 function renderMembers(members) {
   const ul      = document.getElementById('members-list');
   const countEl = document.getElementById('members-count');
@@ -1901,7 +1915,7 @@ function renderMembers(members) {
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
-        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''} ${id ? pingBadge(String(id)) : ''}</div>
+        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}</div>
       </div>
       ${hostBtn}${kickBtn}
     </li>`;

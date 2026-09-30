@@ -113,7 +113,8 @@ async function ensure(ctx) {
     if (!ctx.loginServer) return set({ state: 'Disabled', error: null });
     let st = await status();
     if (!st.installed) {
-      if (!ctx.force && Date.now() - _declinedAt < DECLINE_TTL_MS) return set({ state: 'NotInstalled', error: 'declined' });   // гараар дарвал (force) дахин асууна
+      // 2.9.11: автоматаар UAC гаргахгүй — renderer тайлбартай цонх (needs-consent) харуулж, «Идэвхжүүлэх» дарвал force-оор ирнэ
+      if (!ctx.force) return set({ state: 'NotInstalled', error: Date.now() - _declinedAt < DECLINE_TTL_MS ? 'declined' : 'needs-consent' });
       const r = await install(ctx.msiPath);
       if (!r.ok) { if (r.error === 'declined') _declinedAt = Date.now(); return set({ state: 'NotInstalled', error: r.error }); }
       st = await status();
