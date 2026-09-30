@@ -149,21 +149,22 @@ app.get('/config', async (req, res) => {
   // AD_LINK_URL/AD_TEXT-ээр дарж болно; тохируулаагүй бол GarenaSystem-ийн анхдагч рекламууд.
   const adBase = `https://${req.get('host')}`;
   const gsLink = process.env.AD_LINK_URL || 'https://tiersystem-production.up.railway.app';
+  // image = өргөн тууз (1120×144, ≤2.9.9 клиентийн толгой), image_tall = босоо карт (420×480, 2.9.10+ зүүн самбарын голд)
   const ads = (process.env.AD_IMAGE_URL || process.env.AD_TEXT)
-    ? [{ image: process.env.AD_IMAGE_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
+    ? [{ image: process.env.AD_IMAGE_URL || null, image_tall: process.env.AD_IMAGE_TALL_URL || null, link: process.env.AD_LINK_URL || null, text: process.env.AD_TEXT || null }]
     : [
-        { image: `${adBase}/assets/gs-ad-1.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
+        { image: `${adBase}/assets/gs-ad-1.png`, image_tall: `${adBase}/assets/gs-ad-1-tall.png`, link: gsLink, text: 'GarenaSystem — Хиймэл оюунд суурилсан Discord серверийн менежментийн цогц систем' },
         // ZEON Gaming Center — жинхэнэ зар сурталчлагч (2026-09-05, эзний зөвшөөрөл); WarKey-ийн рекламыг эзний хүсэлтээр хассан
-        { image: `${adBase}/assets/gmn-ad-zeon.png`, link: 'https://www.facebook.com/share/p/1Ej9NtzeL5/', text: 'ZEON Gaming Center — Заал 1500₮ · VIP 2500₮ · Хоног 10К · Захиалга 90007791' },
-        { image: `${adBase}/assets/gmn-ad-diamond.png`, link: adBase, text: 'Diamond · QPay — цэнэглээд Silver/Gold эрх, нэр эффект, фрэйм' },
+        { image: `${adBase}/assets/gmn-ad-zeon.png`, image_tall: `${adBase}/assets/gmn-ad-zeon-tall.png`, link: 'https://www.facebook.com/share/p/1Ej9NtzeL5/', text: 'ZEON Gaming Center — Заал 1500₮ · VIP 2500₮ · Хоног 10К · Захиалга 90007791' },
+        { image: `${adBase}/assets/gmn-ad-diamond.png`, image_tall: `${adBase}/assets/gmn-ad-diamond-tall.png`, link: adBase, text: 'Diamond · QPay — цэнэглээд Silver/Gold эрх, нэр эффект, фрэйм' },
       ];
   // Нэмэлт (жинхэнэ) рекламууд: env AD_EXTRA_JSON = [{image,link,text}, ...] JSON массив.
-  // Зар сурталчлагч өөрийн баннер (1120×144) + линкийг өгсөн үед энд нэмнэ — код өөрчлөхгүй.
+  // Зар сурталчлагч өөрийн баннер (1120×144) + босоо карт image_tall (420×480) + линкийг өгсөн үед энд нэмнэ — код өөрчлөхгүй.
   try {
     const extra = JSON.parse(process.env.AD_EXTRA_JSON || '[]');
     if (Array.isArray(extra)) {
       for (const a of extra) {
-        if (a && (a.image || a.text)) ads.push({ image: a.image || null, link: a.link || null, text: a.text || null });
+        if (a && (a.image || a.image_tall || a.text)) ads.push({ image: a.image || null, image_tall: a.image_tall || null, link: a.link || null, text: a.text || null });
       }
     }
   } catch {}

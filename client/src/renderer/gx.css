@@ -167,7 +167,7 @@ body.gx #page-main.sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr
 .gx-cur-room small { font-size: 11px; color: #86efac; opacity: .85; }
 .gx-cur-room:hover { background: rgba(34, 197, 94, .16); }
 #page-main.sidebar-collapsed .gx-cur-room span { display: none; }
-.gx-side-fill { flex: 1; min-height: 12px; }
+.gx-side-fill { flex: 1; min-height: 12px; display: flex; align-items: center; justify-content: center; padding: 8px 14px; container-type: size; }
 .gx-brandcard {
   margin: 0 10px 8px; display: flex; align-items: center; gap: 10px; padding: 12px;
   border-radius: 14px; border: 1px solid var(--gx-side-line);

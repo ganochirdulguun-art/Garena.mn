@@ -126,6 +126,9 @@ function createWindow() {
     mainWindow.setPosition(x, y);
   } catch {}
 
+  // Эзний хүсэлт (2026-09-30): апп нээгдэхдээ дэлгэц дүүрэн (maximize) — жижиг цонх биш
+  try { mainWindow.maximize(); } catch {}
+
   mainWindow.loadFile('src/renderer/index.html');
   hardenWindow(mainWindow);
   // Найзууд цонх үндсэн цонхны хажууд наалдаж явна; үндсэн цонх хаагдахад хамт хаагдана

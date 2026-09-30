@@ -4972,12 +4972,16 @@ init();
         if (!slot || !Array.isArray(ads) || !ads.length) return;
         slot.classList.add('has-ad');
         let idx = 0;
+        // Зүүн самбарт (GX) босоо карт image_tall; байхгүй бол өргөн туузыг текстийн хамт карт болгон харуулна
+        const tall = slot.classList.contains('gx-side-ad');
         const makeLink = (ad) => {
           const a = document.createElement('a');
           a.className = 'ad-link';
           a.href = '#';
           a.title = ad.text || '';
-          a.innerHTML = ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text || '')}</span>`;
+          if (tall && ad.image_tall) a.innerHTML = `<img src="${escHtml(ad.image_tall)}" alt="">`;
+          else if (tall) a.innerHTML = `<span class="ad-card">${ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : ''}<span class="ad-text">${escHtml(ad.text || '')}</span></span>`;
+          else a.innerHTML = ad.image ? `<img src="${escHtml(ad.image)}" alt="">` : `<span class="ad-text">${escHtml(ad.text || '')}</span>`;
           a.addEventListener('click', (e) => { e.preventDefault(); if (ad.link) window.api.openExternal?.(ad.link); });
           return a;
         };
@@ -4985,6 +4989,31 @@ init();
         let current = makeLink(ads[0]);
         slot.innerHTML = '';
         slot.appendChild(current);
+        // Зай бага (жишээ 1440×900) үед доод «Garena.mn» чимэглэлийн картыг нууж рекламд зай гаргана
+        if (tall && typeof ResizeObserver === 'function') {
+          const side = document.getElementById('gx-side');
+          const fill = slot.parentElement;
+          const brand = side?.querySelector('.gx-brandcard');
+          if (side && fill && brand) {
+            let brandH = 0;
+            const fit = () => {
+              const hid = side.classList.contains('ad-tight');
+              if (!hid) brandH = brand.offsetHeight + 8;    // margin-bottom 8px
+              const base = fill.clientHeight - (hid ? brandH : 0);   // карт харагдаж байх үеийн зай
+              const collapsed = !!side.closest('#page-main.sidebar-collapsed');
+              side.classList.toggle('ad-tight', !collapsed && base < 230 && base + brandH >= 140);
+            };
+            new ResizeObserver(fit).observe(fill);
+            fit();
+          }
+        }
+        let dots = null;
+        if (tall && ads.length > 1) {
+          dots = document.createElement('span');
+          dots.className = 'ad-dots';
+          dots.innerHTML = ads.map((_, i) => `<i class="${i ? '' : 'on'}"></i>`).join('');
+          slot.appendChild(dots);
+        }
         // Баруунаас зүүн тийш swipe
         const swipeTo = (ad) => {
           if (!ad || !(ad.image || ad.text)) return;
@@ -4998,7 +5027,10 @@ init();
           current = next;
           setTimeout(() => { old.remove(); }, 650);
         };
-        if (ads.length > 1) setInterval(() => { idx = (idx + 1) % ads.length; swipeTo(ads[idx]); }, 8000);   // ~8с тутам эргэлдэнэ
+        if (ads.length > 1) setInterval(() => {
+          idx = (idx + 1) % ads.length; swipeTo(ads[idx]);
+          dots?.querySelectorAll('i').forEach((d, i) => d.classList.toggle('on', i === idx));
+        }, 8000);   // ~8с тутам эргэлдэнэ
 
       } catch {}
     })();

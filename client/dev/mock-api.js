@@ -38,7 +38,7 @@
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
-    getAd: async () => null,
+    getAd: async () => (q.get('noad') ? null : [{ image_tall: '/dev/ads/gs-ad-1-tall.png', text: 'GarenaSystem' }, { image_tall: '/dev/ads/gmn-ad-zeon-tall.png', text: 'ZEON' }, { image_tall: '/dev/ads/gmn-ad-diamond-tall.png', text: 'Diamond' }]),
     ipGameKind: async (t) => (/counter|cs/i.test(String(t)) ? 'cs16' : /quake/i.test(String(t)) ? 'q3' : null),
     ipGameHost: async () => ({ kind: 'cs16', ip: '100.64.0.1', port: 27015, map: 'de_dust2' }),
     wc3Info: async () => ({ primary: { exe: 'C:\Program Files (x86)\Warcraft 3\war3.exe', exists: true, version: '1, 26, 0, 6401', is126: true, mapsDir: 'C:\Program Files (x86)\Warcraft 3\Maps\Downloads' } }),
