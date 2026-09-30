@@ -241,6 +241,7 @@ async function runMigrations(db) {
   await require('../routes/clans').ensureTables();
   await require('../routes/maps').ensureTables();   // Map-ын сан (bytea)
   await require('../routes/banner').ensureTables(); // профайлын дэвсгэр
+  await require('../routes/social').ensureTables(); // lobby_messages.reply_to (чатын хариулт)
 }
 
 module.exports = { runMigrations };

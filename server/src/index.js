@@ -188,7 +188,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
@@ -469,21 +469,23 @@ io.on('connection', (socket) => {
   });
 
   // Нийтийн лобби чат (бүх хэрэглэгчид харна)
-  socket.on('lobby:chat', ({ text }) => {
-    if (!text?.trim()) return;
+  socket.on('lobby:chat', ({ text, replyTo } = {}) => {
+    if (typeof text !== 'string' || !text.trim()) return;
     if (checkRateLimit(socket)) return;
+    const reply = socialRoutes.sanitizeReplyTo(replyTo);
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
       text: text.trim().slice(0, 500),
       time: new Date().toISOString(),
+      ...(reply ? { replyTo: reply } : {}),
     };
     // In-memory кэшэд хадгалах (хурдан history-д)
     lobbyHistory.push(msg);
     if (lobbyHistory.length > LOBBY_HISTORY_MAX) lobbyHistory.shift();
     io.emit('lobby:chat', msg);
     // DB-д БАЙНГА хадгалах (сервер restart-д ч түүх үлдэнэ) — time=created_at таарна
-    socialRoutes.saveLobbyMessage(msg.userId, msg.username, msg.text, msg.time)
+    socialRoutes.saveLobbyMessage(msg.userId, msg.username, msg.text, msg.time, reply)
       .catch(e => console.error('[Lobby] save:', e.message));
   });
 
@@ -593,16 +595,18 @@ io.on('connection', (socket) => {
   });
 
   // Өрөөний чат мессеж
-  socket.on('chat:message', async ({ roomId, text }) => {
-    if (!text?.trim() || !roomId) return;
+  socket.on('chat:message', async ({ roomId, text, replyTo } = {}) => {
+    if (typeof text !== 'string' || !text.trim() || !roomId) return;
     if (checkRateLimit(socket)) return;
     if (!await ensureSocketRoomState(socket, roomId)) return;
     if (!await ensureRoomMembership(socket, roomId)) return;
+    const reply = socialRoutes.sanitizeReplyTo(replyTo);
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
       text: text.trim().slice(0, 500),
       time: new Date().toISOString(),
+      ...(reply ? { replyTo: reply } : {}),
     };
     // Өрөөний чат түүхэнд хадгалах (max 100)
     if (!roomMessages[roomId]) roomMessages[roomId] = [];

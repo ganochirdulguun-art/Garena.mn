@@ -80,3 +80,33 @@ body.gx .profile-summary-card.has-banner .profile-identity { z-index: 2; }
 .gx-pop-banner.on { display: block; }
 body.gx .profile-summary-card.has-banner #profile-name { text-shadow: 0 1px 2px rgba(255,255,255,.9), 0 2px 12px rgba(255,255,255,.7); }
 html[data-gx-theme="dark"] body.gx .profile-summary-card.has-banner #profile-name { text-shadow: 0 2px 10px rgba(0,0,0,.85); }
+
+/* ── Чатын хариулт (reply) + mention (2026-09-30) ── */
+.msg-reply { display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; margin-left: 4px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--gx-text-3, #8a90a5); cursor: pointer; opacity: 0; transition: opacity .15s, background .15s, color .15s; vertical-align: middle; }
+.msg-reply .btn-icon-svg { width: 13px; height: 13px; }
+.msg:hover .msg-reply, .msg-reply:focus-visible { opacity: 1; }
+.msg-reply:hover { background: var(--gx-blue-soft, rgba(37,99,235,.11)); color: var(--gx-blue, #2563eb); }
+.msg-deleted .msg-reply { display: none; }
+.msg-quote { display: flex; gap: 6px; align-items: baseline; max-width: 100%; margin: 2px 0 3px; padding: 2px 8px; border-left: 3px solid var(--gx-accent, #e11d2e); border-radius: 0 6px 6px 0; background: var(--gx-surface-3, #eef0f5); font-size: 12px; line-height: 1.45; color: var(--gx-text-2, #545a70); cursor: pointer; overflow: hidden; }
+.msg-quote:hover { background: var(--gx-accent-soft, rgba(225,29,46,.09)); }
+.msg-quote .q-name { flex: none; font-weight: 700; color: var(--gx-accent, #e11d2e); }
+.msg-quote .q-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msg.me .msg-quote { margin-left: auto; }
+.msg.gl .msg-quote { width: fit-content; }
+.msg.reply-me { background: var(--gx-accent-soft, rgba(225,29,46,.09)); border-radius: 8px; box-shadow: inset 3px 0 0 var(--gx-accent, #e11d2e); }
+.msg.gl.reply-me { padding-left: 8px !important; }
+@keyframes gxMsgFlash { 0%, 100% { background: transparent; } 25%, 60% { background: var(--gx-amber-soft, rgba(217,119,6,.18)); } }
+.msg.msg-flash { animation: gxMsgFlash 1.5s ease; border-radius: 8px; }
+.chat-reply-bar { display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; padding: 6px 10px; border-left: 3px solid var(--gx-accent, #e11d2e); border-radius: 0 8px 8px 0; background: var(--gx-surface-3, #eef0f5); font-size: 12.5px; color: var(--gx-text-2, #545a70); }
+.chat-reply-bar.hidden { display: none !important; }
+.chat-reply-bar .rb-ico { color: var(--gx-accent, #e11d2e); font-weight: 700; }
+.chat-reply-bar .rb-label { flex: none; font-weight: 700; color: var(--gx-text, #141726); }
+.chat-reply-bar .rb-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-reply-bar .rb-x { flex: none; width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--gx-text-3, #8a90a5); cursor: pointer; }
+.chat-reply-bar .rb-x:hover { background: var(--gx-red-soft, rgba(220,38,38,.11)); color: var(--gx-red, #dc2626); }
+body.gx .mention { color: var(--gx-blue) !important; font-weight: 700; }
+body.gx .mention-me { color: var(--gx-accent) !important; background: var(--gx-accent-soft) !important; padding: 0 4px; border-radius: 4px; }
+body.gx .mention-dropdown { background: var(--gx-surface) !important; border: 1px solid var(--gx-line) !important; box-shadow: var(--gx-shadow-lg); color: var(--gx-text); }
+body.gx .mention-dropdown-item.active, body.gx .mention-dropdown-item:hover { background: var(--gx-accent) !important; color: #fff !important; }
+body.gx #page-room .chat-reply-bar:not(.gxr-chat-body *) { grid-area: chat; align-self: end; margin-bottom: 70px; z-index: 2; }
+.chat-input-row { position: relative; }

@@ -249,13 +249,13 @@ async function connectSocket() {
     const box = document.getElementById('chat-messages');
     if (!box) return;
     const el = box.querySelector(`.msg[data-time="${time}"]`);
-    if (el) { el.classList.add('msg-deleted'); el.querySelector('.msg-bubble').textContent = '[Устгагдсан мессеж]'; el.querySelector('.msg-delete')?.remove(); }
+    if (el) { el.classList.add('msg-deleted'); el.querySelector('.msg-bubble').textContent = '[Устгагдсан мессеж]'; el.querySelector('.msg-delete')?.remove(); el.querySelector('.msg-reply')?.remove(); el.querySelector('.msg-quote')?.remove(); }
   });
   socket.on('lobby:deleted', ({ time }) => {
     const box = document.getElementById('lobby-chat-messages');
     if (!box) return;
     const el = box.querySelector(`.msg[data-time="${time}"]`);
-    if (el) { el.classList.add('msg-deleted'); el.querySelector('.msg-bubble').textContent = '[Устгагдсан мессеж]'; el.querySelector('.msg-delete')?.remove(); }
+    if (el) { el.classList.add('msg-deleted'); el.querySelector('.msg-bubble').textContent = '[Устгагдсан мессеж]'; el.querySelector('.msg-delete')?.remove(); el.querySelector('.msg-reply')?.remove(); el.querySelector('.msg-quote')?.remove(); }
   });
   socket.on('room:members',         (members)    => {
     if (currentRoom) {
@@ -1807,20 +1807,24 @@ function formatChatTime(time) {
   return date.toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function appendMessage({ userId, username, text, time }) {
+function appendMessage({ userId, username, text, time, replyTo }) {
   const box  = document.getElementById('chat-messages');
   const isMe = username === currentUser?.username;
   const t    = formatChatTime(time);
   const div  = document.createElement('div');
-  div.className = `msg ${isMe ? 'me' : 'other'}`;
+  const toMe = !isMe && isReplyToMe(replyTo);
+  div.className = `msg ${isMe ? 'me' : 'other'}${toMe ? ' reply-me' : ''}`;
   div.dataset.time = time;
   div.dataset.userId = userId || '';
   const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
+  const body = parseMentions(escHtml(text), !isMe && !toMe);
   div.innerHTML = `
-    <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${deleteBtn}</div>
-    <div class="msg-bubble">${parseMentions(escHtml(text), !isMe)}</div>
+    <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
+    ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
   `;
+  if (toMe) playSound('notify');
+  wireChatMsg(div, box, 'room', { username, text, time });
   if (!isMe && userId) {
     div.querySelector('.clickable-name')?.addEventListener('click', () => openUserProfile(userId));
   }
@@ -1858,7 +1862,8 @@ function sendMessage() {
     appendSysMsg('⚠ Chat холбогдож байна. Түр хүлээгээд дахин илгээнэ үү.');
     return;
   }
-  socket.emit('chat:message', { roomId: currentRoom.id, text });
+  const replyTo = takeChatReply('room');
+  socket.emit('chat:message', { roomId: currentRoom.id, text, ...(replyTo ? { replyTo } : {}) });
   input.value = '';
 }
 
@@ -2033,15 +2038,15 @@ async function kickPlayer(targetId, targetName) {
 // ── Нийтийн лобби чат ────────────────────────────────────
 const lobbyMessages = []; // Лобби чатын мессежүүд санах ойд хадгалагдана
 
-function appendLobbyMessage({ userId, username, text, time }, isHistory = false) {
+function appendLobbyMessage({ userId, username, text, time, replyTo }, isHistory = false) {
   // Санах ойд хадгалах
-  lobbyMessages.push({ userId, username, text, time });
+  lobbyMessages.push({ userId, username, text, time, replyTo });
   // Хэт олон мессеж хуримтлагдахаас сэргийлэх (сүүлийн 200)
   if (lobbyMessages.length > 200) lobbyMessages.splice(0, lobbyMessages.length - 200);
 
   const box = document.getElementById('lobby-chat-messages');
   if (!box) return;
-  _appendLobbyMsgDOM(box, { userId, username, text, time });
+  _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, isHistory);
 
   if (username !== currentUser?.username && !isHistory) {
     const chatTab = document.getElementById('tab-chat');
@@ -2052,18 +2057,22 @@ function appendLobbyMessage({ userId, username, text, time }, isHistory = false)
   }
 }
 
-function _appendLobbyMsgDOM(box, { userId, username, text, time }) {
+function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quiet = false) {
   const isMe = username === currentUser?.username;
   const t    = formatChatTime(time);
   const div  = document.createElement('div');
+  const toMe = !isMe && isReplyToMe(replyTo);
   // Garena Plus classic мөр (2026-09-06, эзний хүсэлт): [цаг] Нэр: текст — bubble биш; .msg/.msg-bubble/.msg-delete
   // class-ууд устгах (lobby:deleted) логиктой нийцэж хэвээр. Өнгө: styles.css .gl (цаг цэнхэр, нэр шар, өөрийнх улбар шар)
-  div.className = `msg gl ${isMe ? 'me' : 'other'}`;
+  div.className = `msg gl ${isMe ? 'me' : 'other'}${toMe ? ' reply-me' : ''}`;
   div.dataset.time = time;
   div.dataset.userId = userId || '';
   const nameEl = isMe ? '<span class="g-name">Та</span>' : `<span class="g-name clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete g-x" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
-  div.innerHTML = `<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${parseMentions(escHtml(text), !isMe)}</span>${deleteBtn}`;
+  const body = parseMentions(escHtml(text), !isMe && !quiet && !toMe);
+  div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
+  if (toMe && !quiet) playSound('notify');
+  wireChatMsg(div, box, 'lobby', { username, text, time });
   if (!isMe && userId) {
     div.querySelector('.clickable-name')?.addEventListener('click', () => openUserProfile(userId));
   }
@@ -2082,7 +2091,7 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time }) {
 function rerenderLobbyMessages() {
   const box = document.getElementById('lobby-chat-messages');
   if (!box || box.children.length > 0) return; // Аль хэдийн рендэрлэгдсэн бол дахин хийхгүй
-  lobbyMessages.forEach(msg => _appendLobbyMsgDOM(box, msg));
+  lobbyMessages.forEach(msg => _appendLobbyMsgDOM(box, msg, true));
   box.scrollTop = box.scrollHeight;
 }
 
@@ -2090,7 +2099,8 @@ function sendLobbyMessage() {
   const input = document.getElementById('lobby-chat-input');
   const text  = input.value.trim();
   if (!text || !socket || !currentUser) return;
-  socket.emit('lobby:chat', { text });
+  const replyTo = takeChatReply('lobby');
+  socket.emit('lobby:chat', { text, ...(replyTo ? { replyTo } : {}) });
   input.value = '';
 }
 
@@ -3969,17 +3979,126 @@ function withTier(name, tier) {
   return t ? `${t} ${n}` : n;
 }
 
-// @mention parse: escHtml() дараа дуудна — аюулгүй HTML оруулна
+// ── Чатад танигдах нэрс (mention + autocomplete, 2026-09-30) ──
+// Онлайн хэрэглэгчид, найзууд, чатад бичсэн хүмүүс, өрөөний гишүүд — кирилл, зайтай нэр ч орно.
+function knownChatNames() {
+  const set = new Set();
+  const add = (n) => { n = n == null ? '' : String(n).trim(); if (n.length >= 2 && n.length <= 40) set.add(n); };
+  (_cachedOnlineUsers || []).forEach(u => add(u.username));
+  (myFriends || []).forEach(f => add(f.username));
+  lobbyMessages.forEach(m => add(m.username));
+  if (currentRoom?.members) currentRoom.members.forEach(m => add(m.name || m.username));
+  document.querySelectorAll('#chat-messages .clickable-name').forEach(el => add(el.textContent));
+  if (currentUser?.username) add(currentUser.username);
+  return [...set];
+}
+
+// @mention parse: escHtml() дараа дуудна — аюулгүй HTML оруулна.
+// Танигдсан нэрийг хамгийн урт таарцаар (зайтай/кирилл нэр) — эс бөгөөс @үсэг/тоо дараалал.
 function parseMentions(escapedText, triggerSound) {
-  const myName = currentUser?.username;
-  let mentionedMe = false;
-  const result = escapedText.replace(/@(\w{2,20})/g, (match, name) => {
-    const isMe = myName && name.toLowerCase() === myName.toLowerCase();
+  if (!escapedText || escapedText.indexOf('@') === -1) return escapedText;
+  const myName = currentUser?.username ? escHtml(currentUser.username).toLowerCase() : '';
+  const names = knownChatNames().map(n => escHtml(n)).sort((a, b) => b.length - a.length);
+  const wordCh = /[\p{L}\p{N}_]/u;
+  const s = escapedText;
+  let out = '', i = 0, mentionedMe = false;
+  while (i < s.length) {
+    const at = s.indexOf('@', i);
+    if (at === -1) { out += s.slice(i); break; }
+    out += s.slice(i, at);
+    i = at + 1;
+    if (at > 0 && wordCh.test(s[at - 1])) { out += '@'; continue; }   // имэйл гэх мэт
+    const rest = s.slice(i);
+    const low = rest.toLowerCase();
+    let len = 0;
+    const hit = names.find(n => low.startsWith(n.toLowerCase()) && !wordCh.test(rest[n.length] || ''));
+    if (hit) len = hit.length;
+    else {
+      const m = rest.match(/^[\p{L}\p{N}_.\-]{2,24}/u);
+      const w = m ? m[0].replace(/[.\-]+$/, '') : '';
+      if (w.length >= 2) len = w.length;
+    }
+    if (!len) { out += '@'; continue; }
+    const raw = rest.slice(0, len);
+    const isMe = !!myName && raw.toLowerCase() === myName;
     if (isMe) mentionedMe = true;
-    return `<span class="mention${isMe ? ' mention-me' : ''}">${match}</span>`;
-  });
+    out += `<span class="mention${isMe ? ' mention-me' : ''}">@${raw}</span>`;
+    i += len;
+  }
   if (mentionedMe && triggerSound) playSound('notify');
-  return result;
+  return out;
+}
+
+// ── Мессежид хариулах (reply) ────────────────────────────
+const CHAT_REPLY_BTN = '<button type="button" class="msg-reply" title="Хариулах" aria-label="Хариулах"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></button>';
+const _chatReply = { lobby: null, room: null };
+const _chatReplyIds = { lobby: ['lobby-chat-input', 'lobby-chat-messages'], room: ['chat-input', 'chat-messages'] };
+
+function isReplyToMe(replyTo) {
+  return !!(replyTo && currentUser?.username && String(replyTo.username).toLowerCase() === currentUser.username.toLowerCase());
+}
+function replySnippet(text) {
+  const t = String(text || '').replace(/\s+/g, ' ').trim();
+  return t.length > 80 ? t.slice(0, 79) + '…' : t;
+}
+function replyQuoteHTML(replyTo) {
+  if (!replyTo || !replyTo.username) return '';
+  return `<div class="msg-quote" data-jump="${escHtml(String(replyTo.time || ''))}" title="Эх мессеж рүү очих"><span class="q-name">@${escHtml(replyTo.username)}</span><span class="q-text">${escHtml(replySnippet(replyTo.text))}</span></div>`;
+}
+function wireChatMsg(div, box, kind, msg) {
+  div.querySelector('.msg-reply')?.addEventListener('click', () => setChatReply(kind, msg));
+  div.querySelector('.msg-quote')?.addEventListener('click', () => {
+    const tm = div.querySelector('.msg-quote').dataset.jump;
+    const target = tm && [...box.querySelectorAll('.msg')].find(el => el.dataset.time === tm);
+    if (!target) { showToast('Эх мессеж чатын түүхэнд алга', 'info', 2500); return; }
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    target.classList.remove('msg-flash'); void target.offsetWidth; target.classList.add('msg-flash');
+    setTimeout(() => target.classList.remove('msg-flash'), 1600);
+  });
+}
+function chatReplyBar(kind) {
+  const input = document.getElementById(_chatReplyIds[kind][0]);
+  const row = input?.closest('.chat-input-row');
+  if (!row) return null;
+  let bar = row.parentElement.querySelector(`.chat-reply-bar[data-kind="${kind}"]`);
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'chat-reply-bar hidden';
+    bar.dataset.kind = kind;
+    bar.innerHTML = '<span class="rb-ico">↩</span><span class="rb-label"></span><span class="rb-text"></span><button type="button" class="rb-x" title="Болих (Esc)" aria-label="Хариулт болих">✕</button>';
+    bar.querySelector('.rb-x').addEventListener('click', () => clearChatReply(kind));
+    row.parentElement.insertBefore(bar, row);
+  }
+  return bar;
+}
+function setChatReply(kind, msg) {
+  _chatReply[kind] = { username: msg.username, text: replySnippet(msg.text), time: String(msg.time) };
+  const bar = chatReplyBar(kind);
+  if (bar) {
+    bar.querySelector('.rb-label').textContent = `${msg.username}-д хариулж байна:`;
+    bar.querySelector('.rb-text').textContent = replySnippet(msg.text);
+    bar.classList.remove('hidden');
+  }
+  document.getElementById(_chatReplyIds[kind][0])?.focus();
+}
+function clearChatReply(kind) {
+  _chatReply[kind] = null;
+  const bar = chatReplyBar(kind);
+  if (bar) bar.classList.add('hidden');
+}
+// Илгээхэд авч, самбарыг хаана. Эх мессеж чатаас алга болсон бол (өрөө солигдсон г.м.) хаяна.
+function takeChatReply(kind) {
+  const r = _chatReply[kind];
+  clearChatReply(kind);
+  if (!r) return null;
+  const box = document.getElementById(_chatReplyIds[kind][1]);
+  const still = box && [...box.querySelectorAll('.msg')].some(el => el.dataset.time === r.time);
+  return still ? r : null;
+}
+for (const kind of ['lobby', 'room']) {
+  document.getElementById(_chatReplyIds[kind][0])?.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && _chatReply[kind] && !document.querySelector('.mention-dropdown')) clearChatReply(kind);
+  });
 }
 
 // ── @mention autocomplete ────────────────────────────────
@@ -3991,15 +4110,9 @@ function setupMentionAutocomplete(inputId) {
   let names = [];
 
   function getNames() {
-    const set = new Set();
-    // Өрөөний гишүүд
-    if (currentRoom?.members) currentRoom.members.forEach(m => { if (m.name) set.add(m.name); });
-    // Онлайн хэрэглэгчид
-    const onlineEl = document.querySelectorAll('.online-user-item .online-user-name');
-    onlineEl.forEach(el => { if (el.textContent) set.add(el.textContent.trim()); });
-    // Өөрийгөө хасах
-    if (currentUser?.username) set.delete(currentUser.username);
-    return [...set];
+    // Онлайн, найз, чатад бичсэн, өрөөний гишүүд — өөрийгөө хасна
+    const me = currentUser?.username;
+    return knownChatNames().filter(n => n !== me);
   }
 
   function close() {
@@ -4044,23 +4157,28 @@ function setupMentionAutocomplete(inputId) {
     const atIdx = before.lastIndexOf('@');
     if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== ' ')) { close(); return; }
     const query = before.slice(atIdx + 1).toLowerCase();
-    if (!query || query.length > 20 || /\s/.test(query)) { close(); return; }
+    if (!query || query.length > 24) { close(); return; }
     const all = getNames();
-    const filtered = all.filter(n => n.toLowerCase().startsWith(query)).slice(0, 6);
+    // Зайтай нэр (жишээ «Tom Noiton») бичиж байхад ч санал болгосоор; эхлэлээр нь эхэлж, дараа нь агуулгаар
+    const starts = all.filter(n => n.toLowerCase().startsWith(query));
+    const inner = /\s/.test(query) ? [] : all.filter(n => !starts.includes(n) && n.toLowerCase().includes(query));
+    const filtered = starts.concat(inner).slice(0, 6);
     if (filtered.length === 0) { close(); return; }
     names = filtered; activeIdx = 0;
     render(filtered);
   });
 
+  // capture: Enter-ээр нэр сонгоход sendMessage/sendLobbyMessage зэрэг илгээгдэхгүй (өмнө нь хагас «@Ба» явдаг байсан)
   input.addEventListener('keydown', (e) => {
     if (!dropdown || names.length === 0) return;
+    if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Escape') e.stopImmediatePropagation();
     if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = (activeIdx + 1) % names.length; render(names); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = (activeIdx - 1 + names.length) % names.length; render(names); }
     else if (e.key === 'Tab' || e.key === 'Enter') {
       if (activeIdx >= 0 && activeIdx < names.length) { e.preventDefault(); pick(names[activeIdx]); }
     }
     else if (e.key === 'Escape') { close(); }
-  });
+  }, true);
 
   input.addEventListener('blur', () => setTimeout(close, 150));
 }

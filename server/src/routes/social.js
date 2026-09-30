@@ -543,12 +543,41 @@ async function saveMessage(senderId, receiverId, text) {
   }
 }
 
+// ─────────── Чатын хариулт (reply, 2026-09-30) ───────────
+// Клиентээс ирсэн replyTo-д итгэхгүй: зөвхөн { username ≤40, text ≤80, time ISO } үлдээнэ, бусдыг хаяна.
+function sanitizeReplyTo(r) {
+  if (!r || typeof r !== 'object') return null;
+  const username = typeof r.username === 'string' ? r.username.trim().slice(0, 40) : '';
+  const time = typeof r.time === 'string' ? r.time.slice(0, 40) : '';
+  if (!username || !time || Number.isNaN(Date.parse(time))) return null;
+  let text = typeof r.text === 'string' ? r.text.replace(/\s+/g, ' ').trim() : '';
+  if (text.length > 80) text = text.slice(0, 79) + '…';
+  return { username, text, time: new Date(time).toISOString() };
+}
+async function ensureReplyColumn() {
+  if (!await dbOk()) return;
+  try { await db.query('ALTER TABLE lobby_messages ADD COLUMN IF NOT EXISTS reply_to JSONB'); }
+  catch (e) { console.error('[Migration] lobby_messages.reply_to:', e.message); }
+}
+
 // ─────────── Нийтийн лобби чат (байнга хадгална) ───────────
 // msg.time (ISO) → created_at болгож хадгална: in-memory болон DB-ийн time яг таарна
 // (устгал `time`-аар түлхүүрлэдэг тул reload хийсний дараа ч ажиллана).
-async function saveLobbyMessage(userId, username, text, timeISO) {
+// replyTo = { username, text, time } (sanitizeReplyTo-оор цэвэрлэсэн) — reply_to JSONB багана байхгүй бол түүнгүйгээр хадгална
+async function saveLobbyMessage(userId, username, text, timeISO, replyTo = null) {
   if (!await dbOk()) return null;
   try {
+    if (replyTo) {
+      try {
+        const r = await db.query(
+          `INSERT INTO lobby_messages (user_id, username, text, created_at, reply_to)
+           VALUES ($1, $2, $3, COALESCE($4::timestamptz, NOW()), $5::jsonb)
+           RETURNING id, created_at`,
+          [userId || null, username, text, timeISO || null, JSON.stringify(replyTo)]
+        );
+        return r.rows[0];
+      } catch (e) { if (!/reply_to/.test(e.message)) throw e; }
+    }
     const result = await db.query(
       `INSERT INTO lobby_messages (user_id, username, text, created_at)
        VALUES ($1, $2, $3, COALESCE($4::timestamptz, NOW()))
@@ -569,7 +598,7 @@ async function getLobbyHistory(limit = 50) {
     const n = Math.max(1, Math.min(500, Number(limit) || 50));
     const result = await db.query(
       `SELECT * FROM (
-         SELECT user_id, username, text, deleted, created_at
+         SELECT *
          FROM lobby_messages
          ORDER BY created_at DESC, id DESC
          LIMIT $1
@@ -581,6 +610,7 @@ async function getLobbyHistory(limit = 50) {
       username: r.username,
       text:     r.deleted ? '[Устгагдсан мессеж]' : r.text,
       time:     r.created_at instanceof Date ? r.created_at.toISOString() : new Date(r.created_at).toISOString(),
+      ...(!r.deleted && sanitizeReplyTo(r.reply_to) ? { replyTo: sanitizeReplyTo(r.reply_to) } : {}),
     }));
   } catch (e) {
     console.error('[getLobbyHistory]', e.message);
@@ -609,5 +639,7 @@ module.exports.setIO = setIO;
 module.exports.isUserBlocked = isUserBlocked;
 module.exports.saveMessage = saveMessage;
 module.exports.saveLobbyMessage = saveLobbyMessage;
+module.exports.sanitizeReplyTo = sanitizeReplyTo;
+module.exports.ensureTables = ensureReplyColumn;
 module.exports.getLobbyHistory = getLobbyHistory;
 module.exports.deleteLobbyMessage = deleteLobbyMessage;
