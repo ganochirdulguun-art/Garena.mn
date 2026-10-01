@@ -80,3 +80,17 @@ body.gx #page-room .gxr-old { display: none !important; }
 body.gx.gx-roomview-on #gx-content { padding: 0 !important; overflow: hidden !important; }
 html.gx-embedded body.gx #page-room .gxr-grid { padding: 14px; }
 body.gx #page-room.active { padding: 0 !important; animation: none !important; }
+
+/* ── Өрөөний дэвсгэр зураг «Холболт» хэсэгт (2026-10-01) — текстийн өнгө зургийн гэрэлтэлтээр автоматаар ── */
+.gxr-conn.has-bg { position: relative; isolation: isolate; background-color: #111 !important; background-image: var(--gxr-bg) !important; background-size: cover !important; background-position: center !important; border-color: transparent !important; }
+.gxr-conn.has-bg::before { content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none; }
+.gxr-conn.has-bg.bg-dark::before { background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 45%, rgba(0,0,0,.6) 100%); }
+.gxr-conn.has-bg.bg-light::before { background: linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,.35) 45%, rgba(255,255,255,.7) 100%); }
+.gxr-conn.has-bg.bg-dark h3, .gxr-conn.has-bg.bg-dark #gxr-conn-body, .gxr-conn.has-bg.bg-dark #gxr-conn-body :is(p, span, small, div, b, strong, label) { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.75); }
+.gxr-conn.has-bg.bg-light h3, .gxr-conn.has-bg.bg-light #gxr-conn-body, .gxr-conn.has-bg.bg-light #gxr-conn-body :is(p, span, small, div, b, strong, label) { color: #0b0c13 !important; text-shadow: 0 1px 2px rgba(255,255,255,.8); }
+.gxr-conn.has-bg h3 { background: transparent !important; border-color: rgba(255,255,255,.18) !important; }
+.gxr-conn.has-bg .gxr-conn-state { text-shadow: none !important; }
+.gxr-conn.has-bg #gxr-conn-body :is(.lan-host-panel, .lan-hint, .lan-empty, p) { background: none !important; border: 0 !important; }
+.gxr-conn.has-bg.bg-dark #gxr-conn-body .lan-game-row { background: rgba(0,0,0,.42) !important; border-color: rgba(255,255,255,.22) !important; backdrop-filter: blur(6px); }
+.gxr-conn.has-bg.bg-light #gxr-conn-body .lan-game-row { background: rgba(255,255,255,.72) !important; border-color: rgba(0,0,0,.12) !important; backdrop-filter: blur(6px); }
+.gxr-conn.has-bg #gxr-conn-body .lan-join-btn, .gxr-conn.has-bg #gxr-conn-body .lan-join-btn * { color: #fff !important; text-shadow: none !important; }

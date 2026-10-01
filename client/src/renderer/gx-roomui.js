@@ -58,6 +58,30 @@
   page.insertBefore(root, old);
   old.classList.add('gxr-old');
 
+  // ── Өрөөний дэвсгэр зураг (GOLD) → «Холболт» хэсгийг дүүргэнэ (2026-10-01) ──
+  // Зургийн дундаж гэрэлтэлтийг уншиж: гэрэл зурагт хар текст (bg-light), харанхуйд цагаан текст (bg-dark).
+  // Зургийг уншиж чадахгүй (CORS) бол аюулгүй сонголт — харанхуй бүдэг давхарга + цагаан текст.
+  (function roomBackground() {
+    const bg = q.get('backgroundUrl') || '';
+    if (!/^https:\/\/\S+$/i.test(bg)) return;
+    const conn = root.querySelector('.gxr-conn'); if (!conn) return;
+    conn.style.setProperty('--gxr-bg', `url("${bg.replace(/"/g, '%22')}")`);
+    conn.classList.add('has-bg', 'bg-dark');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 24; c.height = 24;
+        const g = c.getContext('2d'); g.drawImage(img, 0, 0, 24, 24);
+        const d = g.getImageData(0, 0, 24, 24).data; let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+        const lum = sum / (d.length / 4);
+        conn.classList.toggle('bg-light', lum > 0.6); conn.classList.toggle('bg-dark', lum <= 0.6);
+      } catch { /* CORS-оор уншиж чадахгүй — bg-dark хэвээр */ }
+    };
+    img.src = bg;
+  })();
+
   // ── Элементүүдийг зөөх ──
   const move = (id, dest) => { const el = $(id); if (el && dest) dest.appendChild(el); return el; };
   move('room-title', $('gxr-title-slot'));

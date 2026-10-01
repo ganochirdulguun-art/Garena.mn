@@ -121,7 +121,7 @@ body.gx .gx-side-fill .gx-side-ad {
   box-shadow: 0 8px 24px rgba(0,0,0,.35);
 }
 body.gx .gx-side-fill .gx-side-ad .ad-label { border-color: var(--gx-side-line); color: var(--gx-side-text); }
-body.gx .gx-side-fill .gx-side-ad.has-ad { border: 1px solid var(--gx-side-line); background: #0c0d15; }
+body.gx .gx-side-fill .gx-side-ad.has-ad { border: 2px solid rgba(255,255,255,.88); background: #0c0d15; }   /* цагаан хүрээ — харанхуй цэснээс ялгарна (2026-10-01) */
 body.gx .gx-side-fill .gx-side-ad .ad-link { position: absolute; inset: 0; display: block; transition: transform .55s cubic-bezier(.4,0,.2,1); }
 body.gx .gx-side-fill .gx-side-ad img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; display: block; }
 body.gx .gx-side-fill .gx-side-ad .ad-card { display: flex; flex-direction: column; justify-content: center; gap: 10px; height: 100%; padding: 12px; text-transform: none; letter-spacing: 0; }

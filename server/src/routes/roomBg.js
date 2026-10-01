@@ -65,6 +65,9 @@ router.get('/background/:id', async (req, res) => {
     if (!r.rows[0]) return res.status(404).end();
     res.set('Content-Type', r.rows[0].mime);
     res.set('Cache-Control', 'public, max-age=604800, immutable');
+    // 2026-10-01: клиент зургийн гэрэлтэлтийг canvas-аар уншиж текстийн өнгийг сонгоно (нийтийн зураг тул CORS нээлттэй)
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
     res.send(r.rows[0].data);
   } catch (e) {
     console.error('[roomBg]', e);
