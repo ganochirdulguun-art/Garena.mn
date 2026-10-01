@@ -158,3 +158,12 @@ body.gx #gx-content:has(#tab-roomview.active) > #tab-roomview.active { flex: 1; 
 body.gx .mention.mention-all, body .mention.mention-all { color: #fff !important; background: var(--gx-accent, #e11d2e) !important; padding: 0 5px; border-radius: 4px; font-weight: 800; }
 .msg.mention-all-row { background: var(--gx-amber-soft, rgba(217,119,6,.13)); border-radius: 8px; box-shadow: inset 3px 0 0 var(--gx-amber, #d97706); }
 .msg.gl.mention-all-row { padding-left: 8px !important; }
+
+/* ── Ranking / тоглолтын түүх хүснэгт (2026-10-02): хуучин бараан фон GX цайвар загварт текстийг уусгаж байсан ── */
+body.gx #ranking-table, body.gx #game-history-table { background: var(--gx-surface) !important; border: 1px solid var(--gx-line) !important; box-shadow: var(--gx-shadow); }
+body.gx #ranking-table th, body.gx #game-history-table th { background: var(--gx-surface-3) !important; color: var(--gx-text-3) !important; }
+body.gx #ranking-table tbody tr:nth-child(even) td, body.gx #game-history-table tbody tr:nth-child(even) td { background: var(--gx-surface-2) !important; }
+body.gx #ranking-table tbody tr:hover td, body.gx #game-history-table tbody tr:hover td { background: var(--gx-accent-soft) !important; }
+body.gx #ranking-table td, body.gx #game-history-table td { color: var(--gx-text) !important; }
+body.gx #ranking-table tr.ranking-self td { background: var(--gx-amber-soft) !important; font-weight: 700; }
+body.gx #ranking-table tbody tr:nth-child(-n+3) td:nth-child(2) { font-weight: 800; }

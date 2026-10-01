@@ -91,7 +91,7 @@ body.rgc #gxr.rgc-hidden { display: none !important; }
 .rgc-chat #chat-messages .msg .msg-author { order: 1; font-weight: 800 !important; color: #111 !important; }
 .rgc-chat #chat-messages .msg.me .msg-author { color: #b3261e !important; }
 .rgc-chat #chat-messages .msg .msg-author::after { content: ':'; }
-.rgc-chat #chat-messages .msg .msg-author .clickable-name { color: inherit !important; }
+.rgc-chat #chat-messages .msg .msg-author .clickable-name:not([class*="name-fx-"]) { color: inherit !important; }
 .rgc-chat #chat-messages .msg .msg-bubble { order: 2; flex: 1; min-width: 0; display: inline !important; padding: 0 !important; margin: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; color: var(--r-chat-text) !important; border-radius: 0 !important; max-width: none !important; font-size: 13.5px !important; }
 .rgc-chat #chat-messages .msg .msg-quote { order: -1; flex-basis: 100%; margin: 2px 0 0 !important; background: rgba(0,0,0,.06) !important; border-left-color: #8a9099 !important; color: #444 !important; }
 .rgc-chat #chat-messages .msg :is(.msg-reply, .msg-delete) { order: 3; opacity: 0; color: #666 !important; background: none !important; }
@@ -115,7 +115,7 @@ body.rgc #gxr.rgc-hidden { display: none !important; }
 #rgc #members-list .m-flag img { width: 18px; height: 12px; object-fit: cover; border-radius: 1px; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
 #rgc #members-list .member-info { min-width: 0; font-weight: 700; }
 #rgc #members-list .member-info > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e8e9ec; }
-#rgc #members-list .clickable-name { color: inherit !important; }
+#rgc #members-list .clickable-name:not([class*="name-fx-"]) { color: inherit !important; }
 #rgc #members-list li.t-silver .member-info > div { color: #9ccdf5; }
 #rgc #members-list li.t-gold .member-info > div { color: var(--r-gold); }
 #rgc #members-list li.r-mod .member-info > div { color: #6fdc7a; }
@@ -207,3 +207,11 @@ body.rgc #rgc .rgc-chat #chat-input { background: #0e0f11 !important; color: var
 .rgc-soon { margin: 0 0 8px !important; padding: 7px 9px; border-radius: 3px; background: rgba(231,181,74,.12); border: 1px solid rgba(231,181,74,.35); color: var(--r-gold) !important; font-size: 11.5px !important; line-height: 1.45; }
 body.rgc-ra2 #rgc #lan-host-panel { display: none !important; }
 body.rgc:not(.rgc-wc3) .rgc-nav button.start { filter: saturate(.4) brightness(.8); }
+
+/* «Тоглоом дотор өрөө үүсгэх заавар» доорх Moderator эрх хүсэх товч */
+.rgc-howto-mod { margin-top: 8px; }
+.rgc-howto-mod .rgc-btn { width: 100%; margin: 0; }
+.rgc-howto-mod .rgc-btn:disabled { cursor: default; filter: none; background: rgba(61,156,70,.16); border-color: rgba(61,156,70,.45); color: #7ed487; text-shadow: none; }
+.rgc-howto-mod small { display: block; margin-top: 5px; font-size: 11px; color: var(--r-dim); line-height: 1.4; }
+/* Баннер: WC3 Room-д Dota зураг (covers/wc3-room.jpg) — дүрүүд харагдахаар */
+body.rgc-wc3 .rgc-banner { background-position: center, center 42% !important; background: linear-gradient(90deg, rgba(8,9,11,.9) 0%, rgba(8,9,11,.45) 40%, rgba(8,9,11,.05) 100%), var(--rgc-cover) center 42% / cover no-repeat, #111 !important; }

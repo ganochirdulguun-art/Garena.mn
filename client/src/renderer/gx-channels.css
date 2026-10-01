@@ -143,3 +143,7 @@ body.gx-staff .gx-side-fill .gxo-menu { margin: 0; }
 .gxcl-ico.k-cs16 { background: linear-gradient(135deg, #f59e0b, #b45309); }
 .gxcl-ico.k-q3 { background: linear-gradient(135deg, #8b5cf6, #5b21b6); }
 .gxcl-ico.k-ra2 { background: linear-gradient(135deg, #ef4444, #1e3a8a); }
+/* Тоглоомын жинхэнэ icon (icons/*.png) — emoji-ны оронд */
+.gxch-head h3 { display: flex; align-items: center; gap: 8px; }
+.gxch-gico { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; box-shadow: 0 0 0 1px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.25); }
+img.gxcl-img { padding: 0; width: 22px; height: 22px; border-radius: 5px; object-fit: cover; background: none; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }

@@ -141,7 +141,7 @@
           const fav = favs.has(String(c.id));
           const no = String(c.channel_no).padStart(2, '0');
           return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''} ${c.ranked ? 'ranked' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="${c.ranked ? '🏆 Ranked Room — хүчинтэй хожил бүр +2 💎. ' : ''}Дарж орох">
-            <span class="gxcl-name"><i class="gxcl-ico k-${g.id}">${c.ranked ? '🏆' : g.ico}</i>${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
+            <span class="gxcl-name">${c.ranked ? `<i class="gxcl-ico k-${g.id}">🏆</i>` : `<img class="gxcl-ico gxcl-img" src="icons/${g.id}.png" alt="${g.ico}" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'gxcl-ico k-${g.id}',textContent:'${g.ico}'}))">`}${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
             <span class="gxcl-game">${c.ranked ? `${g.short} · <b>Ranked</b>` : `${g.short} · ${g.net}`}</span>
             <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
             <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
@@ -149,7 +149,7 @@
             <button type="button" class="gxcl-fav ${fav ? 'on' : ''}" data-ch-fav="${c.id}" title="${fav ? 'Дуртайгаас хасах' : 'Дуртайд нэмэх'}">${fav ? '★' : '☆'}</button>
           </div>`;
         }).join('');
-        return `<section class="gxch-sec k-${g.id}"><div class="gxch-head"><h3>${g.emoji} ${esc(g.title)} <span>Нийтийн Room 1–${channels.length}${rankedN ? ` · 🏆 Ranked: Room 1–${rankedN}` : ''}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
+        return `<section class="gxch-sec k-${g.id}"><div class="gxch-head"><h3><img class="gxch-gico" src="icons/${g.id}.png" alt="" onerror="this.remove()">${esc(g.title)} <span>Нийтийн Room 1–${channels.length}${rankedN ? ` · 🏆 Ranked: Room 1–${rankedN}` : ''}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
           <div class="gxcl"><div class="gxcl-row gxcl-th" role="row"><span>Өрөөний нэр</span><span>Тоглоом</span><span>Тоглогч</span><span>Дүүргэлт</span><span>Төлөв</span><span>★</span></div>${rows}</div></section>`;
       },
     };

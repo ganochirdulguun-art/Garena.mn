@@ -1948,7 +1948,8 @@ function renderMembers(members) {
     const hostBtn = (isHost && !isMe && id)
       ? `<button class="btn btn-sm btn-secondary transfer-host-btn" data-id="${safeId}" data-name="${safeName}" title="Хост эрхээ энэ хүнд шилжүүлэх">👑 Хост</button>`
       : '';
-    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
+    // Өөрийн нэр ч GOLD/Silver нэрийн эффекттэй (data-fx-user → decorate)
+    const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : (id ? `<span class="m-self" data-fx-user="${safeId}">${displayName}</span>` : displayName);
     const cc = /^[A-Z]{2}$/.test(String(m.cc || '')) ? m.cc : '';
     return `<li class="${isMe ? 'me' : ''}${m.admin ? ' r-admin' : m.mod ? ' r-mod' : ''}" data-uid="${safeId}" data-cc="${cc}">
       <span class="m-flag">${cc ? `<img src="https://flagcdn.com/w20/${cc.toLowerCase()}.png" alt="${cc}" title="${cc}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${cc}'))">` : ''}</span>

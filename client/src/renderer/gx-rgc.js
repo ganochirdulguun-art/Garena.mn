@@ -16,7 +16,7 @@
   const post = (type, extra) => { if (inFrame) { try { window.parent.postMessage({ gx: true, type, roomId: q.get('roomId'), ...(extra || {}) }, '*'); } catch {} } };
 
   // Тоглоом (2026-10-02): WC3 / CS 1.6 / Quake III / Red Alert 2 — баннер зураг, гарчиг, холболтын төлөв
-  const GAME = { wc3: ['Warcraft III', 'wc3'], cs16: ['Counter-Strike 1.6', 'cs16'], q3: ['Quake III Arena', 'q3'], ra2: ['Red Alert 2', 'ra2'] };
+  const GAME = { wc3: ['Warcraft III', 'wc3-room'], cs16: ['Counter-Strike 1.6', 'cs16'], q3: ['Quake III Arena', 'q3'], ra2: ['Red Alert 2', 'ra2'] };
   const gk = (typeof gameKindOf === 'function' ? gameKindOf(q.get('gameType')) : 'wc3');
   const [gameLabel, cover] = GAME[gk] || GAME.wc3;
   const isWc3 = gk === 'wc3' || !GAME[gk];
@@ -221,13 +221,26 @@
     const me = window.gxRoleMe?.(); const box = $('rgc-mod');
     const who = me?.owner ? '👑 Эзэн' : me?.staff ? '🛡 Админ' : me?.role === 'moderator' ? '⭐ Moderator' : 'Гишүүн';
     let action;
-    if (me?.can_host_channel) action = `<p class="ok">✓ Та LAN тоглоом нээх эрхтэй.</p>${me.staff ? '<p class="dim">Энгийн гишүүдэд энд «Moderator хүсэлт илгээх» товч харагдана. Ирсэн хүсэлтийг эзний самбар → «Хүсэлтүүд»-ээс батална.</p>' : ''}`;
+    if (me?.can_host_channel) action = `<p class="ok">✓ Та LAN тоглоом нээх эрхтэй.</p>${me.staff ? '<p class="dim">Ирсэн Moderator хүсэлтийг эзний цэс → «Moderator хүсэлт»-ээс батална.</p>' : ''}`;
     else if (me?.pending) action = '<p class="warn">⏳ Таны Moderator хүсэлт хүлээгдэж байна — эзэн шалгаад батална.</p>';
-    else action = '<button type="button" class="rgc-btn" id="rgc-modreq">🛡 Moderator хүсэлт илгээх</button>';
+    else action = '<p class="dim">LAN тоглоом нээхийн тулд «Тоглоом дотор өрөө үүсгэх заавар» доорх товчоор Moderator эрх хүснэ.</p>';
     box.innerHTML = `<h3>🛡 Эрх</h3><div class="rgc-kv"><span>Таны эрх</span><b>${who}</b></div>
       <p class="dim">LAN тоглоом нээх эрх: <b>Moderator · Админ · Эзэн</b></p>${action}`;
+    // «Тоглоом дотор өрөө үүсгэх заавар» доорх Moderator эрх хүсэх товч (2026-10-02, эзний хүсэлт) — хүн бүрт харагдана
+    const hm = $('rgc-howto-mod');
+    if (hm) hm.innerHTML = me?.can_host_channel
+      ? `<button type="button" class="rgc-btn" disabled title="Та аль хэдийн LAN нээх эрхтэй">✓ ${me.owner ? 'Эзэн' : me.staff ? 'Админ' : 'Moderator'} — LAN нээх эрхтэй</button>`
+      : me?.pending ? '<button type="button" class="rgc-btn" disabled>⏳ Moderator хүсэлт хүлээгдэж байна</button>'
+      : '<button type="button" class="rgc-btn" id="rgc-modreq">🛡 Moderator эрх хүсэх</button><small>Moderator нь энэ Room-д LAN тоглоом нээж бусдыг тоглуулна.</small>';
     syncSign();
   }
+  // Заавар хэсэгт товчны байр
+  (function mountHowtoMod() {
+    const ht = document.querySelector('#rgc-l-game .gxr-howto'); if (!ht || $('rgc-howto-mod')) return;
+    const d = document.createElement('div'); d.id = 'rgc-howto-mod'; d.className = 'rgc-howto-mod';
+    ht.appendChild(d);
+    d.addEventListener('click', async (e) => { if (e.target.closest('#rgc-modreq') && window.gxRequestModerator) { await window.gxRequestModerator(); renderMod(); } });
+  })();
   $('rgc-mod').addEventListener('click', async (e) => {
     if (e.target.closest('#rgc-modreq') && window.gxRequestModerator) { await window.gxRequestModerator(); renderMod(); }
   });
