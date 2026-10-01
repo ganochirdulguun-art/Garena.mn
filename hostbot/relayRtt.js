@@ -14,6 +14,8 @@ const KEY = process.env.RELAY_REPORT_KEY || '';
 const TICK_MS = Number(process.env.RELAY_RTT_TICK_MS || 8000);
 const ACTIVE_MS = Number(process.env.RELAY_RTT_ACTIVE_MS || 30000);   // lastsnd < 30 с = яг одоо тоглож буй
 const PORT = Number(process.env.RELAY_PORT || 7000);
+// 2026-10-01: relay 4 процесст хуваагдсан (7000–7003) — RELAY_PORT_MAX хүртэлх бүх портын холболтыг хэмжинэ
+const PORT_MAX = Number(process.env.RELAY_PORT_MAX || PORT);
 const log = (m) => console.log(`${new Date().toISOString()} ${m}`);
 
 // `ss -tni state established ( sport = :7000 )` гаралт: мөр1 = хаягууд, мөр2 = "... rtt:53.3/17.2 ... retrans:0/7 ... lastsnd:89 ..."
@@ -39,7 +41,7 @@ function parseSs(out) {
 
 function ss() {
   return new Promise((resolve) => {
-    execFile('ss', ['-tni', 'state', 'established', `( sport = :${PORT} )`], { timeout: 4000, maxBuffer: 4 * 1024 * 1024 }, (err, out) => resolve(err ? '' : out));
+    execFile('ss', ['-tni', 'state', 'established', PORT_MAX > PORT ? `( sport >= :${PORT} and sport <= :${PORT_MAX} )` : `( sport = :${PORT} )`], { timeout: 4000, maxBuffer: 4 * 1024 * 1024 }, (err, out) => resolve(err ? '' : out));
   });
 }
 

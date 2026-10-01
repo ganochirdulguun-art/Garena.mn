@@ -48,6 +48,15 @@ const RELAYS = parseRelays();
 const RELAY_IP = RELAYS[0]?.ip || '';          // хуучин экспорт/тестүүдэд
 const RELAY_PORT = RELAYS[0]?.port || 7000;
 const FAILS_TO_DOWN = 3;
+// 2026-10-01: үндсэн relay олон процесст хуваагдсан (CPU core бүрт нэг) — LAN_RELAY_SHARD_PORTS="7000,7001,7002,7003".
+// Тоглоом бүрийн портыг токены hash-аар тодорхойлно (детерминист → сервер restart-ын дараа ч хост/joiner ижил портыг авна).
+// Зөвхөн үндсэн relay-д хамаарна; failover-ын нөөц relay өөрийн нэг портоороо үлдэнэ.
+const SHARD_PORTS = String(process.env.LAN_RELAY_SHARD_PORTS || '').split(',').map((x) => Number(String(x).trim())).filter((p) => Number.isInteger(p) && p > 0 && p < 65536);
+function shardFor(r, token) {
+  if (!r || !SHARD_PORTS.length || r !== RELAYS[0]) return r;
+  const h = crypto.createHash('sha1').update(String(token)).digest().readUInt32BE(0);
+  return { ip: r.ip, port: SHARD_PORTS[h % SHARD_PORTS.length] };
+}
 function relayConfigured() { return RELAYS.length > 0; }
 function currentRelay() { return RELAYS.find((r) => r.fails < FAILS_TO_DOWN) || RELAYS[0] || null; }
 function probeRelay(r, timeoutMs = 4000) {
@@ -131,7 +140,7 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   if (!relayConfigured()) return res.status(503).json({ error: 'LAN relay тохируулаагүй' });
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
   const token = crypto.randomBytes(18).toString('hex');   // санамсаргүй, таамаглах боломжгүй → зөвхөн өрөөнд тарна
-  const r = currentRelay();
+  const r = shardFor(currentRelay(), token);
   rememberBegin(token, r);
   return res.json({ game_token: token, relay_ip: r.ip, relay_port: r.port, relay_key: RELAY_KEY, capture: captureFor(token) });
 });
@@ -147,7 +156,7 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const m = gamesOf(roomId);
   const existing = m.get(String(game_token));
   if (existing && String(existing.host_user_id) !== String(req.user.id)) return res.status(409).json({ error: 'Токен өөр хэрэглэгчийнх' });
-  const br = beginRelay.get(String(game_token)) || currentRelay();
+  const br = beginRelay.get(String(game_token)) || shardFor(currentRelay(), String(game_token));
   const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
   // Хостын mesh шууд endpoint (100.64/10 л зөвшөөрнө — өөр хаяг руу joiner-уудыг чиглүүлэх боломжгүй)
@@ -225,4 +234,4 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
-module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor };
+module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };

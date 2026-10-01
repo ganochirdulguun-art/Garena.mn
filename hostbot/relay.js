@@ -240,6 +240,10 @@ const server = net.createServer((sock) => {
       if (old) { try { old.control.destroy(); } catch {} }
       const h = { control: sock, name: String(msg.name || ''), sessions: new Map(), nocap: !!msg.nocap };
       hosts.set(game, h);
+      // 2026-10-01: хостын PC унтарсан/интернэт тасарсан үед FIN ирэхгүй тул control socket үүрд нээлттэй үлддэг
+      // байсан (DATACOM дээр 106 «host» хуримтлагдсан). Зөвхөн CONTROL socket-д TCP keepalive — тоглоомын
+      // splice замыг хөндөхгүй; kernel 30с сул зогсолтын дараа шалгаж, үхсэн холболтыг ~2–10 мин-д хаана.
+      try { sock.setKeepAlive(true, 30000); } catch {}
       try { sock.write(JSON.stringify({ t: 'registered', game, relayPort: CFG.PORT, relayIp: CFG.PUBLIC_IP }) + '\n'); } catch {}
       log('host бүртгэгдлээ game=' + game.slice(0, 12) + ' name=' + h.name);
       sock.on('close', () => {
