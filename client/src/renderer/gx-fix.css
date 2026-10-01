@@ -154,3 +154,7 @@ body.gx .gx-side-fill .gx-side-ad:hover { box-shadow: 0 10px 30px rgba(0,0,0,.5)
 body.gx #gx-content:has(#tab-roomview.active) { display: flex; flex-direction: column; }
 body.gx #gx-content:has(#tab-roomview.active) > .gx-mesh-banner { flex: none; margin: 10px 16px 0; }
 body.gx #gx-content:has(#tab-roomview.active) > #tab-roomview.active { flex: 1; min-height: 0; height: auto !important; }
+/* @everyone (2026-10-01) — эзэн/админы бүгдэд хандсан мессеж */
+body.gx .mention.mention-all, body .mention.mention-all { color: #fff !important; background: var(--gx-accent, #e11d2e) !important; padding: 0 5px; border-radius: 4px; font-weight: 800; }
+.msg.mention-all-row { background: var(--gx-amber-soft, rgba(217,119,6,.13)); border-radius: 8px; box-shadow: inset 3px 0 0 var(--gx-amber, #d97706); }
+.msg.gl.mention-all-row { padding-left: 8px !important; }

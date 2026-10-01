@@ -324,6 +324,15 @@ const onlineUsers = new Map();
 // холбогддог тул userId-гаар нэгтгэж, хамгийн идэвхтэй статусыг нь харуулна —
 // үгүй бол лоббид нэг хүн 2-3 удаа давхардаж харагдана
 const STATUS_PRIORITY = { in_game: 3, in_room: 2, online: 1 };
+// @everyone (2026-10-01): зөвхөн эзэн/админ бүгдийг mention хийнэ. Бусдынх «@​everyone» болж саармагжина
+// (клиент танихгүй, дуу гарахгүй) — DB/түүхэнд ч саармаг хэлбэрээр хадгалагдана.
+async function everyoneGate(socket, text) {
+  if (!/@(everyone|here)\b/i.test(text)) return text;
+  let ok = false;
+  try { ok = await require('./middleware/admin').isAdminUser(socket.user); } catch {}
+  return ok ? text : text.replace(/@(everyone|here)\b/gi, '@​$1');
+}
+
 function onlineUsersList() {
   const byUser = new Map();
   for (const user of onlineUsers.values()) {
@@ -473,14 +482,14 @@ io.on('connection', (socket) => {
   });
 
   // Нийтийн лобби чат (бүх хэрэглэгчид харна)
-  socket.on('lobby:chat', ({ text, replyTo } = {}) => {
+  socket.on('lobby:chat', async ({ text, replyTo } = {}) => {
     if (typeof text !== 'string' || !text.trim()) return;
     if (checkRateLimit(socket)) return;
     const reply = socialRoutes.sanitizeReplyTo(replyTo);
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
-      text: text.trim().slice(0, 500),
+      text: await everyoneGate(socket, text.trim().slice(0, 500)),
       time: new Date().toISOString(),
       ...(reply ? { replyTo: reply } : {}),
     };
@@ -608,7 +617,7 @@ io.on('connection', (socket) => {
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
-      text: text.trim().slice(0, 500),
+      text: await everyoneGate(socket, text.trim().slice(0, 500)),
       time: new Date().toISOString(),
       ...(reply ? { replyTo: reply } : {}),
     };
@@ -992,4 +1001,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { app, server, io, start, runStartupMigrations };
+module.exports = { app, server, io, start, runStartupMigrations, _everyoneGate: everyoneGate };

@@ -1830,6 +1830,7 @@ function appendMessage({ userId, username, text, time, replyTo }) {
   const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
   const body = parseMentions(escHtml(text), !isMe && !toMe);
+  if (body.includes('mention-all')) div.classList.add('mention-all-row');
   div.innerHTML = `
     <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
     ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
@@ -2092,6 +2093,7 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quie
   const nameEl = isMe ? '<span class="g-name">Та</span>' : `<span class="g-name clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete g-x" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
   const body = parseMentions(escHtml(text), !isMe && !quiet && !toMe);
+  if (body.includes('mention-all')) div.classList.add('mention-all-row');
   div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
   if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'lobby', { username, text, time });
@@ -4032,6 +4034,9 @@ function parseMentions(escapedText, triggerSound) {
     if (at > 0 && wordCh.test(s[at - 1])) { out += '@'; continue; }   // имэйл гэх мэт
     const rest = s.slice(i);
     const low = rest.toLowerCase();
+    // @everyone / @here — сервер зөвхөн эзэн/админых үлдээдэг (бусдынх «@​everyone» болж энд таарахгүй)
+    const all = low.match(/^(everyone|here)(?![\p{L}\p{N}_])/u);
+    if (all) { mentionedMe = true; out += `<span class="mention mention-me mention-all">@${rest.slice(0, all[1].length)}</span>`; i += all[1].length; continue; }
     let len = 0;
     const hit = names.find(n => low.startsWith(n.toLowerCase()) && !wordCh.test(rest[n.length] || ''));
     if (hit) len = hit.length;
@@ -4134,7 +4139,10 @@ function setupMentionAutocomplete(inputId) {
   function getNames() {
     // Онлайн, найз, чатад бичсэн, өрөөний гишүүд — өөрийгөө хасна
     const me = currentUser?.username;
-    return knownChatNames().filter(n => n !== me);
+    const list = knownChatNames().filter(n => n !== me);
+    // @everyone — зөвхөн эзэн/админд санал болгоно (сервер бусдынхыг саармагжуулдаг)
+    if (currentUser?.is_owner || currentUser?.is_admin) list.unshift('everyone');
+    return list;
   }
 
   function close() {
