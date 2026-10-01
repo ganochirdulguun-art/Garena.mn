@@ -745,6 +745,11 @@ async function init() {
     showUpdateBar(`v${version} бэлэн боллоо!`, true);
     setUpdateMsg(`v${version} татагдлаа! Дээрх "Суулгаж дахин эхлүүлэх" дарна уу.`, 'success');
   });
+  // Апп нээгдэх үед татагдсан шинэчлэлт → өөрөө суулгаад дахин нээгдэнэ (main.js autoApplyOnStartup)
+  window.api.onUpdateAutoInstall?.(({ version }) => {
+    showUpdateBar(`v${version} суулгаж байна — апп хэдэн секундэд дахин нээгдэнэ…`, null, 100);
+    setUpdateMsg(`v${version} автоматаар суулгаж байна…`, 'info');
+  });
   window.api.onUpdateError?.((msg) => {
     setUpdateMsg(`Шинэчлэлийн алдаа: ${msg}`, 'error');
     showToast(`Шинэчлэлийн алдаа: ${msg}`, 'error', 6000);

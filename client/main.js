@@ -44,7 +44,37 @@ autoUpdater.on('update-downloaded', (info) => {
   _downloadedVersion = info.version;
   mainWindow?.webContents.send('update:downloaded', { version: info.version });
   const w = _downloadWaiters.splice(0); w.forEach((r) => r(info.version));
+  autoApplyOnStartup(info.version);
 });
+
+// ── «Хаагаад нээхэд шинэчлэгддэг» болгох (2026-10-02, эзний гомдол) ──
+// Өмнө нь: апп асаад 5с-ийн дараа л татаж эхэлдэг, дуусахад «Дахин эхлүүлэх» товч гардаг байсан тул хаагаад нээхэд
+// хуучнаараа асдаг байв. Одоо: апп нээгдсэнээс хойш AUTO_APPLY_MS дотор шинэчлэлт татагдаж дуусвал (өрөөнд ороогүй,
+// LAN relay/тоглоом ажиллаагүй үед) өөрөө чимээгүй суулгаж шинэ хувилбараар дахин нээгдэнэ. Түүнээс хойш бол
+// хэрэглэгчийг тасалдуулахгүй — товч + хаахад чимээгүй суулгалт (autoInstallOnAppQuit) хэвээр.
+const _bootAt = Date.now();
+const AUTO_APPLY_MS = 4 * 60 * 1000;
+let _roomOpenedSinceBoot = false;
+function autoApplyOnStartup(version) {
+  if (!app.isPackaged || _isInstallingUpdate) return;
+  if (Date.now() - _bootAt > AUTO_APPLY_MS) return;
+  if (_roomOpenedSinceBoot) return;
+  try { if (gameRelayService.isRunning()) return; } catch { return; }
+  // Гогцооноос хамгаалалт: суулгалт бүтэлгүйтээд хуучин хувилбар дахин асвал нэг хувилбарыг 15 мин-д нэг л удаа оролдоно
+  const mark = require('path').join(app.getPath('userData'), 'auto-update-attempt.json');
+  try {
+    const prev = JSON.parse(require('fs').readFileSync(mark, 'utf8'));
+    if (prev?.version === version && Date.now() - Number(prev.at || 0) < 15 * 60 * 1000) { console.log('[AutoUpdater] саяхан оролдсон — товчоор үлдээнэ'); return; }
+  } catch { /* анх удаа */ }
+  try { require('fs').writeFileSync(mark, JSON.stringify({ version, at: Date.now() })); } catch {}
+  _isInstallingUpdate = true;   // before-quit-ийн өрөө цэвэрлэгээг алгасна (өрөөнд ороогүй)
+  try { mainWindow?.webContents.send('update:auto-install', { version }); } catch {}
+  console.log(`[AutoUpdater] эхлэлийн автомат шинэчлэлт → v${version}`);
+  setTimeout(() => {
+    try { gameRelayService.stopAll(); } catch {}
+    autoUpdater.quitAndInstall(true, true);   // чимээгүй суулгаад шинэ хувилбараар дахин нээнэ
+  }, 2500);
+}
 
 // ── Ямар ч хоцорсон хувилбараас ШУУД хамгийн сүүлийнх рүү (2026-09-03) ──
 // Асуудал: апп асахдаа тухайн үеийн хамгийн сүүлийнхийг татчихдаг; хэрэглэгч хэдэн цагийн дараа
@@ -203,7 +233,7 @@ app.whenReady().then(() => {
 
   // Апп бэлэн болсноос 5 секундийн дараа update шалгах
   if (app.isPackaged) {
-    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 2000);
     // 30 мин тутам дахин шалгана — өдөрт олон хувилбар гарахад хэрэглэгч хоцрохгүй
     setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 30 * 60 * 1000).unref?.();
   }
@@ -807,6 +837,7 @@ ipcMain.handle('settings:removeGame', async (_, id) => {
 
 // Өрөөний шинэ цонх нээх
 ipcMain.handle('room:openWindow', (event, roomData) => {
+  _roomOpenedSinceBoot = true;   // өрөөнд орсон бол эхлэлийн автомат шинэчлэлтээр тасалдуулахгүй
   // GX: үндсэн цонхны агуулгад шигтгэнэ — renderer iframe үүсгэнэ (өрөөний логик ижил index.html?mode=room)
   if (roomEmbedded() && mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('room:embed', {
