@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('api', {
   updateLanJoin:   (opts)      => ipcRenderer.invoke('relay:updateLanJoin', opts),
   stopLanJoin:     ()          => ipcRenderer.invoke('relay:stopLanJoin'),
   onLanGameInfo:   (cb)        => ipcRenderer.on('lan:gameinfo', (_, d) => cb(d)),
+  onLanStarted:    (cb)        => ipcRenderer.on('lan:started', (_, d) => cb(d)),
   getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),
   isWc3LanReady:   ()          => ipcRenderer.invoke('wc3:lanReady'),
   isWc3Running:    ()          => ipcRenderer.invoke('wc3:running'),

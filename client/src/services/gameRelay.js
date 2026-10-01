@@ -668,7 +668,7 @@ function createHostCapture({ ip, port, key, game }) {
 // capture = {ip,port,key} → хост өөрөө бичиж Oracle relay руу урсгана (relay давхар бичихгүй: register nocap).
 const MESH_HOST_PORT = 7000;
 function isMeshIp(ip) { const p = String(ip || '').split('.').map(Number); return p.length === 4 && p[0] === 100 && p[1] >= 64 && p[1] <= 127; }
-function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo, meshIp, capture }) {
+function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo, onGameStarted, meshIp, capture }) {
   stopLanHost();
   if (!relayIp || !relayPort || !game) throw new Error('LAN host мэдээлэл дутуу');
   const state = { relayIp, relayPort: Number(relayPort), game: String(game), running: true,
@@ -684,14 +684,20 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo,
   state.probe.on('message', (msg) => {
     if (msg.length >= 24 && msg[0] === W3_HEADER && msg[1] === W3_GAMEINFO) {
       const b64 = msg.toString('base64');
+      state.giAt = Date.now(); state.startedSent = false;
       if (b64 !== state.giB64) { state.giB64 = b64; bblog('LAN host: локал WC3 GAMEINFO баригдав'); try { onGameInfo?.(b64); } catch {} }
     }
   });
   state.probe.bind(() => {
     const probeTick = () => {
       if (!state.running) return;
+      // WC3 лобби SEARCHGAME-д 15с хариулаагүй = тоглоом эхэлсэн (лоббиос гарсан) → STARTED GAMES. Зөвхөн timestamp харьцуулалт.
+      if (state.giB64 && !state.startedSent && state.giAt && Date.now() - state.giAt > 15000) {
+        state.startedSent = true; state.giB64 = null; bblog('LAN host: лобби хаагдсан → тоглоом эхэлсэн');
+        try { onGameStarted?.(); } catch {}
+      }
       for (const v of SEARCH_VERSIONS) { try { state.probe.send(makeSearchPacket(v.product, v.version), 0, 16, WC3_PORT, '127.0.0.1'); } catch {} }
-      state.timer = setTimeout(probeTick, state.giB64 ? 5000 : 1500);
+      state.timer = setTimeout(probeTick, (state.giB64 || state.startedSent) ? 5000 : 1500);
     };
     probeTick();
   });

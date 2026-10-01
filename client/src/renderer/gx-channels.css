@@ -132,3 +132,8 @@ body.gx-staff .gx-side-fill .gxo-menu { margin: 0; }
 .gxcl-fav { width: 30px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--gx-text-3); font-size: 16px; cursor: pointer; }
 .gxcl-fav:hover { background: var(--gx-surface-3); color: var(--gx-gold); }
 .gxcl-fav.on { color: #f59e0b; }
+
+/* 🏆 Ranked Room 1–5 (2026-10-02) */
+.gxcl-row.ranked .gxcl-ico { background: linear-gradient(135deg, #f5b301, #b7791f); font-size: 11px; }
+.gxcl-rk { margin-left: 2px; font: 800 9.5px var(--gx-font); letter-spacing: .06em; padding: 1px 6px; border-radius: 5px; background: linear-gradient(135deg, #f5b301, #d97706); color: #fff; }
+.gxcl-row.ranked .gxcl-game b { color: #d97706; }

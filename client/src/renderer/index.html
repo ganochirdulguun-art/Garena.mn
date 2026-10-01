@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="gx-fix.css" />
   <link rel="stylesheet" href="gx-roomui.css" />
   <link rel="stylesheet" href="gx-channels.css" />
+  <link rel="stylesheet" href="gx-rgc.css" />
   <script src="gx-boot.js"></script>
 </head>
 <body class="gx">
@@ -431,10 +432,9 @@
             <input id="room-has-password" type="checkbox" />
             <span>Нууц үгтэй өрөө</span>
           </label>
-          <label class="checkbox-label" title="Ranked өрөө: relay-ээр автомат бүртгэгдсэн ХҮЧИНТЭЙ хожил бүр 2💎 (≥3v3, ≥12 мин, ялагч мэдэгдсэн). Энгийн өрөө XP л өгнө, 💎 өгөхгүй.">
-            <input id="room-ranked" type="checkbox" />
-            <span>🏆 Ranked өрөө — хожил бүр 2💎</span>
-          </label>
+          <!-- 🏆 Ranked зөвхөн нийтийн WC3 Room 1–5 (2026-10-02) — хувийн өрөө Ranked болохгүй -->
+          <input id="room-ranked" type="checkbox" class="hidden" disabled />
+          <p class="hint" style="margin:2px 0 0">🏆 Ranked тоглолт зөвхөн нийтийн <b>WC3 Room 1–5</b>-д явагдана — хувийн өрөө XP л өгнө.</p>
           <input id="room-password" type="password" placeholder="Өрөөний нууц үг" class="input hidden mt-6" />
         </div>
         <div class="form-actions">
@@ -721,14 +721,26 @@
         <div class="info-hero-text">
           <span class="info-kicker">ҮНЭГҮЙ · АВТОМАТ ДҮН · DIAMOND ОЛБОРЛОЛТ</span>
           <h2>🏆 Ranked — тоглонгоо Diamond олборло</h2>
-          <p class="info-lead">Ranked өрөөнд тоглосон тоглолт бүрийн дүн (K/D/A, creep, denie, neutral, gold, hero, item) DATACOM relay серверээс <b>автоматаар</b> бүртгэгдэж, хүчинтэй хожил бүрд <b>+2 💎</b> олгоно. Бот хост ч, replay ч хэрэггүй — бидний ялсан LAN холболт дээрээ шууд.</p>
+          <p class="info-lead">Ranked тоглолт нийтийн <b>WC3 Room 1–5</b>-д явагдана. Тоглолт бүрийн дүн (K/D/A, creep, denie, neutral, gold, hero, item) DATACOM relay серверээс <b>автоматаар</b> бүртгэгдэж, хүчинтэй хожил бүрд <b>+2 💎</b> олгоно. Бот хост ч, replay ч хэрэггүй — бидний ялсан LAN холболт дээрээ шууд.</p>
           <div class="info-actions">
-            <button type="button" id="rk-create" class="btn btn-primary">🏆 Ranked өрөө үүсгэх</button>
+            <button type="button" id="rk-create" class="btn btn-primary">🏆 Ranked Room 1–5 руу орох</button>
             <button type="button" id="rk-profile" class="btn btn-secondary">💎 Миний Diamond · XP</button>
           </div>
-          <p class="hint">Энгийн өрөө XP л өгнө · Ranked зөвхөн платформоор нэгдсэн тоглогчдод тоологдоно</p>
+          <p class="hint">Room 6–20 болон хувийн өрөө XP л өгнө · Ranked зөвхөн платформоор нэгдсэн тоглогчдод тоологдоно</p>
         </div>
-        <img class="info-hero-img" src="ranked-guide.jpg" alt="Ranked заавар" />
+        <div class="rk-guide" aria-label="Ranked заавар">
+          <div class="rk-guide-k">GARENA.MN <b>RANKED</b></div>
+          <h3>Ranked — тоглонгоо Diamond олборло</h3>
+          <p class="rk-guide-sub">Үнэгүй · хүчинтэй хожил бүрд +2 Diamond · дүн relay серверээс автоматаар · Room 1–5</p>
+          <div class="rk-guide-grid">
+            <div><i>1</i><b>Ranked Room 1–5-д ор</b><span>Лоббигийн «Нийтийн өрөөнүүд» жагсаалтад 🏆 RANKED тэмдэгтэй Room 1–5. Room 6–20 энгийн (XP л).</span></div>
+            <div><i>2</i><b>6+ тоглогч (3v3+)</b><span>Хоёр багт тус бүр ≥3 тоглогч платформын OPEN GAMES-ээс «Нэгдэх» дарж орно. 1v1, 2v2 Diamond өгөхгүй.</span></div>
+            <div><i>3</i><b>Moderator LAN нээнэ</b><span>Moderator «LAN нээх» → WC3 → LAN → Create Game. Бусад нь OPEN GAMES → «Нэгдэх» → WC3 LAN жагсаалтаас орно.</span></div>
+            <div><i>4</i><b>≥12 мин, ялагч хүртэл</b><span>Skill сонголт + 10 минутаас дээш тоглоод -ff эсвэл throne-оор дуусга. 10 минутын өмнө гарсан хүн хожил авахгүй.</span></div>
+            <div><i>5</i><b>Дүн автоматаар</b><span>Тоглоом дуусмагц K/D/A, creep, denie, neutral, gold, hero, item серверт бүртгэгдэж, хожсон баг тус бүр +2 Diamond.</span></div>
+            <div><i>6</i><b>Diamond-оо зарцуул</b><span>Silver (800) / Gold (1500) гишүүнчлэл, найздаа бэлэглэл. Энгийн өрөө XP л өгнө.</span></div>
+          </div>
+        </div>
       </div>
 
       <h3 class="info-h3">Яагаад Ranked?</h3>
@@ -738,14 +750,14 @@
         <div class="info-card"><span class="info-ico">🛡️</span><b>Шударга орчин</b><p>MapHack илрүүлэлт (3 сануулга → бан), ижил бүрэлдэхүүн өдөрт 3 хүртэл, 10 минутын өмнө гарсан хүн хожил авахгүй — фермлэлт, хуйвалдаан ашиггүй.</p></div>
         <div class="info-card"><span class="info-ico">📈</span><b>Карьер, түүх</b><p>Хожил/хожигдол, win rate, тоглолтын түүх, XP ба Level профайлд хуримтлагдана. Тэмцээнд орохын өмнө бодит чадвараа харуулна.</p></div>
         <div class="info-card"><span class="info-ico">🚀</span><b>Хамгийн хурдан LAN</b><p>DATACOM relay ~6мс ping; тоглогч бүрийн ping өрөөнд харагдана — хэн гацааж байгааг шууд мэднэ.</p></div>
-        <div class="info-card"><span class="info-ico">🆓</span><b>Үнэгүй</b><p>Ranked-д ямар ч төлбөр байхгүй. Өрөө үүсгэхдээ 🏆 сонгоод л тоглоно.</p></div>
+        <div class="info-card"><span class="info-ico">🆓</span><b>Үнэгүй</b><p>Ranked-д ямар ч төлбөр байхгүй. Ranked Room 1–5-д ороод л тоглоно.</p></div>
       </div>
 
       <h3 class="info-h3">Хэрхэн тоглох вэ</h3>
       <ol class="info-steps">
-        <li><b>Өрөө үүсгэх</b> → «🏆 Ranked өрөө» checkbox-ийг сонго (жагсаалтад 🏆 тэмдэгтэй).</li>
+        <li><b>Ranked Room 1–5</b>-д ор (лоббид 🏆 RANKED тэмдэгтэй) — эсвэл дээрх «Ranked Room 1–5 руу орох» товч.</li>
         <li><b>6+ тоглогч (3v3-аас дээш)</b> — хоёр багт тус бүр ≥3 тоглогч платформоор «Нэгдэх» дарж орно. 1v1, 2v2 💎 өгөхгүй.</li>
-        <li>Хост <b>«LAN тоглоом нээх»</b> → WC3 → LAN → Create Game; бусад нь WC3-ийн LAN жагсаалтаас нэгдэнэ.</li>
+        <li><b>Moderator</b> «LAN нээх» → WC3 → LAN → Create Game; бусад нь <b>OPEN GAMES</b>-ээс «Нэгдэх» дарж WC3-ийн LAN жагсаалтаас орно.</li>
         <li><b>≥12 минут</b> тоглоод <b>-ff эсвэл throne</b>-оор ялагчтай дуусга.</li>
         <li>Тоглоом дуусмагц дүн + 💎 автоматаар. Профайл → Diamond · XP хэсэгт харна.</li>
       </ol>
@@ -1620,6 +1632,7 @@
   <script src="gx-room.js"></script>
   <script src="gx-roomui.js"></script>
   <script src="gx-channels.js"></script>
+  <script src="gx-rgc.js"></script>
   <script src="gx-banner.js"></script>
 </body>
 </html>

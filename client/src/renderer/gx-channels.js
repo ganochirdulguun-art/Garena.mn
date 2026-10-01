@@ -34,7 +34,8 @@
   };
 
   let me = null;   // /roles/me — { role, staff, owner, can_host_channel, pending, pending_count }
-  async function loadMe() { try { me = await api('get', '/roles/me'); } catch { me = null; } return me; }
+  async function loadMe() { try { me = await api('get', '/roles/me'); } catch { me = null; } try { document.dispatchEvent(new Event('gx:me')); } catch {} return me; }
+  window.gxRoleMe = () => me;   // gx-rgc.js (RGC маягийн өрөө) — Moderator хэсэг
   async function requestModerator() {
     const note = await window.gxPrompt('🛡 Moderator авах хүсэлт', 'Moderator нь нийтийн Room-д LAN тоглоом нээж бусдыг тоглуулна. Өөрийнхөө тухай товч бичнэ үү (заавал биш):', '', { okText: 'Хүсэлт илгээх' });
     if (note == null) return false;
@@ -125,16 +126,16 @@
           const st = n >= cap ? 'full' : pct >= 80 ? 'busy' : 'ok';
           const fav = favs.has(String(c.id));
           const no = String(c.channel_no).padStart(2, '0');
-          return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="Дарж орох">
-            <span class="gxcl-name"><i class="gxcl-ico">W3</i>${esc(c.name)}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
-            <span class="gxcl-game">Warcraft III · LAN</span>
+          return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''} ${c.ranked ? 'ranked' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="${c.ranked ? '🏆 Ranked Room — хүчинтэй хожил бүр +2 💎. ' : ''}Дарж орох">
+            <span class="gxcl-name"><i class="gxcl-ico">${c.ranked ? '🏆' : 'W3'}</i>${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
+            <span class="gxcl-game">${c.ranked ? 'Warcraft III · <b>Ranked</b>' : 'Warcraft III · LAN'}</span>
             <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
             <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
             <span class="gxcl-st">${st === 'full' ? 'Дүүрсэн · ⭐' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
             <button type="button" class="gxcl-fav ${fav ? 'on' : ''}" data-ch-fav="${c.id}" title="${fav ? 'Дуртайгаас хасах' : 'Дуртайд нэмэх'}">${fav ? '★' : '☆'}</button>
           </div>`;
         }).join('');
-        return `<section class="gxch-sec"><div class="gxch-head"><h3>🌐 Нийтийн өрөөнүүд <span>Warcraft III · Room 1–${channels.length}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
+        return `<section class="gxch-sec"><div class="gxch-head"><h3>🌐 Нийтийн өрөөнүүд <span>Warcraft III · Room 1–${channels.length} · 🏆 Ranked: Room 1–${channels.filter((c) => c.ranked).length || 5}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
           <div class="gxcl"><div class="gxcl-row gxcl-th" role="row"><span>Өрөөний нэр</span><span>Тоглоом</span><span>Тоглогч</span><span>Дүүргэлт</span><span>Төлөв</span><span>★</span></div>${rows}</div></section>`;
       },
     };
@@ -145,6 +146,17 @@
       if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(r.id)) { enterRoom(String(r.id), r.name, r.game_type, false, ''); return; }
       channelJoin(r);
     });
+    // 🏆 Ranked товч (Ranked таб): Ranked Room 1–5-аас багтаамжтай, хамгийн олон хүнтэйг сонгоно
+    window.gxJoinRanked = async () => {
+      let list = Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && r.ranked);
+      if (!list.length) { try { await loadRooms(); } catch {} list = Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && r.ranked); }
+      if (!list.length) { showTab('lobby'); return; }
+      const cap = (r) => Number(r.visible_cap || 200);
+      const free = list.filter((r) => Number(r.player_count || 0) < cap(r));
+      const pick = (free.length ? free : list).sort((a, b) => Number(b.player_count || 0) - Number(a.player_count || 0) || Number(a.channel_no) - Number(b.channel_no))[0];
+      if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(pick.id)) { enterRoom(String(pick.id), pick.name, pick.game_type, false, ''); return; }
+      channelJoin(pick);
+    };
     async function channelJoin(r) {
       try { await window.api.joinRoom(String(r.id), null); enterRoom(String(r.id), r.name, r.game_type, false, ''); }
       catch (err) {
@@ -343,7 +355,7 @@
       const text = (meta?.pinned_notice || (isChannel ? '' : (meta?.description || def))).trim();
       let btn = '';
       if (isChannel) {
-        if (me?.can_host_channel) btn = `<span class="gxn-role">${me.staff ? '🛡 Админ' : '⭐ Та Moderator'} — «LAN тоглоом нээх» эрхтэй</span>`;
+        if (me?.can_host_channel) btn = `<span class="gxn-role" title="LAN тоглоом нээх эрх: Moderator · Админ · Эзэн">${me.owner ? '👑 Эзэн' : me.staff ? '🛡 Админ' : '⭐ Moderator'} — LAN нээх эрхтэй (Moderator · Админ · Эзэн)</span>`;
         else if (me?.pending) btn = '<span class="gxn-role pending">⏳ Moderator хүсэлт хүлээгдэж байна</span>';
         else btn = '<button type="button" class="btn btn-primary btn-sm" id="gxn-modreq">🛡 Moderator авах</button>';
       }

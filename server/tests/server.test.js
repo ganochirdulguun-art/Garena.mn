@@ -138,7 +138,7 @@ async function testSmokeFlow() {
     const prevOwnerIds = process.env.OWNER_USER_IDS;
     process.env.OWNER_USER_IDS = String(meJson.id);   // эзэн болгож үргэлжлүүлнэ (доор сэргээнэ)
 
-    // 🏆 Ranked өрөө: create → ranked:true буцаана, жагсаалтад ч харагдана (v2.7.8 / Алхам 3)
+    // 🏆 Ranked зөвхөн нийтийн Room 1–5 (2026-10-02): хувийн өрөө ranked:true хүссэн ч ranked=false
     const rankedRes = await fetch(`${server.baseUrl}/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginJson.token}` },
@@ -147,11 +147,11 @@ async function testSmokeFlow() {
     assert.ok([200, 201].includes(rankedRes.status), `rooms create ${rankedRes.status}`);
     const rankedJson = await rankedRes.json();
     if (prevOwnerIds === undefined) delete process.env.OWNER_USER_IDS; else process.env.OWNER_USER_IDS = prevOwnerIds;
-    assert.equal(rankedJson.ranked, true, 'create хариунд ranked=true байх ёстой');
+    assert.equal(rankedJson.ranked, false, 'хувийн өрөө Ranked болохгүй');
     const listRes = await fetch(`${server.baseUrl}/rooms`, { headers: { Authorization: `Bearer ${loginJson.token}` } });
     const listJson = await listRes.json();
     const listed = (Array.isArray(listJson) ? listJson : []).find((r) => String(r.id) === String(rankedJson.id));
-    assert.ok(listed && listed.ranked === true, 'жагсаалтад ranked=true байх ёстой');
+    assert.ok(listed && listed.ranked === false, 'жагсаалтад ranked=false байх ёстой');
 
     const forgotRes = await fetch(`${server.baseUrl}/auth/forgot-password`, {
       method: 'POST',

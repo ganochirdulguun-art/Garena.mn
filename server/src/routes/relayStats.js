@@ -111,8 +111,9 @@ router.post('/game-stats', async (req, res) => {
     try {
       const jr = await db.query('SELECT user_id, wc3_name FROM lan_game_players WHERE token = $1', [token]);
       joiners = jr.rows;
-      const rr = await db.query('SELECT ranked FROM rooms WHERE id = $1', [game.room_id]);
-      ranked = !!rr.rows[0]?.ranked;
+      // Ranked зөвхөн нийтийн Room 1–5 (kind='channel' AND ranked) — хуучин ranked хувийн өрөө тооцогдохгүй (2026-10-02)
+      const rr = await db.query("SELECT ranked, COALESCE(kind,'room') AS kind FROM rooms WHERE id = $1", [game.room_id]);
+      ranked = !!rr.rows[0]?.ranked && rr.rows[0]?.kind === 'channel';
     } catch (e) { console.warn('[Relay] lookup:', e.message); }
   }
   const players = resolvePlayers(b.players.slice(0, 12), { hostUserId: game.host_user_id, hostWc3Name: game.host_wc3_name, joiners });

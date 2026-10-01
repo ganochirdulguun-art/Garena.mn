@@ -59,6 +59,8 @@
     const d = e.data; if (!d || !d.gx || !frame || e.source !== frame.contentWindow) return;
     if (d.type === 'closed') { closeFrame(); showTab('lobby'); try { loadRooms(); } catch {} }
     else if (d.type === 'back') { showTab('lobby'); }
+    // RGC маягийн доод цэс (FORUM / LADDER / SHOP) → үндсэн цонхны таб (зөвхөн зөвшөөрөгдсөн)
+    else if (d.type === 'tab' && ['discord', 'ranking', 'premium', 'lobby'].includes(d.tab)) { showTab(d.tab); }
   });
   // Зүүн цэсний ногоон «одоогийн өрөө» карт → шигтгэсэн өрөө рүү
   document.addEventListener('click', (e) => {

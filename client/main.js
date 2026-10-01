@@ -1178,7 +1178,7 @@ ipcMain.handle('relay:startLanHost', async (_, opts) => {
   let meshIp = null;
   // 2026-10-01: сервер mesh-ийг унтраасан (login_server алга) бол bot1-ийн үеийнх шиг ЗӨВХӨН relay — mesh listener нээхгүй
   try { const st = meshService.installed() ? await meshService.status() : meshService.last(); if (_meshLoginServer && st.state === 'Running' && st.ip) meshIp = st.ip; } catch {}
-  const r = gameRelayService.startLanHost({ ...(opts || {}), meshIp, onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }) });
+  const r = gameRelayService.startLanHost({ ...(opts || {}), meshIp, onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }), onGameStarted: () => broadcastToWindows('lan:started', {}) });
   return { ok: true, direct: r?.direct || null };
 });
 ipcMain.handle('relay:stopLanHost', () => { gameRelayService.stopLanHost(); return true; });

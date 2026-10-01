@@ -1919,7 +1919,8 @@ function renderMembers(members) {
     const isRoomHost = id ? id === hostId : false;
     const safeName = escHtml(name);
     const safeId   = escHtml(id);
-    const displayName = escHtml(withTier(name, m.tier));   // харагдах нэр = "3-1 Нэр" (Tier nickname)
+    // харагдах нэр = "3-1 Нэр" (Tier nickname); RGC маягийн Room-д Tier тусдаа ногоон хайрцагт тул нэр цэвэр
+    const displayName = escHtml(document.body.classList.contains('rgc') ? name : withTier(name, m.tier));
     // Нийтийн Room 1–20: хост байхгүй — эзэн/админ (шалтгаантай) kick хийнэ
     const staffKick = currentRoom?.kind === 'channel' && currentRoom?.staff && !isMe && id;
     const kickBtn = ((isHost && !isMe) || staffKick)
@@ -1930,10 +1931,13 @@ function renderMembers(members) {
       ? `<button class="btn btn-sm btn-secondary transfer-host-btn" data-id="${safeId}" data-name="${safeName}" title="Хост эрхээ энэ хүнд шилжүүлэх">👑 Хост</button>`
       : '';
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
-    return `<li class="${isMe ? 'me' : ''}">
+    const cc = /^[A-Z]{2}$/.test(String(m.cc || '')) ? m.cc : '';
+    return `<li class="${isMe ? 'me' : ''}${m.admin ? ' r-admin' : m.mod ? ' r-mod' : ''}" data-uid="${safeId}" data-cc="${cc}">
+      <span class="m-flag">${cc ? `<img src="https://flagcdn.com/w20/${cc.toLowerCase()}.png" alt="${cc}" title="${cc}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${cc}'))">` : ''}</span>
       <div class="member-info">
         <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.admin ? '<span class="mod-badge admin" title="Платформын ADMIN">ADMIN</span>' : m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
       </div>
+      <span class="m-tier" title="Tier">${escHtml(m.tier || '—')}</span><span class="m-lv" data-lv-uid="${safeId}" title="Level">·</span>
       ${hostBtn}${kickBtn}
     </li>`;
   }).join('');
@@ -5522,6 +5526,7 @@ init();
   }
 
   function renderGames() {
+    try { document.dispatchEvent(new Event('garena:lan-games')); } catch {}   // RGC маягийн OPEN/STARTED GAMES (gx-rgc.js)
     const box = el('lan-games-list'); if (!box) return;
     const list = [...games.values()].filter((g) => String(g.host_user_id) !== String(currentUser?.id));
     if (!list.length) { box.innerHTML = '<div class="lan-hint">Идэвхтэй тоглоом алга. Хэн нэг нь "LAN тоглоом нээх" дарвал энд гарч ирнэ.</div>'; return; }
@@ -5594,10 +5599,13 @@ init();
   function attach(s) {
     s.on('room:lan_lobby', (g) => {
       if (!g?.game_token) return;
+      const prev = games.get(g.game_token);
       games.set(g.game_token, g);
-      if (String(g.host_user_id) === String(currentUser?.id)) return;   // өөрийн тоглоом
+      if (String(g.host_user_id) === String(currentUser?.id)) { renderGames(); return; }   // өөрийн тоглоом
       if (joinedToken === g.game_token && g.gameinfo_b64) window.api.updateLanJoin?.({ gameInfoB64: g.gameinfo_b64 }).catch(() => {});
-      else appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}» LAN тоглоом нээлээ — "Нэгдэх" дарж WC3-даа харна.`);
+      // GAMEINFO 5с тутам шинэчлэгддэг тул зөвхөн ШИНЭ тоглоом / эхэлсэн үед л чатад мэдэгдэнэ (давхар спам үгүй)
+      else if (!prev) appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}» LAN тоглоом нээлээ — "Нэгдэх" дарж WC3-даа харна.`);
+      if (g.started_at && !prev?.started_at) appendSysMsg(`▶ «${g.host_wc3_name || g.host_username}»-ийн тоглоом эхэллээ.`);
       renderGames();
     });
     s.on('room:lan_lobby_gone', ({ game_token } = {}) => {
@@ -5626,6 +5634,10 @@ init();
     } catch { /* relay тохируулаагүй */ }
   }
 
+  // Хостын WC3 лобби хаагдсан (тоглоом эхэлсэн) → серверт мэдэгдэж STARTED GAMES руу шилжүүлнэ
+  window.api.onLanStarted?.(() => { const t = hosting?.token; if (t && currentRoom?.id) api('post', `/rooms/${currentRoom.id}/lan-host/${t}/started`).catch(() => {}); });
+  // gx-rgc.js (RGC маягийн өрөө) уншина: бүх тоглоом, нэгдэх, төлөв
+  window.gxLan = { games, join: (t) => joinGame(t), get hosting() { return hosting; }, get joined() { return joinedToken; } };
   el('btn-lan-host')?.addEventListener('click', startHosting);
   el('btn-lan-stop')?.addEventListener('click', stopHosting);
   // 👑 Хост шилжсэн → "LAN тоглоом нээх" товч/зөвлөмжийг шинэ ролиор дахин тааруулна

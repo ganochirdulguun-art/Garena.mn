@@ -339,6 +339,8 @@ const roomMembers = {};
 // Хэрэглэгчийн Tier кэш (userId → tierbot_tier) — өрөөний гишүүд/лоббид нэрийн урд
 // Tier ("3-1" гэх мэт) харуулахад. 5 мин тутам DB-ээс шинэчилнэ (TierSync-тэй нийцнэ).
 const userTierById = new Map();
+// userId → улсын код (GeoIP, холбогдох үед) — RGC маягийн өрөөнд гишүүдийн тугийг харуулна
+const userGeo = new Map();
 async function refreshTierCache() {
   if (!dbForMigration) return;
   try {
@@ -353,6 +355,7 @@ function membersArray(roomId) {
   const readySet = roomReady[roomId] || new Set();
   return [...roomMembers[roomId].entries()].map(([name, id]) => ({
     id, name, ready: readySet.has(id), tier: userTierById.get(String(id)) || null,
+    ...(userGeo.get(String(id)) ? { cc: userGeo.get(String(id)) } : {}),   // улсын туг (RGC маяг)
     // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг; MESH_DISABLED үед талбаргүй (хуучин клиент тэмдэг харуулахгүй)
     ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
     ...(require('./routes/roles').isModCached(id) ? { mod: true } : {}),   // Moderator «MOD» тэмдэг
@@ -483,6 +486,7 @@ io.on('connection', (socket) => {
     clientIp = geo.clientIp(socket.handshake.headers, socket.handshake.address);
     socket.data.geo = geo.geoInfo(clientIp);
   } catch { socket.data.geo = {}; }
+  if (socket.user?.id != null && socket.data.geo?.country) userGeo.set(String(socket.user.id), String(socket.data.geo.country).slice(0, 2));
   // IP-г логд бичнэ (2026-09-05): гацалт оношлоход тоглогч → IP → relay-ийн TCP RTT (ss -tni) холбоход зайлшгүй;
   // Railway edge лог socket sid агуулдаггүй тул өөр аргаар холбох боломжгүй байсан.
   console.log(`[Socket] холбогдлоо: ${socket.id} (${socket.user?.username})${socket.data.geo?.country ? ' ' + socket.data.geo.country : ''}${clientIp ? ' ip=' + clientIp : ''}`);

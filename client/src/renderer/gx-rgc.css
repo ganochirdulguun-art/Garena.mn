@@ -1,0 +1,204 @@
+/* ═══════════ RGC маягийн нийтийн Room (gx-rgc.js) — бараан металл хүрээ, саарал чат, баруун талд OPEN/STARTED GAMES ═══════════ */
+body.rgc {
+  --r-bg: #0b0c0e; --r-panel: #15171a; --r-panel2: #1c1f23; --r-line: #2b2f35; --r-line2: #3a3f46;
+  --r-text: #d9dbe0; --r-dim: #8c929b; --r-gold: #e7b54a; --r-green: #3d9c46; --r-green2: #2b7a33; --r-red: #c9372c; --r-blue: #5aa2e6;
+  --r-chat: #e4e5e7; --r-chat-text: #1b1d21;
+}
+body.rgc #page-room.active { background: var(--r-bg) !important; }
+body.rgc #gxr.rgc-hidden { display: none !important; }
+#rgc { display: flex; flex-direction: column; height: 100%; min-height: 0; background: radial-gradient(1200px 400px at 50% -100px, #23262b 0%, var(--r-bg) 60%); color: var(--r-text); font-family: var(--gx-font, 'Inter', system-ui, sans-serif); padding: 10px 12px 0; gap: 10px; }
+
+/* ── Баннер + миний карт ── */
+.rgc-top { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 10px; }
+.rgc-banner { position: relative; display: flex; align-items: center; gap: 14px; height: 92px; padding: 0 18px; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--r-line2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 2px 10px rgba(0,0,0,.5);
+  background: linear-gradient(90deg, rgba(8,9,11,.92) 0%, rgba(8,9,11,.55) 45%, rgba(8,9,11,.2) 100%), url('covers/wc3.jpg') center 30% / cover no-repeat, #111; }
+.rgc-logo { width: 62px; height: auto; filter: drop-shadow(0 2px 6px rgba(0,0,0,.7)); }
+.rgc-btitle { display: flex; flex-direction: column; min-width: 0; }
+.rgc-btitle b { font: 900 26px/1.05 var(--gx-font, sans-serif); letter-spacing: .02em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 0 #7a1410, 0 0 18px rgba(255,80,40,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rgc-btitle span { margin-top: 4px; font: 700 11px var(--gx-font, sans-serif); letter-spacing: .14em; text-transform: uppercase; color: var(--r-gold); }
+#rgc-privacy-slot .gxr-pill { background: rgba(61,156,70,.18) !important; color: #7ed487 !important; border-color: rgba(61,156,70,.45) !important; }
+.rgc-fill { flex: 1; }
+.rgc-actions { display: flex; gap: 8px; }
+.rgc-actions .btn { display: inline-flex !important; align-items: center; gap: 6px; height: 30px !important; padding: 0 12px !important; border-radius: 4px !important; background: linear-gradient(#3a1714, #241010) !important; color: #ffb3a8 !important; border: 1px solid #6b2a22 !important; font: 700 12px var(--gx-font, sans-serif) !important; }
+.rgc-actions .btn[style*="none"] { display: none !important; }
+.rgc-actions .btn .btn-icon-svg { width: 13px; height: 13px; }
+.rgc-me { display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 10px 12px; border-radius: 8px; background: linear-gradient(#1d2024, #121417); border: 1px solid var(--r-line2); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.rgc-me-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rgc-me-h b { font: 800 14px var(--gx-font, sans-serif); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rgc-me-lv { min-width: 28px; text-align: center; padding: 2px 6px; border-radius: 3px; background: #3b4048; color: #fff; font: 800 12px var(--gx-font, sans-serif); }
+.rgc-me-sub { font-size: 11.5px; color: var(--r-dim); }
+.rgc-xp { position: relative; height: 15px; border-radius: 3px; background: #0a0b0d; border: 1px solid var(--r-line2); overflow: hidden; }
+.rgc-xp i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #1f6fb8, #4fb2ff); }
+.rgc-xp span { position: relative; display: block; text-align: right; padding-right: 6px; font: 700 10px/15px var(--gx-font, sans-serif); color: #e6f3ff; text-shadow: 0 1px 1px #000; }
+
+/* ── Үндсэн 4 багана ── */
+.rgc-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr) 270px 240px; gap: 8px; padding: 8px; border-radius: 8px;
+  background: linear-gradient(#17191c, #101113); border: 1px solid var(--r-line2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.03); }
+.rgc-main > * { min-height: 0; min-width: 0; }
+.rgc-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 9px; font: 800 12px var(--gx-font, sans-serif); letter-spacing: .06em; text-transform: uppercase; color: #f1f2f4; background: linear-gradient(#2a2e34, #1b1e22); border-bottom: 1px solid var(--r-line2); }
+.rgc-h b { color: var(--r-gold); font-weight: 800; }
+
+/* Зүүн: өрөөнүүд + Тоглоомын тохиргоо + Холболт + Эрх */
+.rgc-left { display: flex; flex-direction: column; gap: 8px; overflow: auto; padding-right: 2px; }
+.rgc-tree { background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 4px; padding: 8px 10px; font-size: 13px; }
+.rgc-tree-h { color: #f1f2f4; font-weight: 700; margin-bottom: 4px; }
+.rgc-tree-i { display: flex; align-items: center; gap: 7px; padding: 3px 4px 3px 16px; color: var(--r-text); }
+.rgc-tree-i i { width: 9px; height: 9px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #8df095, var(--r-green2)); box-shadow: 0 0 6px rgba(61,156,70,.7); }
+.rgc-tree-i em { font-style: normal; color: var(--r-dim); }
+.rgc-tree-i em b { color: var(--r-text); font-weight: 600; }
+.rgc-lsec .gxr-card, .rgc-mod { background: var(--r-panel) !important; border: 1px solid var(--r-line) !important; border-radius: 4px !important; box-shadow: none !important; color: var(--r-text) !important; }
+.rgc-lsec .gxr-card > h3, .rgc-mod > h3 { margin: 0; padding: 7px 10px !important; font: 800 12px var(--gx-font, sans-serif) !important; letter-spacing: .05em; text-transform: uppercase; color: #f1f2f4 !important; background: linear-gradient(#2a2e34, #1b1e22) !important; border-bottom: 1px solid var(--r-line2) !important; display: flex; align-items: center; gap: 7px; }
+.rgc-lsec .gxr-card > h3 .btn-icon-svg { width: 14px; height: 14px; color: var(--r-gold) !important; }
+.rgc-lsec .gxr-kv { padding: 5px 10px !important; font-size: 12px; }
+.rgc-lsec .gxr-kv span, .rgc-mod .rgc-kv span { color: var(--r-dim) !important; }
+.rgc-lsec .gxr-kv b, .rgc-mod .rgc-kv b { color: var(--r-text) !important; font-size: 12px; }
+.rgc-lsec .gxr-howto { margin: 4px 10px 8px !important; border-color: var(--r-line) !important; color: var(--r-dim) !important; font-size: 11.5px !important; }
+.rgc-lsec .gxr-howto summary { color: var(--r-text) !important; font-size: 12px; }
+.rgc-lsec .gxr-game-card { padding-bottom: 4px !important; }
+.rgc-lsec .gxr-conn-state { background: #2a2e34 !important; color: var(--r-dim) !important; font-size: 9.5px !important; }
+.rgc-lsec .gxr-conn-state[data-state="hosting"], .rgc-lsec .gxr-conn-state[data-state="live"] { background: rgba(61,156,70,.2) !important; color: #7ed487 !important; }
+.rgc-lsec #gxr-conn-body { padding: 8px 10px !important; }
+.rgc-lsec #gxr-conn-body .hint, .rgc-lsec #gxr-conn-body .lan-hint, .rgc-lsec #gxr-conn-body p { color: var(--r-dim) !important; font-size: 11.5px !important; }
+.rgc-lsec #gxr-conn-body .lan-game-row { background: var(--r-panel2) !important; border: 1px solid var(--r-line) !important; color: var(--r-text) !important; border-radius: 3px !important; padding: 6px 8px !important; font-size: 12px !important; }
+.rgc-lsec #gxr-conn-body .lan-join-btn { border-radius: 3px !important; height: 24px !important; background: linear-gradient(#3fae4a, #237a2c) !important; }
+.rgc-lsec #gxr-conn-body #btn-lan-stop { background: #2a2e34 !important; color: #ffb3a8 !important; border-color: #6b2a22 !important; }
+.rgc-mod { padding-bottom: 8px; }
+.rgc-mod .rgc-kv { display: flex; justify-content: space-between; padding: 6px 10px 2px; font-size: 12px; }
+.rgc-mod p { margin: 6px 10px 0; font-size: 11.5px; line-height: 1.45; }
+.rgc-mod p.dim { color: var(--r-dim); }
+.rgc-mod p.dim b { color: var(--r-text); }
+.rgc-mod p.ok { color: #7ed487; font-weight: 700; }
+.rgc-mod p.warn { color: var(--r-gold); font-weight: 700; }
+.rgc-btn { display: block; width: calc(100% - 20px); margin: 8px 10px 0; height: 30px; border-radius: 3px; border: 1px solid #1d5e24; background: linear-gradient(#45b350, #23772c); color: #fff; font: 800 12px var(--gx-font, sans-serif); letter-spacing: .03em; cursor: pointer; text-shadow: 0 1px 1px rgba(0,0,0,.5); }
+.rgc-btn:hover { filter: brightness(1.12); }
+
+/* Голд: чат (RGC-ийн цайвар саарал талбар, [цаг] Нэр: текст мөрүүд) */
+.rgc-chat { display: flex; min-height: 0; }
+.rgc-chat .gxr-chat { flex: 1; display: flex; flex-direction: column; background: var(--r-chat) !important; border: 1px solid #9ea3aa !important; border-radius: 3px !important; box-shadow: inset 0 1px 3px rgba(0,0,0,.25) !important; overflow: hidden; }
+.rgc-chat .gxr-chat > h3 { display: none !important; }
+.rgc-chat #gxn { background: #f3ecd9 !important; border-bottom: 1px solid #c9b98f !important; color: #2b2410 !important; }
+.rgc-chat #gxn * { color: inherit; }
+.rgc-chat #gxn .gxn-role { color: #1f6b27 !important; background: rgba(61,156,70,.14) !important; }
+.rgc-chat #chat-messages { background: var(--r-chat) !important; padding: 6px 10px !important; font: 500 13.5px/1.5 var(--gx-font, sans-serif) !important; color: var(--r-chat-text) !important; }
+.rgc-chat #chat-messages .msg { display: flex !important; flex-direction: row !important; flex-wrap: wrap; align-items: baseline; gap: 0 5px; max-width: none !important; margin: 0 !important; padding: 1px 2px !important; background: none !important; border: 0 !important; box-shadow: none !important; align-self: stretch !important; text-align: left !important; }
+.rgc-chat #chat-messages .msg:hover { background: rgba(0,0,0,.05) !important; }
+.rgc-chat #chat-messages .msg .msg-header { display: contents !important; }
+.rgc-chat #chat-messages .msg .msg-time { order: 0; color: #1b1d21 !important; font-size: 13px !important; opacity: 1 !important; }
+.rgc-chat #chat-messages .msg .msg-time::before { content: '['; }
+.rgc-chat #chat-messages .msg .msg-time::after { content: ']'; }
+.rgc-chat #chat-messages .msg .msg-dot { display: none !important; }
+.rgc-chat #chat-messages .msg .msg-author { order: 1; font-weight: 800 !important; color: #111 !important; }
+.rgc-chat #chat-messages .msg.me .msg-author { color: #b3261e !important; }
+.rgc-chat #chat-messages .msg .msg-author::after { content: ':'; }
+.rgc-chat #chat-messages .msg .msg-author .clickable-name { color: inherit !important; }
+.rgc-chat #chat-messages .msg .msg-bubble { order: 2; flex: 1; min-width: 0; display: inline !important; padding: 0 !important; margin: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; color: var(--r-chat-text) !important; border-radius: 0 !important; max-width: none !important; font-size: 13.5px !important; }
+.rgc-chat #chat-messages .msg .msg-quote { order: -1; flex-basis: 100%; margin: 2px 0 0 !important; background: rgba(0,0,0,.06) !important; border-left-color: #8a9099 !important; color: #444 !important; }
+.rgc-chat #chat-messages .msg :is(.msg-reply, .msg-delete) { order: 3; opacity: 0; color: #666 !important; background: none !important; }
+.rgc-chat #chat-messages .msg:hover :is(.msg-reply, .msg-delete) { opacity: 1; }
+.rgc-chat #chat-messages .msg.reply-me, .rgc-chat #chat-messages .msg.mention-all-row { background: rgba(231,181,74,.22) !important; }
+.rgc-chat #chat-messages .sys-msg { margin: 1px 0 !important; padding: 1px 2px !important; background: none !important; border: 0 !important; text-align: left !important; color: #1d5fb0 !important; font: 600 13px/1.5 var(--gx-font, sans-serif) !important; }
+.rgc-chat .chat-input-row { background: #1a1c20 !important; border-top: 1px solid var(--r-line2) !important; padding: 6px !important; border-radius: 0 !important; }
+.rgc-chat .chat-input-row .input { background: #0e0f11 !important; border: 1px solid var(--r-line2) !important; color: var(--r-text) !important; border-radius: 3px !important; height: 32px !important; }
+.rgc-chat .chat-input-row .btn { height: 32px !important; width: 40px !important; border-radius: 3px !important; }
+
+/* Гишүүд: туг · нэр · Tier · LV */
+.rgc-members { display: flex; flex-direction: column; background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 4px; overflow: hidden; }
+.rgc-mhead { display: grid; grid-template-columns: 22px minmax(0, 1fr) 44px 30px; gap: 6px; padding: 3px 8px; font: 700 10px var(--gx-font, sans-serif); letter-spacing: .06em; text-transform: uppercase; color: var(--r-dim); border-bottom: 1px solid var(--r-line); }
+.rgc-mlist { flex: 1; min-height: 0; overflow: auto; padding: 3px 4px; }
+#rgc #members-list { list-style: none; margin: 0; padding: 0; display: block; }
+#rgc #members-list > li { display: grid !important; grid-template-columns: 22px minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px; padding: 2px 4px !important; margin: 0 0 1px !important; border: 0 !important; border-radius: 2px !important; background: none !important; color: var(--r-text) !important; font-size: 12.5px; min-height: 24px; }
+#rgc #members-list > li:nth-child(odd) { background: rgba(255,255,255,.025) !important; }
+#rgc #members-list > li:hover { background: rgba(90,162,230,.12) !important; }
+#rgc #members-list > li.me { background: rgba(231,181,74,.1) !important; }
+#rgc #members-list .m-flag { display: flex; align-items: center; justify-content: center; font: 700 9px var(--gx-font, sans-serif); color: var(--r-dim); }
+#rgc #members-list .m-flag img { width: 18px; height: 12px; object-fit: cover; border-radius: 1px; box-shadow: 0 0 0 1px rgba(0,0,0,.6); }
+#rgc #members-list .member-info { min-width: 0; font-weight: 700; }
+#rgc #members-list .member-info > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #e8e9ec; }
+#rgc #members-list .clickable-name { color: inherit !important; }
+#rgc #members-list li.t-silver .member-info > div { color: #9ccdf5; }
+#rgc #members-list li.t-gold .member-info > div { color: var(--r-gold); }
+#rgc #members-list li.r-mod .member-info > div { color: #6fdc7a; }
+#rgc #members-list li.r-admin .member-info > div { color: #ff6b5e; }
+#rgc #members-list .m-tier { min-width: 44px; text-align: center; padding: 1px 4px; border-radius: 2px; background: linear-gradient(#3fae4a, #237a2c); color: #fff; font: 800 11px/16px var(--gx-font, sans-serif); text-shadow: 0 1px 1px rgba(0,0,0,.4); }
+#rgc #members-list .m-lv { min-width: 26px; text-align: center; padding: 1px 3px; border-radius: 2px; background: #3b4048; color: #fff; font: 800 11px/16px var(--gx-font, sans-serif); }
+#rgc #members-list .mod-badge { font-size: 9px !important; padding: 0 4px !important; margin-left: 4px; vertical-align: 1px; }
+#rgc #members-list .afk-badge { font-size: 10px; color: var(--r-gold); margin-left: 4px; }
+#rgc #members-list .afk-badge.game { color: #7ed487; }
+#rgc #members-list .btn { height: 20px !important; padding: 0 6px !important; font-size: 10px !important; border-radius: 2px !important; }
+#rgc #members-list .ping-badge, #rgc #members-list [class*="ping"] { font-size: 10px; }
+#rgc #btn-invite-friends { margin: 6px 2px !important; width: calc(100% - 4px) !important; background: #22262b !important; color: var(--r-text) !important; border: 1px solid var(--r-line2) !important; border-radius: 3px !important; }
+body:not(.rgc) #members-list :is(.m-flag, .m-tier, .m-lv) { display: none !important; }
+
+/* Баруун: STARTED / OPEN GAMES + сонгосон тоглоом + [НЭГДЭХ] */
+.rgc-games { display: flex; flex-direction: column; gap: 6px; }
+.rgc-gsec { display: flex; flex-direction: column; min-height: 0; background: var(--r-panel); border: 1px solid var(--r-line); border-radius: 4px; overflow: hidden; }
+.rgc-gsec:first-child { flex: 0 1 30%; }
+.rgc-gsec-open { flex: 1 1 40%; }
+.rgc-selsec { flex: 0 0 auto; }
+.rgc-glist { flex: 1; min-height: 0; overflow: auto; padding: 3px 0; }
+.rgc-g { padding: 2px 9px; font-size: 12px; color: #cfd3d9; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; user-select: none; }
+.rgc-g b { font-weight: 700; color: var(--r-dim); margin-left: 3px; }
+.rgc-g:hover { background: rgba(90,162,230,.14); color: #fff; }
+.rgc-g.sel { background: linear-gradient(90deg, rgba(90,162,230,.35), rgba(90,162,230,.1)); color: #fff; }
+.rgc-g.mine { color: var(--r-gold); }
+.rgc-g.joined { color: #7ed487; }
+.rgc-g.st b { color: #e6a04a; }
+.rgc-empty { padding: 6px 9px; font-size: 11.5px; color: #5f656e; font-style: italic; }
+.rgc-sel { padding: 4px 0 6px; }
+.rgc-sel > div:not(.rgc-empty) { display: flex; justify-content: space-between; gap: 8px; padding: 2px 9px; font-size: 11.5px; }
+.rgc-sel span { color: var(--r-dim); }
+.rgc-sel b { color: var(--r-text); font-weight: 700; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.rgc-sign { flex: none; height: 38px; border-radius: 4px; border: 1px solid #1d5e24; background: linear-gradient(#4cc058, #2a8a33 55%, #1f6d27); color: #fff; font: 900 15px var(--gx-font, sans-serif); letter-spacing: .08em; text-shadow: 0 1px 2px rgba(0,0,0,.55); cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 6px rgba(0,0,0,.5); }
+.rgc-sign:hover:not(:disabled) { filter: brightness(1.1); }
+.rgc-sign:disabled { filter: grayscale(.8) brightness(.7); cursor: default; font-size: 11px; }
+.rgc-sign[data-act="stop"] { background: linear-gradient(#d5493d, #9e2a21); border-color: #6b1d16; }
+.rgc-sign[data-act="modreq"] { font-size: 12.5px; background: linear-gradient(#3d82c9, #24578f); border-color: #183d66; }
+
+/* ── Доод цэс: MENU · FORUM · START · LADDER · SHOP ── */
+.rgc-nav { flex: none; display: flex; justify-content: center; align-items: flex-end; gap: 6px; padding: 6px 0 8px; }
+.rgc-nav button { position: relative; min-width: 120px; height: 30px; padding: 0 18px; border: 1px solid #3c4148; border-radius: 3px; background: linear-gradient(#2e3238, #17191c); color: #e6e8eb; font: 800 13px var(--gx-font, sans-serif); letter-spacing: .1em; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 2px 4px rgba(0,0,0,.5); }
+.rgc-nav button:hover { background: linear-gradient(#3a3f46, #1d2024); color: #fff; }
+.rgc-nav button.start { min-width: 150px; height: 38px; font-size: 17px; letter-spacing: .14em; border-color: #7a1712; background: linear-gradient(#e2473a, #a3201a 60%, #7d1712); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+.rgc-nav button.start:hover { filter: brightness(1.1); }
+.rgc-nav button.start.dim { filter: saturate(.55) brightness(.85); }
+.rgc-nav button.start small { display: block; position: absolute; left: 0; right: 0; bottom: -15px; font: 600 10px var(--gx-font, sans-serif); letter-spacing: 0; color: var(--r-dim); text-shadow: none; white-space: nowrap; }
+.rgc-nav { padding-bottom: 18px; }
+
+@media (max-width: 1280px) { .rgc-main { grid-template-columns: 220px minmax(0, 1fr) 240px 210px; } }
+@media (max-width: 1080px) { .rgc-main { grid-template-columns: minmax(0, 1fr) 230px 200px; } .rgc-left { display: none; } }
+#rgc #members-list > li::before { display: none !important; content: none !important; }
+#rgc #members-list > li { position: relative; }
+#rgc #members-list > li :is(.kick-btn, .transfer-host-btn) { position: absolute; right: 74px; top: 50%; transform: translateY(-50%); display: none !important; }
+#rgc #members-list > li:hover :is(.kick-btn, .transfer-host-btn) { display: inline-flex !important; align-items: center; }
+#rgc #members-list .rp-ping:empty { display: none; }
+
+/* ── Ranked табын заавар карт (ranked-guide.jpg-ийн оронд, Room 1–5 дүрэмтэй) ── */
+.rk-guide { width: 100%; padding: 22px 24px; border-radius: 12px; background: radial-gradient(600px 300px at 20% 0%, #3a0d0d 0%, #1a0707 60%, #120505 100%); border: 2px solid #b91c1c; box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 30px rgba(0,0,0,.35); color: #f3e7e7; }
+.rk-guide-k { font: 800 11px var(--gx-font, sans-serif); letter-spacing: .08em; color: #ef4444; }
+.rk-guide-k b { color: #fbbf24; margin-left: 6px; }
+body .rk-guide h3 { margin: 6px 0 2px !important; font: 800 24px var(--gx-font, sans-serif) !important; color: #fff !important; }
+.rk-guide-sub { margin: 0 0 14px; font-size: 11.5px; color: #c9a9a9; }
+.rk-guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rk-guide-grid > div { display: grid; grid-template-columns: 24px 1fr; gap: 2px 8px; align-items: center; padding: 12px; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid rgba(239,68,68,.35); }
+.rk-guide-grid i { grid-row: span 1; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 800 12px var(--gx-font, sans-serif); font-style: normal; background: #dc2626; color: #fff; }
+.rk-guide-grid b { font: 800 13px var(--gx-font, sans-serif); color: #fbbf24; }
+.rk-guide-grid span { grid-column: 1 / -1; font-size: 11.5px; line-height: 1.45; color: #e5d3d3; }
+
+/* RGC баннер: Ranked тэмдэг */
+.rgc-rk { display: none; margin-left: 2px; padding: 3px 10px; border-radius: 3px; font: 900 11px var(--gx-font, sans-serif); letter-spacing: .12em; color: #1a1205; background: linear-gradient(#ffd25a, #d99a12); box-shadow: 0 0 12px rgba(255,190,40,.45); }
+#rgc.ranked .rgc-rk { display: inline-block; }
+
+/* ── засвар 1: чатын саарал талбар, нэрийн хэмжээ, Гарах товч, Холболтын давхардал ── */
+body.rgc #rgc .rgc-chat .gxr-chat-body, body.rgc #rgc .rgc-chat #chat-messages { background: var(--r-chat) !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; }
+body.rgc #rgc .rgc-chat #chat-input { background: #0e0f11 !important; color: var(--r-text) !important; }
+#rgc .rgc-chat #chat-messages .msg .msg-author, #rgc .rgc-chat #chat-messages .msg .msg-author * { font-size: 13.5px !important; font-weight: 800 !important; }
+#rgc .rgc-chat #chat-messages .msg .msg-time { font-weight: 600 !important; }
+#rgc .rgc-chat #chat-messages .sys-msg { text-align: left !important; }
+#rgc .rgc-chat .gxr-chat-body .chat-input-row, #rgc .rgc-chat #reply-bar, #rgc .rgc-chat [class*="reply-bar"] { background: #1a1c20 !important; color: var(--r-text) !important; }
+#rgc .rgc-chat [class*="reply-bar"] * { color: inherit; }
+#rgc .rgc-actions .btn { background: linear-gradient(#4a1a15, #2a0f0c) !important; color: #ffcdc6 !important; border: 1px solid #8a3328 !important; box-shadow: 0 2px 6px rgba(0,0,0,.6) !important; }
+#rgc .rgc-actions .btn:hover { background: linear-gradient(#6a231b, #3a130f) !important; color: #fff !important; }
+#rgc #gxr-conn-body .lan-host-panel, #rgc #gxr-conn-body .ip-game-panel { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+#rgc #gxr-conn-body #lan-games-list { display: none !important; }   /* RGC: тоглоомууд баруун талын OPEN GAMES-д */
+#rgc #gxr-conn-body #lan-host-text { margin: 0 !important; }

@@ -114,7 +114,8 @@ function gamePublic(g) {
   if (g.direct) endpoints.push({ type: 'direct', ip: g.direct.ip, port: g.direct.port });
   endpoints.push({ type: 'relay', ip: g.relay_ip, port: g.relay_port });
   return { game_token: g.token, relay_ip: g.relay_ip, relay_port: g.relay_port, gameinfo_b64: g.gameinfo_b64, endpoints,
-           host_user_id: g.host_user_id, host_username: g.host_username, host_wc3_name: g.host_wc3_name, created_at: g.created_at };
+           host_user_id: g.host_user_id, host_username: g.host_username, host_wc3_name: g.host_wc3_name, created_at: g.created_at,
+           started_at: g.started_at || null };
 }
 
 // Хэрэглэгчийн бүх тоглоомыг өрөөнөөс устгах (leave/disconnect дээр index.js дуудна)
@@ -168,6 +169,7 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const br = beginRelay.get(String(game_token)) || shardFor(currentRelay(), String(game_token));
   const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
+  delete g.started_at;   // GAMEINFO дахин ирсэн = лобби нээлттэй (OPEN GAMES)
   // Хостын mesh шууд endpoint (100.64/10 л зөвшөөрнө — өөр хаяг руу joiner-уудыг чиглүүлэх боломжгүй)
   // MESH_DISABLED үед хостын шууд endpoint-ийг зарлахгүй → бүх joiner (хуучин клиент ч) зөвхөн relay-ээр
   const meshOff = /^(1|true|yes)$/i.test(String(process.env.MESH_DISABLED || ''));
@@ -186,6 +188,16 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   }
   emitRoom(roomId, 'room:lan_lobby', gamePublic(g));
   await syncRoomStatus(roomId);   // LAN тоглоом нээгдлээ → өрөө 'playing' (гаднын хүн нэгдэхгүй)
+  return res.json({ ok: true });
+});
+
+// Тоглоом эхэлсэн (хостын WC3 лобби SEARCHGAME-д хариулахаа больсон) → STARTED GAMES (RGC маяг, 2026-10-02)
+router.post('/:id/lan-host/:token/started', authMW, async (req, res) => {
+  const m = roomGames.get(String(req.params.id));
+  const g = m && m.get(String(req.params.token));
+  if (!g) return res.status(404).json({ error: 'Тоглоом олдсонгүй' });
+  if (String(g.host_user_id) !== String(req.user.id)) return res.status(403).json({ error: 'Зөвхөн хост' });
+  if (!g.started_at) { g.started_at = Date.now(); emitRoom(String(req.params.id), 'room:lan_lobby', gamePublic(g)); }
   return res.json({ ok: true });
 });
 

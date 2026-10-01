@@ -149,7 +149,9 @@ router.get('/mine', optAuth, async (req, res) => {
 });
 
 router.post('/', strictAuth, async (req, res) => {
-  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '', ranked = false } = req.body;
+  const { name, max_players = 10, game_type = '', password, description = '', game_mode = '', background_url = '' } = req.body;
+  // 🏆 Ranked зөвхөн нийтийн WC3 Room 1–5-д (2026-10-02, эзний шийдвэр) — хувийн/кланы өрөө Ranked болохгүй
+  const ranked = false;
   if (!name) return res.status(400).json({ error: 'Room name is required' });
   if (!game_type) return res.status(400).json({ error: 'Game type is required' });
   // Кланы өрөө — зөвхөн тухайн кланы гишүүн үүсгэнэ
@@ -200,7 +202,7 @@ router.post('/', strictAuth, async (req, res) => {
         `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, password_hash, description, game_mode, background_url, ranked, clan_id)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
          RETURNING *`,
-        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl, ranked === true || ranked === 'true' || ranked === 1, clanId]
+        [name, userId, max_players, game_type, hasPassword, passwordHash, descTrimmed, game_mode || '', bgUrl, ranked, clanId]
       );
 
       const room = result.rows[0];
@@ -235,7 +237,7 @@ router.post('/', strictAuth, async (req, res) => {
     zerotier_network_id: null,
     description: descTrimmed,
     game_mode: game_mode || '',
-    ranked: ranked === true || ranked === 'true' || ranked === 1,
+    ranked,
     background_url: bgUrl,
     players: new Map([[userId, hostName]]),
   };

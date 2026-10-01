@@ -11,7 +11,7 @@
     play_seconds_total: 184000, play_next_diamond_sec: 1400, name_effect: 'neon', is_owner: true, unlimited_diamonds: false, banner_ver: q.get('banner') ? 1 : null,
   };
   const M = (id, name, tier) => ({ id, name, tier });
-  const CHANNELS = Array.from({ length: 20 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, game_type: 'Warcraft III: The Frozen Throne', status: 'waiting', player_count: [213, 200, 187, 164, 121, 96, 74, 52, 31, 18, 9, 4, 0, 0, 0, 0, 0, 0, 0, 0][i], members: [] }));
+  const CHANNELS = Array.from({ length: 20 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, ranked: i < 5, game_type: 'Warcraft III: The Frozen Throne', status: 'waiting', player_count: [213, 200, 187, 164, 121, 96, 74, 52, 31, 18, 9, 4, 0, 0, 0, 0, 0, 0, 0, 0][i], members: [] }));
   const rooms = [
     { id: 11, name: 'dota lod 6.74v5e', game_type: 'Warcraft III: The Frozen Throne', game_mode: 'LoD', status: 'waiting', ranked: true,
       host_id: 1, host_name: 'VitoCorleone', player_count: 7, max_players: 10, has_password: false, description: 'Ranked 5v5 · -ff 12 мин',
@@ -35,7 +35,7 @@
   const noop = () => {};
   const specific = {
     getUser: async () => (loggedIn ? user : null), refreshUser: async () => true, getToken: async () => 'preview',
-    getRooms: async () => (q.get('nochan') ? rooms : [...CHANNELS, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
+    getRooms: async () => (q.get('nochan') ? rooms : [...CHANNELS, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
@@ -45,7 +45,24 @@
     wc3Info: async () => ({ primary: { exe: 'C:\Program Files (x86)\Warcraft 3\war3.exe', exists: true, version: '1, 26, 0, 6401', is126: true, mapsDir: 'C:\Program Files (x86)\Warcraft 3\Maps\Downloads' } }),
     mapsLocal: async () => ({ files: { 'DotA v6.74c LoD v5e.w3x': { size: 1, sha256: 'a'.repeat(64) }, 'DotA IMBA v3.73.4b.w3x': { size: 1, sha256: 'old' } } }), meshStatus: async () => (q.get('mesh') === 'off' ? { state: 'NotInstalled', error: 'needs-consent' } : { state: 'Running', ip: '100.64.0.1' }), meshEnsure: async () => ({ state: 'NotInstalled', error: 'declined' }), getQR: async () => ({}),
     request: async (method, path) => {
-      if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
+      // RGC маягийн өрөө: OPEN/STARTED GAMES (хуурамч W3GS GAMEINFO)
+      if (/\/lan-host$/.test(String(path)) && q.get('kind') === 'channel') {
+        const gi = (name, map, host, used, avail) => {
+          const te = new TextEncoder(); const dec = [1, 0, 0, 0, 0, 116, 0, 116, 0, 9, 9, 9, 9, ...te.encode('Maps/Download/' + map + '.w3x'), 0, ...te.encode(host), 0, 0];
+          const enc = []; for (let i = 0; i < dec.length; i += 7) { const ch = dec.slice(i, i + 7); let mask = 1; const out = ch.map((b, j) => { if (b % 2 === 0) return b + 1; mask |= 1 << (j + 1); return b; }); enc.push(mask, ...out); }
+          const u32 = (v) => [v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >> 24) & 255];
+          const bytes = [0xf7, 0x30, 0, 0, ...te.encode('PX3W'), ...u32(26), ...u32(1), ...u32(7), ...te.encode(name), 0, 0, ...enc, 0, ...u32(12), ...u32(1), ...u32(used), ...u32(avail), ...u32(30), 0xe0, 0x17];
+          return btoa(String.fromCharCode(...bytes));
+        };
+        const now2 = Date.now();
+        return { relay_configured: true, games: [
+          { game_token: 'g1', host_user_id: 2, host_username: 'Billionaire', host_wc3_name: 'Billionaire', created_at: now2 - 120e3, gameinfo_b64: gi('Room1 #12 -ap', 'DotA v6.83d', 'Billionaire', 7, 10) },
+          { game_token: 'g2', host_user_id: 5, host_username: 'Benihen', host_wc3_name: 'Benihen', created_at: now2 - 40e3, gameinfo_b64: gi('LoD -sdzm 3k+', 'DotA v6.74c LoD v5e', 'Benihen', 3, 10) },
+          { game_token: 'g3', host_user_id: 6, host_username: 'FaSi', host_wc3_name: 'FaSi', created_at: now2 - 900e3, started_at: now2 - 754e3, gameinfo_b64: gi('Room1 #9 -ar', 'DotA v6.83d', 'FaSi', 10, 10) },
+          { game_token: 'g4', host_user_id: 7, host_username: 'Peozzzz', host_wc3_name: 'Peozzzz', created_at: now2 - 600e3, started_at: now2 - 233e3, gameinfo_b64: gi('IMBA fun', 'DotA IMBA v3.73.4b', 'Peozzzz', 8, 10) },
+        ] };
+      }
+      if (String(path).startsWith('/membership/public')) return String(path).split('ids=')[1].split(',').map(Number).map((id) => ({ id, tier: id === 2 ? 'gold' : [3, 8].includes(id) ? 'silver' : 'bronze', name_effect: 'gradient', level: [0, 42, 31, 9, 18, 27, 12, 55, 8, 3, 21, 14, 6, 2, 11, 5, 4][id] || 1, xp: 5000 }));
       const P = String(path);
       const staff = !q.get('user') && !(window.parent !== window && window.parent.location.search.includes('user=1'));
       if (P.startsWith('/roles/user/')) return { id: 31, username: 'Uka', role: 'moderator', can_set_admin: true, can_set_mod: true };
@@ -100,7 +117,7 @@
     if (q.get('create')) document.getElementById('btn-create-room')?.click();
     if (q.get('select')) { selectedRoomId = q.get('select'); renderFilteredRooms(); }
     if (q.get('chat')) { showTab('chat'); [['Bibi','gg wp'],['Uka','Өрөө нээлээ, орцгоо'],['FaSi','@VitoCorleone ирлээ']].forEach(([u,t],i)=>appendLobbyMessage({ userId: 30+i, username: u, text: t, time: Date.now()-i*6e4 })); appendLobbyMessage({ userId: 1, username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: Date.now() }); appendLobbyMessage({ userId: 2, username: 'Billionaire', text: '@everyone 20:00 цагт LoD тэмцээн эхэлнэ!', time: Date.now()+500 }, true); appendLobbyMessage({ userId: 41, username: 'Тэмүүжин Бат', text: 'Сайн, @VitoCorleone өрөөнд ор. @Uka чи бас', time: Date.now()+1000, replyTo: { username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: String(Date.now()) } }, true); document.querySelector('#lobby-chat-messages .msg.other .msg-reply')?.click(); const li=document.getElementById('lobby-chat-input'); if (li && q.get('mention')) { li.value='@Тэ'; li.dispatchEvent(new Event('input')); } }
-    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); try { renderMembers([{ id: 1, name: 'VitoCorleone', tier: '1-1' }, { id: 2, name: 'Billionaire', tier: '2-3', mod: true }, { id: 3, name: 'Eboshdee' }, { id: 4, name: 'Tom_Noiton', tier: '2-2' }]); } catch {} }, 900);
+    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); try { renderMembers([{ id: 1, name: 'VitoCorleone', tier: '1-1', cc: 'MN', admin: true }, { id: 2, name: 'Billionaire', tier: '2-3', mod: true, cc: 'MN' }, { id: 3, name: 'Eboshdee', cc: 'MN' }, { id: 4, name: 'Tom_Noiton', tier: '2-2', cc: 'KR' }, ...(q.get('kind') === 'channel' ? ['Benihen', 'FaSi', 'Peozzzz', 'qwe', 'Uka', 'Bibi', 'love68', 'MAYASTRO', 'AnTyC', 'Khulan', 'Temka', 'sda'].map((n, i) => ({ id: 5 + i, name: n, tier: ['3-1', '2-2', '4-1', '1-3', null][i % 5], cc: i === 6 ? 'US' : 'MN' })) : [])]); } catch {} }, 900);
     if (q.get('room')) window.gxRoom?.openRoom({ mode: 'room', roomId: '11', roomName: 'dota lod 6.74v5e', gameType: 'Warcraft III: The Frozen Throne', isHost: '1', hostId: '1', maxPlayers: q.get('ch') ? '300' : '10', theme: q.get('theme') || '', backgroundUrl: q.get('bg') || '', ...(q.get('ch') ? { roomId: '901', roomName: 'WC3 Room 1', isHost: '0', hostId: '', kind: 'channel', visibleCap: '200', gameType: 'Warcraft III: The Frozen Throne' } : {}) });
     if (q.get('clantab')) document.querySelector(`[data-clan-tab="${q.get('clantab')}"]`)?.click();
     if (q.get('clan')) window.gxClans?.openClan(q.get('clan'));

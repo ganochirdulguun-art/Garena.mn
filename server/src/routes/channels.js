@@ -13,6 +13,8 @@ try { db = require('../config/db'); } catch { db = null; }
 const WC3 = 'Warcraft III: The Frozen Throne';
 const CHANNEL_COUNT = Number(process.env.CHANNEL_COUNT || 20);
 const VISIBLE_CAP = 200;
+// 🏆 Ranked өрөөнүүд: Room 1..RANKED_CHANNELS (2026-10-02, эзний шийдвэр) — бусад нь энгийн
+const RANKED_CHANNELS = Number(process.env.RANKED_CHANNELS || 5);
 const REAL_CAP = 300;
 const DEFAULT_NOTICE = [
   '📢 Garena.mn нийтийн өрөөнд тавтай морил!',
@@ -62,6 +64,7 @@ async function ensureTables() {
         [`WC3 Room ${n}`, REAL_CAP, WC3, n, VISIBLE_CAP, DEFAULT_NOTICE]
       );
     }
+    await db.query("UPDATE rooms SET ranked = (channel_no <= $1::int) WHERE kind = 'channel' AND ranked IS DISTINCT FROM (channel_no <= $1::int)", [RANKED_CHANNELS]);
   } catch (e) { console.error('[Migration] channels:', e.message); }
 }
 
@@ -71,4 +74,4 @@ async function hasPremiumSlot(user) {
   try { const { tierOf } = require('./membership'); const t = await tierOf(user.id); return t === 'silver' || t === 'gold'; } catch { return false; }
 }
 
-module.exports = { ensureTables, hasPremiumSlot, DEFAULT_NOTICE, VISIBLE_CAP, REAL_CAP, WC3 };
+module.exports = { ensureTables, hasPremiumSlot, DEFAULT_NOTICE, VISIBLE_CAP, REAL_CAP, WC3, RANKED_CHANNELS };
