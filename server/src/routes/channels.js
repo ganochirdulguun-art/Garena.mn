@@ -57,8 +57,8 @@ async function ensureTables() {
     for (let n = 1; n <= CHANNEL_COUNT; n++) {
       await db.query(
         `INSERT INTO rooms (name, host_id, max_players, game_type, has_password, description, game_mode, kind, channel_no, visible_cap, pinned_notice, status)
-         SELECT $1, NULL, $2, $3, FALSE, '', 'LAN', 'channel', $4, $5, $6, 'waiting'
-         WHERE NOT EXISTS (SELECT 1 FROM rooms WHERE kind = 'channel' AND game_type = $3 AND channel_no = $4)`,
+         SELECT $1::varchar, NULL::int, $2::int, $3::varchar, FALSE, '', 'LAN', 'channel', $4::int, $5::int, $6::text, 'waiting'
+         WHERE NOT EXISTS (SELECT 1 FROM rooms WHERE kind = 'channel' AND game_type = $3::varchar AND channel_no = $4::int)`,
         [`WC3 Room ${n}`, REAL_CAP, WC3, n, VISIBLE_CAP, DEFAULT_NOTICE]
       );
     }
