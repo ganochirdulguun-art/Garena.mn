@@ -147,3 +147,7 @@ body.gx-staff .gx-side-fill .gxo-menu { margin: 0; }
 .gxch-head h3 { display: flex; align-items: center; gap: 8px; }
 .gxch-gico { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; box-shadow: 0 0 0 1px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.25); }
 img.gxcl-img { padding: 0; width: 22px; height: 22px; border-radius: 5px; object-fit: cover; background: none; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
+/* Ranked Room: тоглоомын icon + баруун доод буланд жижиг 🏆 */
+.gxcl-icw { position: relative; display: inline-flex; flex: none; }
+.gxcl-icw.rk img { box-shadow: 0 0 0 2px #f5b301, 0 0 8px rgba(245,179,1,.55); }
+.gxcl-icw.rk::after { content: '🏆'; position: absolute; right: -6px; bottom: -5px; font-size: 10px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }

@@ -141,7 +141,7 @@
           const fav = favs.has(String(c.id));
           const no = String(c.channel_no).padStart(2, '0');
           return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''} ${c.ranked ? 'ranked' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="${c.ranked ? '🏆 Ranked Room — хүчинтэй хожил бүр +2 💎. ' : ''}Дарж орох">
-            <span class="gxcl-name">${c.ranked ? `<i class="gxcl-ico k-${g.id}">🏆</i>` : `<img class="gxcl-ico gxcl-img" src="icons/${g.id}.png" alt="${g.ico}" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'gxcl-ico k-${g.id}',textContent:'${g.ico}'}))">`}${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
+            <span class="gxcl-name"><span class="gxcl-icw ${c.ranked ? 'rk' : ''}"${c.ranked ? ' title="Ranked Room"' : ''}><img class="gxcl-ico gxcl-img" src="icons/${g.id}.png" alt="${g.ico}" onerror="this.replaceWith(Object.assign(document.createElement('i'),{className:'gxcl-ico k-${g.id}',textContent:'${g.ico}'}))"></span>${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
             <span class="gxcl-game">${c.ranked ? `${g.short} · <b>Ranked</b>` : `${g.short} · ${g.net}`}</span>
             <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
             <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
