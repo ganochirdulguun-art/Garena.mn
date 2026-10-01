@@ -290,7 +290,12 @@
   if (Object.keys(roomsCache || {}).length) renderFilteredRooms();
   setTimeout(() => { syncMe(); if (Object.keys(roomsCache || {}).length) renderFilteredRooms(); }, 400);
   // ── Шууд холболт (mesh) төлөв — зүүн цэсэнд; идэвхгүй бол дарахад суулгаж/холбоно (UAC нэг удаа) ──
+  // 2026-10-01 (эзэн): bot1-ийн үеийнх шиг бүх тоглолт зөвхөн УБ relay-ээр — шууд холболтын (mesh) товч/тууз/цонхыг
+  // харуулахгүй. Дахин нээх бол MESH_UI = true + сервер MESH_DISABLED-ийг авна.
+  const MESH_UI = window.GX_MESH_UI !== false;   // app.js-д тодорхойлсон (одоо false)
+  if (!MESH_UI) { $('gx-mesh')?.classList.add('hidden'); document.getElementById('mesh-row')?.classList.add('hidden'); }
   function meshUi(st) {
+    if (!MESH_UI) return;
     const b = $('gx-mesh'); if (!b || !st) return;
     const on = st.state === 'Running' && !!st.ip;
     const busy = st.state === 'Installing' || st.state === 'Starting';

@@ -30,7 +30,8 @@ async function request(method, urlPath, body) {
 }
 
 async function getRooms() {
-  const { data } = await getClient().get('/rooms');
+  // 2026-10-01: Railway гацахад хүсэлт мөнхөд «Ачааллаж байна» дээр үлддэг байсан → 15с timeout (renderer дахин оролдоно)
+  const { data } = await getClient().get('/rooms', { timeout: 15000 });
   return data;
 }
 

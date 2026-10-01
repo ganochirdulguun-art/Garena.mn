@@ -160,7 +160,10 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
   // Хостын mesh шууд endpoint (100.64/10 л зөвшөөрнө — өөр хаяг руу joiner-уудыг чиглүүлэх боломжгүй)
-  if (direct && isMeshIp(direct.ip) && Number(direct.port) > 0 && Number(direct.port) < 65536) g.direct = { ip: String(direct.ip), port: Number(direct.port) };
+  // MESH_DISABLED үед хостын шууд endpoint-ийг зарлахгүй → бүх joiner (хуучин клиент ч) зөвхөн relay-ээр
+  const meshOff = /^(1|true|yes)$/i.test(String(process.env.MESH_DISABLED || ''));
+  if (!meshOff && direct && isMeshIp(direct.ip) && Number(direct.port) > 0 && Number(direct.port) < 65536) g.direct = { ip: String(direct.ip), port: Number(direct.port) };
+  else if (meshOff) delete g.direct;
   g.host_username = req.user.username || req.user.name || '';
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
   m.set(g.token, g);

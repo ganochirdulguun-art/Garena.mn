@@ -982,7 +982,7 @@ ipcMain.handle('config:ad', async () => {
   try {
     const { data } = await axios.get(`${SERVER_URL}/config`, { timeout: 8000 });
     return data?.ads?.length ? data.ads : (data?.ad ? [data.ad] : []);   // массив (эргэлдэх)
-  } catch { return []; }
+  } catch { return null; }   // null = сервер хүрэхгүй (renderer дахин оролдоно); [] = реклам алга
 });
 
 ipcMain.handle('dm:isWindowOpen', (_, userId) => {
@@ -1113,11 +1113,16 @@ ipcMain.handle('streamers:openUrl', async (_, url) => {
 });
 
 // ── Mesh (Tailscale ↔ Headscale) ──────────────────────────────────────────
-let _meshLoginServer = null;   // сервер /config → mesh.login_server (null = mesh унтраалттай)
+let _meshLoginServer = null;
+let _meshRetryTimer = null;   // сервер /config → mesh.login_server (null = mesh унтраалттай)
 async function meshEnsure(force = false) {
   if (!authService.getToken()) return meshService.last();   // нэвтрээгүй бол хүлээнэ
   if (!_meshLoginServer) {
-    try { const { data } = await axios.get(`${apiService.SERVER_URL}/config`, { timeout: 10000 }); _meshLoginServer = data?.mesh?.login_server || null; } catch {}
+    try { const { data } = await axios.get(`${apiService.SERVER_URL}/config`, { timeout: 10000 }); _meshLoginServer = data?.mesh?.login_server || null; }
+    catch {
+      // 2026-10-01: Railway түр унахад /config авч чадахгүй → 30 мин хүлээлгүй 1 минутын дараа дахин оролдоно
+      if (!_meshRetryTimer) _meshRetryTimer = setTimeout(() => { _meshRetryTimer = null; meshEnsure().catch(() => {}); }, 60 * 1000);
+    }
   }
   const msiPath = app.isPackaged ? path.join(process.resourcesPath, 'tailscale-setup.msi') : path.join(__dirname, 'resources', 'tailscale-setup.msi');
   return meshService.ensure({
@@ -1162,7 +1167,8 @@ ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotB
 ipcMain.handle('relay:startLanHost', async (_, opts) => {
   // Ш3: mesh (Tailscale) холбогдсон бол Tailscale IP дээр шууд joiner хүлээн авна (renderer announce-д direct-ийг илгээнэ)
   let meshIp = null;
-  try { const st = meshService.installed() ? await meshService.status() : meshService.last(); if (st.state === 'Running' && st.ip) meshIp = st.ip; } catch {}
+  // 2026-10-01: сервер mesh-ийг унтраасан (login_server алга) бол bot1-ийн үеийнх шиг ЗӨВХӨН relay — mesh listener нээхгүй
+  try { const st = meshService.installed() ? await meshService.status() : meshService.last(); if (_meshLoginServer && st.state === 'Running' && st.ip) meshIp = st.ip; } catch {}
   const r = gameRelayService.startLanHost({ ...(opts || {}), meshIp, onGameInfo: (b64) => broadcastToWindows('lan:gameinfo', { gameinfo_b64: b64 }) });
   return { ok: true, direct: r?.direct || null };
 });

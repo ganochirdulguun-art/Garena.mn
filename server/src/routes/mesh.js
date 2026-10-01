@@ -14,7 +14,10 @@ const HS_USER = process.env.HEADSCALE_USER_ID || '1';
 const AUTHKEY_TTL_MS = 60 * 60 * 1000;
 const AUTHKEY_COOLDOWN_MS = 2 * 60 * 1000;   // нэг хэрэглэгч 2 мин тутам 1 түлхүүр (алдаатай давталтаас хамгаална)
 
-function meshConfigured() { return !!(HS_URL && HS_KEY); }
+// 2026-10-01 (эзэн): bot1-ийн үеийнх шиг бүх тоглолт зөвхөн УБ relay-ээр — MESH_DISABLED=1 бол mesh бүхэлдээ унтарна
+// (клиент /config-оос login_server авахгүй → Tailscale-д нэгдэхгүй, шинэ түлхүүр олгохгүй, өрөөнд ⚡ тэмдэг гарахгүй).
+function meshDisabled() { return /^(1|true|yes)$/i.test(String(process.env.MESH_DISABLED || '')); }
+function meshConfigured() { return !meshDisabled() && !!(HS_URL && HS_KEY); }
 
 // userId → { ip, state, version, at, hostname }
 const meshByUser = new Map();
@@ -79,4 +82,4 @@ router.get('/status', authMiddleware, (req, res) => {
 });
 
 router._fetch = undefined;   // тест: mock fetch тавьж болно
-module.exports = { router, meshOf, hasMesh, noteMeshIp, isMeshIp, meshConfigured, loginServer: () => HS_URL || null };
+module.exports = { router, meshOf, hasMesh, noteMeshIp, isMeshIp, meshConfigured, meshDisabled, loginServer: () => (meshDisabled() ? null : HS_URL || null) };

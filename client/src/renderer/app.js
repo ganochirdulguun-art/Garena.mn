@@ -339,7 +339,7 @@ async function connectSocket() {
   socket.on('room:history', (msgs) => {
     msgs.forEach(msg => appendMessage(msg));
     // Өрөөнд ороход шууд холболтгүй бол сануулна (2.9.11)
-    if (window._meshState && !(window._meshState.state === 'Running' && window._meshState.ip) && !['ForeignTailnet', 'Disabled'].includes(window._meshState.state)) {
+    if (window.GX_MESH_UI !== false && window._meshState && !(window._meshState.state === 'Running' && window._meshState.ip) && !['ForeignTailnet', 'Disabled'].includes(window._meshState.state)) {
       appendSysMsg('⚠ Таны «Шууд холболт» идэвхгүй — тоглолт серверээр (Сингапур) дамжиж ping ~100мс+ болно. Үндсэн цонхны зүүн доод «Шууд холболт идэвхжүүлэх»-ийг дарж Монгол дотор ~10мс болгоорой.');
     }
   });
@@ -1008,10 +1008,15 @@ async function loadRooms() {
     rooms.forEach(r => { roomsCache[String(r.id)] = r; });
     populateGameTypeFilter(rooms);
     renderFilteredRooms();
+    _roomsRetry = 0;
   } catch {
-    waiting.innerHTML = '<p class="empty-text">Серверт холбогдож чадсангүй</p>';
+    waiting.innerHTML = '<p class="empty-text">Серверт холбогдож чадсангүй — автоматаар дахин оролдож байна…</p>';
+    // Сервер түр унасан бол 10, 20, … 60с-ийн дараа өөрөө дахин ачаална (апп дахин асаах шаардлагагүй)
+    clearTimeout(_roomsRetryTimer);
+    _roomsRetryTimer = setTimeout(() => { if (currentUser) loadRooms(); }, Math.min(++_roomsRetry, 6) * 10000);
   }
 }
+let _roomsRetry = 0, _roomsRetryTimer = null;
 
 // Тоглоомын төрлийн filter dropdown-г populate хийх
 function populateGameTypeFilter(rooms) {
@@ -1880,7 +1885,10 @@ document.getElementById('chat-input').addEventListener('keydown', e => {
 
 // ── Тоглогчдын жагсаалт ──────────────────────────────────
 // Шууд холболтын тэмдэг (2.9.11): ⚡ шууд = mesh идэвхтэй; relay = Сингапураар (~100мс+). Хуучин сервер mesh талбаргүй → юу ч харуулахгүй.
+// 2026-10-01 (эзэн): шууд холболт (mesh) UI унтраалттай — бүх цонхонд (өрөөний iframe ч) хамаарна
+window.GX_MESH_UI = false;
 function meshBadge(m) {
+  if (window.GX_MESH_UI === false) return '';   // mesh унтраалттай (2026-10-01)
   if (!m || typeof m !== 'object' || m.mesh === undefined) return '';
   return m.mesh
     ? '<span class="mesh-badge on" title="Шууд холболт идэвхтэй — Монгол дотор ~10мс">⚡ шууд</span>'
@@ -4979,10 +4987,12 @@ init();
     // GX (2.9.1): найзууд баруун самбарт шигтгэгдсэн тул тусдаа цонхыг автоматаар нээхгүй (самбараас гараар нээж болно)
     showPage = function (id) { _showPageMain(id); if (id === 'page-main' && !document.body.classList.contains('gx')) window.api.notifyMainShown?.(); };
     // Реклам (сервер /config → ad)
-    (async () => {
+    (async function loadAds(attempt = 1) {
       try {
-        const ads = await window.api.getAd?.();   // массив
+        const ads = await window.api.getAd?.();   // массив; null = сервер түр хүрэхгүй
         const slot = document.getElementById('ad-slot');
+        // 2026-10-01: сервер түр унасан бол (null) 1, 2, … 5 минутын дараа дахин оролдоно — апп дахин асаах шаардлагагүй
+        if (ads === null && slot && !slot.classList.contains('has-ad')) { setTimeout(() => loadAds(attempt + 1), Math.min(attempt, 5) * 60 * 1000); return; }
         if (!slot || !Array.isArray(ads) || !ads.length) return;
         slot.classList.add('has-ad');
         let idx = 0;

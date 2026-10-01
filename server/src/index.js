@@ -313,7 +313,8 @@ function membersArray(roomId) {
   const readySet = roomReady[roomId] || new Set();
   return [...roomMembers[roomId].entries()].map(([name, id]) => ({
     id, name, ready: readySet.has(id), tier: userTierById.get(String(id)) || null,
-    mesh: meshRoutes.hasMesh(id),   // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг
+    // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг; MESH_DISABLED үед талбаргүй (хуучин клиент тэмдэг харуулахгүй)
+    ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
   }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)

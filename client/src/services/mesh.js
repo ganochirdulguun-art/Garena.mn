@@ -110,7 +110,12 @@ async function ensure(ctx) {
   if (_busy) return _last;
   _busy = true;
   try {
-    if (!ctx.loginServer) return set({ state: 'Disabled', error: null });
+    if (!ctx.loginServer) {
+      // Сервер түр хүрэхгүй (/config алга) — Tailscale аль хэдийн ажиллаж байвал «идэвхгүй» гэж буруу харуулахгүй
+      const cur = await status();
+      if (cur.state === 'Running' && cur.ip) return set({ error: 'config-unavailable' });
+      return set({ state: 'Disabled', error: null });
+    }
     let st = await status();
     if (!st.installed) {
       // 2.9.11: автоматаар UAC гаргахгүй — renderer тайлбартай цонх (needs-consent) харуулж, «Идэвхжүүлэх» дарвал force-оор ирнэ
