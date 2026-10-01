@@ -3943,10 +3943,10 @@ function showGameResult(data) {
     const w = document.createElement('div');
     w.id = 'gx-whatsnew'; w.className = 'gxp-back';
     w.innerHTML = `<div class="gxp gxw" role="dialog" aria-modal="true">
-      <div class="gxw-hero"><img src="logo.png" alt=""><div><small>ШИНЭ ХУВИЛБАР</small><h3>Garena.mn 3.0</h3><p>Шинэ түвшинд шилжлээ — Garena Plus / RGC шиг нийтийн өрөөнүүд</p></div></div>
+      <div class="gxw-hero"><img src="logo.png" alt=""><div><small>ШИНЭ ХУВИЛБАР</small><h3>Garena.mn 3.0</h3><p>Шинэ түвшинд шилжлээ — нийтийн өрөөнүүд, Ranked, Moderator, чатын түүх</p></div></div>
       <ul class="gxw-list">
         <li><b>🌐 Нийтийн Room-ууд</b><span>WC3 Room 1–20 (200 хүн), CS 1.6 / Quake III / Red Alert 2 Room 1–5 — нэг товшилтоор орно.</span></li>
-        <li><b>🎮 RGC маягийн өрөө</b><span>OPEN / STARTED GAMES, гишүүдийн туг · Tier · Level, том чат, доод цэс MENU · START · LADDER · SHOP.</span></li>
+        <li><b>🎮 Шинэ өрөөний цонх</b><span>OPEN / STARTED GAMES, гишүүдийн туг · Tier · Level, том чат, доод цэс MENU · START · LADDER · SHOP.</span></li>
         <li><b>🏆 Ranked — WC3 Room 1–5</b><span>1v1-ээс дээш бүх тоглолтын дүн автоматаар, хожил бүр +2 💎.</span></li>
         <li><b>🛡 Moderator эрх</b><span>Room дотор «Moderator эрх хүсэх» → өөрөө LAN тоглоом нээж бусдыг тоглуулна.</span></li>
         <li><b>💬 Чатын түүх</b><span>Өрөөнөөс гараад буцаж ороход байхгүй үеийнхээ чатыг уншина.</span></li>
