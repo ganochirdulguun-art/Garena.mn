@@ -2,7 +2,8 @@
 // DATACOM relay нь тоглогч-хостын WC3 тоглоомын урсгалыг бичиж (capture), дуусмагц hostbot/reportGame.js
 // w3gsStats-аар задлаад энд POST хийнэ. Бот-хост ч, клиентийн replay ч ХЭРЭГГҮЙ: сервер өөрөө тоглогч
 // бүрийн K/D/A/creep/denie/neutral/gold/hero/item/ward, ялагч, сүлжээний тайланг (хэн гацаасан/унасан) авна.
-// Эзний дүрэм: 💎 зөвхөн RANKED өрөөний ХҮЧИНТЭЙ тоглолт (≥3v3, ≥12 мин, ялагч мэдэгдсэн); энгийн өрөө XP л.
+// Эзний дүрэм: 💎 зөвхөн RANKED өрөөний (WC3 Room 1–5) ХҮЧИНТЭЙ тоглолт (1v1-ээс дээш, ≥12 мин, ялагч мэдэгдсэн); энгийн өрөө XP л.
+// 2026-10-02 (эзэн): Ranked Room-д 1v1 тоглосон ч дүн бүртгэгдэж XP + 💎 олгоно (өмнө нь ≥3v3).
 const express = require('express');
 const crypto = require('crypto');
 const { recordGameResult } = require('../services/results');
@@ -15,7 +16,7 @@ try { db = require('../config/db'); } catch { db = null; }
 const REPORT_KEY = process.env.RELAY_REPORT_KEY || '';
 const RANKED = {
   MIN_GAME_SEC: 12 * 60,   // skill pick 2–5 мин + 10 мин -ff хүртэл
-  MIN_PER_TEAM: 3,         // 3v3-аас дээш; 1v1, 2v2 💎 үгүй
+  MIN_PER_TEAM: Math.max(1, Number(process.env.RANKED_MIN_PER_TEAM || 1)),   // 1v1-ээс дээш (2026-10-02)
   MAX_PLAYERS: 10,
 };
 

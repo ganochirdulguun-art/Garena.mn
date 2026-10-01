@@ -24,7 +24,7 @@
         <img class="rgc-logo" src="logo.png" alt="" />
         <div class="rgc-btitle"><b id="rgc-title">${esc(q.get('roomName') || 'WC3 Room')}</b><span>Garena.mn · Warcraft III · Нийтийн өрөө</span></div>
         <span id="rgc-privacy-slot"></span>
-        <span class="rgc-rk" title="Ranked Room: хүчинтэй хожил бүр +2 💎 (≥3v3, ≥12 мин, ялагчтай)">🏆 RANKED</span>
+        <span class="rgc-rk" title="Ranked Room: хүчинтэй хожил бүр +2 💎 (1v1-ээс дээш, ≥12 мин, ялагчтай)">🏆 RANKED</span>
         <span class="rgc-fill"></span>
         <div class="rgc-actions" id="rgc-actions"></div>
       </div>

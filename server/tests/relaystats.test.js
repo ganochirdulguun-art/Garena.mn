@@ -17,8 +17,12 @@ ok('11 мин → too-short (доод хязгаар ' + RANKED.MIN_GAME_SEC + '
   const players = [P(1, 1), P(1, 2), P(1, 3), P(2, 4), P(2, 5), P(2, 6)];
   assert.strictEqual(rankedValidity({ gameTimeSec: 11 * 60, winnerTeam: 2, players }).reason, 'too-short');
 });
-ok('2v2 → team-size; бүртгэлгүй (user_id-гүй) тоглогч тоологдохгүй', () => {
-  const players = [P(1, 1), P(1, 2), P(1, null), P(2, 4), P(2, 5), P(2, null)];
+ok('1v1 Ranked → хүчинтэй (2026-10-02 эзний шийдвэр)', () => {
+  const players = [P(1, 1), P(2, 2)];
+  assert.deepStrictEqual(rankedValidity({ gameTimeSec: 900, winnerTeam: 1, players }), { valid: true, reason: null });
+});
+ok('нэг талд бүртгэлтэй тоглогч алга → team-size; бүртгэлгүй (user_id-гүй) тоглогч тоологдохгүй', () => {
+  const players = [P(1, 1), P(1, 2), P(2, null), P(2, null)];
   assert.strictEqual(rankedValidity({ gameTimeSec: 900, winnerTeam: 1, players }).reason, 'team-size');
 });
 ok('resolvePlayers: joiner нэр → user_id, хост pid1 → host_user_id, статистик дамжина', () => {
