@@ -52,6 +52,8 @@ async function isAdminDiscordId(discordId) {
 async function isAdminUser(payload) {
   if (!payload) return false;
   if (isOwnerUser(payload)) return true;
+  // Платформын ADMIN цол (эзэн апп-аас баруун товчоор олгосон, 2026-10-02) — санах ойн кэш, DB асуулгагүй
+  try { if (payload.id != null && require('../routes/roles').isAdminCached(payload.id)) return true; } catch {}
   return isAdminDiscordId(payload.discord_id);
 }
 

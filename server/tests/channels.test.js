@@ -40,6 +40,9 @@ async function query(sql, p = []) {
   if (s.includes("SELECT id, user_id, role FROM role_requests WHERE id = $1 AND status = 'pending'")) return { rows: requests.filter((r) => r.id === Number(p[0]) && r.status === 'pending') };
   if (s.startsWith('UPDATE role_requests SET status = $2')) { const r = requests.find((x) => x.id === Number(p[0])); if (r) r.status = p[1]; return { rows: [] }; }
   if (s.startsWith('INSERT INTO platform_roles')) { roles.set(Number(p[0]), p[1]); return { rows: [] }; }
+  if (s.startsWith('DELETE FROM platform_roles WHERE user_id')) { const had = roles.delete(Number(p[0])); return { rows: had ? [{ role: 'x' }] : [], rowCount: had ? 1 : 0 }; }
+  if (s.includes('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean).map((u) => ({ ...u, banned: false })) };
+  if (s.includes('SELECT id, username, discord_id FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean) };
   if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
   if (s.includes('FROM room_players rp JOIN rooms r') || s.includes('isUserInRoom')) return { rows: [{}] };
   if (s.startsWith('UPDATE rooms SET pinned_notice')) { notice = p[1]; return { rows: [{ id: 901 }] }; }
@@ -79,6 +82,15 @@ async function main() {
 
   // Гишүүдийн идэвх
   r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Гишүүдийн идэвх зөвхөн ажилтанд');
+  // Баруун товчны цол: эзэн ADMIN өгнө, админ зөвхөн Moderator, эзэнд/админд хүрэхгүй
+  r = await call(2, 'POST', '/roles/set/3', { role: 'moderator' }); assert.equal(r.status, 403); ok('Moderator өөр хүнд цол өгч чадахгүй');
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin' }); assert.equal(r.status, 200); ok('Эзэн ADMIN цол өгнө');
+  r = await call(3, 'GET', '/roles/activity'); assert.notEqual(r.status, 403); ok('Шинэ ADMIN ажилтны эрхтэй болно (кэш)');
+  r = await call(3, 'POST', '/roles/set/2', { role: 'admin' }); assert.equal(r.status, 403); ok('Админ ADMIN цол өгч чадахгүй');
+  r = await call(3, 'POST', '/roles/set/2', { role: null }); assert.equal(r.status, 200); assert.equal(roles.has(2), false); ok('Админ Moderator хураана');
+  r = await call(3, 'POST', '/roles/set/1', { role: null }); assert.equal(r.status, 403); ok('Эзний цолд хүрэхгүй');
+  r = await call(1, 'POST', '/roles/set/3', { role: null }); assert.equal(r.status, 200); ok('Эзэн ADMIN хураана');
+  r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Хураасны дараа ажилтны эрхгүй');
   console.log(`=== channels: ${pass} PASS ===`);
   process.exit(0);
 }

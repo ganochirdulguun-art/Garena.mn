@@ -48,6 +48,7 @@
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
       const staff = !q.get('user') && !(window.parent !== window && window.parent.location.search.includes('user=1'));
+      if (P.startsWith('/roles/user/')) return { id: 31, username: 'Uka', role: 'moderator', can_set_admin: true, can_set_mod: true };
       if (P === '/roles/me') return { role: q.get('mod') ? 'moderator' : null, staff, owner: staff, can_host_channel: staff || !!q.get('mod'), pending: null, pending_count: 3 };
       if (P.startsWith('/roles/activity/')) return { rooms: [{ room_id: 5, name: 'dota lod 6.74v5e', game_type: 'Warcraft III', created_at: new Date(Date.now() - 864e5).toISOString(), open_sec: 5400 }], games: [{ created_at: new Date(Date.now() - 36e5).toISOString(), game_sec: 2700, ranked: true, xp: 45 }] };
       if (P.startsWith('/roles/activity')) return { users: [
@@ -93,6 +94,7 @@
   window.addEventListener('load', () => setTimeout(() => {
     if (q.get('noconfirm')) showConfirm = async () => false;
     if (q.get('tab')) showTab(q.get('tab'));
+    if (q.get('ctxuser')) setTimeout(() => { const el = document.querySelector('#lobby-chat-messages .clickable-name[data-user-id]'); const b = el.getBoundingClientRect(); el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 10, clientY: b.top + 8 })); }, 3500);
     if (q.get('owner')) setTimeout(() => document.querySelector('[data-gxo="' + q.get('owner') + '"]')?.click(), 1500);
     if (q.get('drawer')) window.gx?.openDrawer(q.get('drawer'));
     if (q.get('create')) document.getElementById('btn-create-room')?.click();

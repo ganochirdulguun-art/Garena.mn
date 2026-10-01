@@ -356,6 +356,7 @@ function membersArray(roomId) {
     // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг; MESH_DISABLED үед талбаргүй (хуучин клиент тэмдэг харуулахгүй)
     ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
     ...(require('./routes/roles').isModCached(id) ? { mod: true } : {}),   // Moderator «MOD» тэмдэг
+    ...(require('./routes/roles').isAdminCached(id) ? { admin: true } : {}),   // платформын ADMIN тэмдэг
   }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)

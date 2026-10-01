@@ -1932,7 +1932,7 @@ function renderMembers(members) {
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
-        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
+        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.admin ? '<span class="mod-badge admin" title="Платформын ADMIN">ADMIN</span>' : m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
       </div>
       ${hostBtn}${kickBtn}
     </li>`;

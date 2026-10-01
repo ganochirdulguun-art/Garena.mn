@@ -49,30 +49,93 @@
   };
   const fmtHours = (sec) => { const h = (Number(sec) || 0) / 3600; return h >= 10 ? `${Math.round(h)}ц` : `${h.toFixed(1)}ц`; };
 
+  // ── Хэрэглэгчийн нэр дээр баруун товч → цол (эзэн: ADMIN+Moderator, админ: Moderator) ──
+  (function userRoleMenu() {
+    let box = null;
+    const hide = () => box?.classList.add('hidden');
+    document.addEventListener('click', (e) => { if (box && !e.target.closest('#gxu-ctx')) hide(); });
+    window.addEventListener('blur', hide);
+    document.addEventListener('scroll', hide, true);
+    document.addEventListener('contextmenu', async (e) => {
+      const el = e.target.closest('[data-user-id]');
+      if (!el || !me?.staff) return;
+      const uid = String(el.dataset.userId || '');
+      if (!uid || uid === String((typeof currentUser !== 'undefined' && currentUser?.id) || '')) return;
+      e.preventDefault(); e.stopPropagation();
+      if (!box) { box = document.createElement('div'); box.id = 'gxu-ctx'; box.className = 'gx-ctx hidden'; document.body.appendChild(box); box.addEventListener('click', onPick); }
+      box.innerHTML = '<div class="gxu-h">Ачааллаж байна…</div>';
+      place(e);
+      let u; try { u = await api('get', `/roles/user/${uid}`); } catch (err) { box.innerHTML = `<div class="gxu-h">${esc(errMsg(err))}</div>`; return; }
+      const roleLbl = { owner: '👑 Эзэн', admin: '🛡 ADMIN', moderator: '⭐ Moderator' }[u.role] || 'Энгийн гишүүн';
+      const item = (act, label, cls = '') => `<button type="button" class="gx-ctx-i ${cls}" data-gxu="${act}" data-uid="${u.id}" data-name="${esc(u.username)}">${label}</button>`;
+      box.innerHTML = [
+        `<div class="gxu-h"><b>${esc(u.username)}</b><span>${roleLbl}</span></div>`,
+        u.can_set_admin ? (u.role === 'admin' ? item('unset', '🛡 ADMIN цол хураах', 'danger') : item('admin', '🛡 ADMIN цол өгөх', 'accent')) : '',
+        u.can_set_mod && u.role !== 'admin' ? (u.role === 'moderator' ? item('unset', '⭐ Moderator хураах', 'danger') : item('moderator', '⭐ Moderator өгөх', 'accent')) : '',
+        !u.can_set_admin && !u.can_set_mod ? '<div class="gxu-h gxo-muted">Энэ хэрэглэгчийн цолыг өөрчлөх эрхгүй</div>' : '',
+        '<hr>', item('profile', '👤 Профайл харах'),
+      ].join('');
+      place(e);
+    }, true);
+    function place(e) {
+      box.classList.remove('hidden');
+      const w = box.offsetWidth, h = box.offsetHeight;
+      box.style.left = `${Math.min(e.clientX, innerWidth - w - 8)}px`;
+      box.style.top = `${Math.min(e.clientY, innerHeight - h - 8)}px`;
+    }
+    async function onPick(e) {
+      const b = e.target.closest('[data-gxu]'); if (!b) return;
+      hide();
+      const act = b.dataset.gxu, uid = b.dataset.uid, name = b.dataset.name;
+      if (act === 'profile') { try { openUserProfile(uid); } catch {} return; }
+      const role = act === 'unset' ? null : act;
+      const q = role ? `${name}-д ${role === 'admin' ? 'ADMIN' : 'Moderator'} цол өгөх үү?` : `${name}-ийн цолыг хураах уу?`;
+      if (!await showConfirm('Цол', q)) return;
+      try { await api('post', `/roles/set/${uid}`, { role }); toast(role ? `✓ ${name} → ${role === 'admin' ? 'ADMIN' : 'Moderator'}` : `${name}-ийн цол хураагдлаа`, 'success'); }
+      catch (err) { toast(errMsg(err), 'error'); }
+    }
+  })();
+
   if (mode === 'room') return roomMode();
   if (mode) return;
   mainMode();
 
   // ══════════════════ Үндсэн цонх ══════════════════
+  function chFavs() { try { return new Set(JSON.parse(localStorage.getItem('gx_ch_favs') || '[]')); } catch { return new Set(); } }
   function mainMode() {
+    document.addEventListener('click', (e) => {
+      const f = e.target.closest('[data-ch-fav]'); if (!f) return;
+      e.stopPropagation(); e.preventDefault();
+      const s2 = chFavs(); const id = String(f.dataset.chFav); s2.has(id) ? s2.delete(id) : s2.add(id);
+      try { localStorage.setItem('gx_ch_favs', JSON.stringify([...s2])); } catch {}
+      try { renderFilteredRooms(); } catch {}
+    }, true);
     // Лобби: Room 1–20 хэсэг (gx.js renderFilteredRooms дуудна)
     window.gxChannels = {
+      // Garena Plus маяг: дээрээс доош цувсан жагсаалт — Өрөөний нэр | Тоглоом | Тоглогч | Дүүргэлт | ★
       sectionHTML(channels) {
         if (!channels.length) return '';
         const mine = String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '');
+        const favs = chFavs();
         const total = channels.reduce((a, c) => a + Number(c.player_count || 0), 0);
-        const cards = channels.map((c) => {
+        const sorted = channels.slice().sort((a, b) => (favs.has(String(b.id)) - favs.has(String(a.id))) || (Number(a.channel_no) - Number(b.channel_no)));
+        const rows = sorted.map((c) => {
           const n = Number(c.player_count || 0); const cap = Number(c.visible_cap || c.max_players || 200);
           const extra = Math.max(0, n - cap); const pct = Math.min(100, Math.round((Math.min(n, cap) / cap) * 100));
           const st = n >= cap ? 'full' : pct >= 80 ? 'busy' : 'ok';
-          return `<button type="button" class="gxch st-${st} ${String(c.id) === mine ? 'mine' : ''}" data-ch-join="${c.id}" title="${esc(c.name)} — ${n}/${cap}${extra ? ` (+${extra} Premium)` : ''}">
-            <span class="gxch-top"><b>Room ${esc(c.channel_no)}</b>${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
-            <span class="gxch-n">${Math.min(n, cap)}<small>/${cap}</small>${extra ? `<i title="Premium нөөц slot-оор орсон">⭐+${extra}</i>` : ''}</span>
-            <span class="gxch-bar"><i style="width:${pct}%"></i></span>
-            <span class="gxch-st">${st === 'full' ? 'Дүүрсэн · ⭐ Premium нэвтэрнэ' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
-          </button>`;
+          const fav = favs.has(String(c.id));
+          const no = String(c.channel_no).padStart(2, '0');
+          return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="Дарж орох">
+            <span class="gxcl-name"><i class="gxcl-ico">W3</i>${esc(c.name)}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
+            <span class="gxcl-game">Warcraft III · LAN</span>
+            <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
+            <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
+            <span class="gxcl-st">${st === 'full' ? 'Дүүрсэн · ⭐' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
+            <button type="button" class="gxcl-fav ${fav ? 'on' : ''}" data-ch-fav="${c.id}" title="${fav ? 'Дуртайгаас хасах' : 'Дуртайд нэмэх'}">${fav ? '★' : '☆'}</button>
+          </div>`;
         }).join('');
-        return `<section class="gxch-sec"><div class="gxch-head"><h3>🌐 Нийтийн өрөөнүүд <span>Warcraft III · Room 1–${channels.length}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div><div class="gxch-grid">${cards}</div></section>`;
+        return `<section class="gxch-sec"><div class="gxch-head"><h3>🌐 Нийтийн өрөөнүүд <span>Warcraft III · Room 1–${channels.length}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
+          <div class="gxcl"><div class="gxcl-row gxcl-th" role="row"><span>Өрөөний нэр</span><span>Тоглоом</span><span>Тоглогч</span><span>Дүүргэлт</span><span>Төлөв</span><span>★</span></div>${rows}</div></section>`;
       },
     };
     document.addEventListener('click', (e) => {
