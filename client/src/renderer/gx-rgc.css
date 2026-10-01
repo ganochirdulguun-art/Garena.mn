@@ -215,3 +215,7 @@ body.rgc:not(.rgc-wc3) .rgc-nav button.start { filter: saturate(.4) brightness(.
 .rgc-howto-mod small { display: block; margin-top: 5px; font-size: 11px; color: var(--r-dim); line-height: 1.4; }
 /* Баннер: WC3 Room-д Dota зураг (covers/wc3-room.jpg) — дүрүүд харагдахаар */
 body.rgc-wc3 .rgc-banner { background-position: center, center 42% !important; background: linear-gradient(90deg, rgba(8,9,11,.9) 0%, rgba(8,9,11,.45) 40%, rgba(8,9,11,.05) 100%), var(--rgc-cover) center 42% / cover no-repeat, #111 !important; }
+
+/* 👑 Эзэн — гишүүдийн жагсаалтын хамгийн дээр */
+#rgc #members-list li.r-owner .member-info > div { color: #ffd25a; }
+.mod-badge.owner { background: linear-gradient(135deg, #f5b301, #b7791f) !important; color: #1a1205 !important; }

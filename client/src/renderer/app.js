@@ -1956,10 +1956,10 @@ function renderMembers(members) {
     // Өөрийн нэр ч GOLD/Silver нэрийн эффекттэй (data-fx-user → decorate)
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : (id ? `<span class="m-self" data-fx-user="${safeId}">${displayName}</span>` : displayName);
     const cc = /^[A-Z]{2}$/.test(String(m.cc || '')) ? m.cc : '';
-    return `<li class="${isMe ? 'me' : ''}${m.admin ? ' r-admin' : m.mod ? ' r-mod' : ''}" data-uid="${safeId}" data-cc="${cc}">
+    return `<li class="${isMe ? 'me' : ''}${m.owner ? ' r-owner' : m.admin ? ' r-admin' : m.mod ? ' r-mod' : ''}" data-uid="${safeId}" data-cc="${cc}" data-tier="${escHtml(m.tier || '')}">
       <span class="m-flag">${cc ? `<img src="https://flagcdn.com/w20/${cc.toLowerCase()}.png" alt="${cc}" title="${cc}" loading="lazy" onerror="this.replaceWith(document.createTextNode('${cc}'))">` : ''}</span>
       <div class="member-info">
-        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.admin ? '<span class="mod-badge admin" title="Платформын ADMIN">ADMIN</span>' : m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
+        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.owner ? '<span class="mod-badge owner" title="Garena.mn-ийн эзэн">👑 ЭЗЭН</span>' : m.admin ? '<span class="mod-badge admin" title="Платформын ADMIN">ADMIN</span>' : m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
       </div>
       <span class="m-tier" title="Tier">${escHtml(m.tier || '—')}</span><span class="m-lv" data-lv-uid="${safeId}" title="Level">·</span>
       ${hostBtn}${kickBtn}

@@ -167,3 +167,8 @@ body.gx #ranking-table tbody tr:hover td, body.gx #game-history-table tbody tr:h
 body.gx #ranking-table td, body.gx #game-history-table td { color: var(--gx-text) !important; }
 body.gx #ranking-table tr.ranking-self td { background: var(--gx-amber-soft) !important; font-weight: 700; }
 body.gx #ranking-table tbody tr:nth-child(-n+3) td:nth-child(2) { font-weight: 800; }
+
+/* DM цонх (Yahoo маяг, бараан): GX цайвар загварын --text бараан болсноос бичсэн мессеж фонтойгоо уусдаг байв (2026-10-02) */
+body.gx .ymdm-input, body.gx .dm-popup-input { color: #f3f4f6 !important; caret-color: #ff6b5e; background: rgba(255,255,255,.07) !important; border-color: rgba(255,255,255,.18) !important; }
+body.gx .ymdm-input::placeholder, body.gx .dm-popup-input::placeholder { color: rgba(255,255,255,.45) !important; }
+body.gx .ymdm-input:focus, body.gx .dm-popup-input:focus { border-color: rgba(255,107,94,.65) !important; background: rgba(255,255,255,.1) !important; }

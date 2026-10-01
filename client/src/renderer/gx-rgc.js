@@ -254,7 +254,7 @@
     fetching = true;
     try {
       const rows = await window.api.request('get', `/membership/public?ids=${ids.slice(0, 200).join(',')}`);
-      (rows || []).forEach((r) => lvCache.set(String(r.id), { level: Number(r.level) || 1, xp: Number(r.xp) || 0, tier: r.tier || 'bronze' }));
+      (rows || []).forEach((r) => lvCache.set(String(r.id), { level: Number(r.level) || 1, xp: Number(r.xp) || 0, wins: Number(r.wins) || 0, tier: r.tier || 'bronze' }));
       ids.forEach((id) => { if (!lvCache.has(id)) lvCache.set(id, { level: 1, xp: 0, tier: 'bronze' }); });
     } catch { ids.forEach((id) => lvCache.set(id, lvCache.get(id) || { level: 1, xp: 0, tier: 'bronze' })); }
     fetching = false;
@@ -272,10 +272,12 @@
       if (!c) { need.push(id); return; }
       const lv = li.querySelector('.m-lv'); if (lv) lv.textContent = String(c.level);
       li.classList.toggle('t-gold', c.tier === 'gold'); li.classList.toggle('t-silver', c.tier === 'silver');
-      li.dataset.lv = String(c.level);
+      li.dataset.lv = String(c.level); li.dataset.wins = String(c.wins || 0);
     });
-    const rank = (li) => (li.classList.contains('r-admin') ? 2 : li.classList.contains('r-mod') ? 1 : 0);
-    const sorted = lis.slice().sort((a, b) => (rank(b) - rank(a)) || (Number(b.dataset.lv || 0) - Number(a.dataset.lv || 0)));
+    // Эрэмбэ (2026-10-02, эзэн): 👑 Эзэн → ADMIN → Moderator → Tier (1-1 хамгийн өндөр) → хожил → Level
+    const rank = (li) => (li.classList.contains('r-owner') ? 3 : li.classList.contains('r-admin') ? 2 : li.classList.contains('r-mod') ? 1 : 0);
+    const tierPts = (li) => { const m = /^([1-4])-([1-3])$/.exec(li.dataset.tier || ''); return m ? (5 - Number(m[1])) * 12 - (Number(m[2]) - 1) * 4 : 0; };
+    const sorted = lis.slice().sort((a, b) => (rank(b) - rank(a)) || (tierPts(b) - tierPts(a)) || (Number(b.dataset.wins || 0) - Number(a.dataset.wins || 0)) || (Number(b.dataset.lv || 0) - Number(a.dataset.lv || 0)));
     if (sorted.some((li, i) => li !== lis[i])) sorted.forEach((li) => ul.appendChild(li));
     $('rgc-mcount').textContent = String(lis.length);
     $('rgc-tree-n').textContent = String(lis.length);

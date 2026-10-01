@@ -244,10 +244,10 @@ router.get('/public', async (req, res) => {
   if (!ids.length || !await dbOk()) return res.json([]);
   try {
     const r = await db.query(
-      'SELECT id, membership, membership_until, name_effect, level, xp FROM users WHERE id = ANY($1::int[])',
+      'SELECT id, membership, membership_until, name_effect, level, xp, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins FROM users WHERE id = ANY($1::int[])',
       [ids]
     );
-    return res.json(r.rows.map((row) => ({ id: row.id, level: row.level || 1, xp: row.xp || 0, ...publicFx(row) })));
+    return res.json(r.rows.map((row) => ({ id: row.id, level: row.level || 1, xp: row.xp || 0, wins: Number(row.wins) || 0, ...publicFx(row) })));
   } catch (e) {
     console.error(e);
     return res.json([]);

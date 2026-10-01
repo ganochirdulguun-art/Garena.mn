@@ -360,6 +360,7 @@ function membersArray(roomId) {
     ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
     ...(require('./routes/roles').isModCached(id) ? { mod: true } : {}),   // Moderator «MOD» тэмдэг
     ...(require('./routes/roles').isAdminCached(id) ? { admin: true } : {}),   // платформын ADMIN тэмдэг
+    ...(require('./middleware/admin').isOwnerUser({ id }) ? { owner: true } : {}),   // 👑 Эзэн — жагсаалтын хамгийн дээр
   }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)
