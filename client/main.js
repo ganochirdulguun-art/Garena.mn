@@ -220,7 +220,9 @@ app.on('before-quit', async (e) => {
   if (_quitCleanupDone || _isInstallingUpdate) return;
   e.preventDefault();
   _quitCleanupDone = true;
-  try {
+  // 2026-10-01: сервер (Railway) гацахад эдгээр хүсэлт хэдэн минут хүлээж, апп ЦОНХГҮЙ далд үлддэг байсан →
+  // дахин дарахад single-instance lock-оос болж «алга болдог». Цэвэрлэгээг дээд тал нь 3 секунд хүлээнэ.
+  const cleanup = (async () => {
     const token = authService.getToken();
     if (token) {
       const myRoom = await apiService.getMyRoom();
@@ -233,7 +235,8 @@ app.on('before-quit', async (e) => {
         }
       }
     }
-  } catch {}
+  })().catch(() => {});
+  await Promise.race([cleanup, new Promise((r) => setTimeout(r, 3000))]);
   // Хаахад чимээгүй суулгах шинэчлэлт татагдсан бол: илүү шинэ хувилбар гарсан эсэхийг 8 сек дотор шалгаж татна
   if (_downloadedVersion) { try { await ensureLatestDownloaded(8000); } catch {} }
   gameRelayService.stopAll();
@@ -250,9 +253,13 @@ app.on('window-all-closed', () => {
 app.on('second-instance', (event, argv) => {
   const url = argv.find((arg) => arg.startsWith('garenamn://'));
   if (url) handleDeepLink(url);
-  if (mainWindow) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
     mainWindow.focus();
+  } else if (!_quitCleanupDone && app.isReady()) {
+    // Цонх ямар нэг шалтгаанаар алга болсон бол дахин дарахад шинээр нээнэ (2026-10-01)
+    createWindow();
   }
 });
 
