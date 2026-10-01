@@ -158,3 +158,18 @@ img.gxcl-img { padding: 0; width: 22px; height: 22px; border-radius: 5px; object
 .gxo-auto.on b { color: var(--gx-green); }
 .gxo-auto span { font-size: 12.5px; color: var(--gx-text-2); }
 .gxo-auto-act { display: flex; gap: 8px; flex: none; }
+/* «Өрөө үүсгэх» — GOLD биш хэрэглэгчийн заавар цонх */
+.gxp.gxg { width: min(620px, calc(100vw - 32px)); padding: 20px 20px 16px; }
+.gxg h3 { margin: 0 0 6px; font: 800 18px var(--gx-font); }
+.gxg-lead { margin: 0 0 12px; font-size: 13.5px; color: var(--gx-text-2); line-height: 1.5; }
+.gxg-steps { margin: 0 0 14px; padding: 0; list-style: none; counter-reset: g; display: grid; gap: 8px; }
+.gxg-steps li { counter-increment: g; position: relative; padding: 10px 12px 10px 44px; border-radius: 11px; background: var(--gx-surface-2); border: 1px solid var(--gx-line); }
+.gxg-steps li::before { content: counter(g); position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 800 12px var(--gx-font); color: #fff; background: var(--gx-accent, #e11d2e); }
+.gxg-steps li.done::before { content: '✓'; background: var(--gx-green); }
+.gxg-steps b { display: block; font-size: 13.5px; color: var(--gx-text); }
+.gxg-steps span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--gx-text-2); line-height: 1.45; }
+.gxg-steps em { font-style: normal; font-weight: 700; color: var(--gx-green); }
+.gxg-act { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+body.gx .gxp.gxg .gxg-gold { background: linear-gradient(135deg, #f5b301, #d97706) !important; color: #fff !important; border: 0 !important; }
+.gxg-act .btn { padding: 0 12px !important; font-size: 13px !important; white-space: nowrap; }
+.gxg-x { margin-right: auto; order: -1; }

@@ -191,8 +191,54 @@
       const cu = (typeof currentUser !== 'undefined' && currentUser) || {};
       if (cu.is_owner || cu.is_admin || cu.tier === 'gold' || cu.membership === 'gold') return;
       e.stopImmediatePropagation(); e.preventDefault();
-      if (await showConfirm('👑 GOLD эрх', 'Өөрийн хувийн өрөө үүсгэх нь GOLD гишүүнчлэлийн эрх.\n\nНийтийн Room 1–20-д хэн ч орж тоглоно. GOLD авбал 10 хүний хувийн өрөөгөө нээнэ. Premium хуудас руу очих уу?')) showTab('premium');
+      goldGuide();
     }, true);
+
+    // Нийтийн WC3 Room руу оруулна: багтаамжтай, хамгийн олон хүнтэйг (хүн цуглардаг) сонгоно
+    window.gxJoinPublic = async (kind = 'wc3') => {
+      const pick = () => Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && (typeof gameKindOf !== 'function' || gameKindOf(r.game_type) === kind));
+      let list = pick(); if (!list.length) { try { await loadRooms(); } catch {} list = pick(); }
+      if (!list.length) { showTab('lobby'); return; }
+      const free = list.filter((r) => Number(r.player_count || 0) < Number(r.visible_cap || 200));
+      const r = (free.length ? free : list).sort((a, b) => Number(b.player_count || 0) - Number(a.player_count || 0) || Number(a.channel_no) - Number(b.channel_no))[0];
+      if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(r.id)) { enterRoom(String(r.id), r.name, r.game_type, false, ''); return; }
+      channelJoin(r);
+    };
+
+    // «Өрөө үүсгэх» — GOLD биш хэрэглэгчид бүрэн заавар (2026-10-02, эзэн): Нийтийн Room → Moderator хүсэлт → LAN нээх, эсвэл GOLD
+    async function goldGuide() {
+      await loadMe();
+      const canHost = !!me?.can_host_channel; const pending = !!me?.pending; const auto = !!me?.auto_approve;
+      const wrap = document.createElement('div');
+      wrap.className = 'gxp-back';
+      wrap.innerHTML = `<div class="gxp gxg" role="dialog" aria-modal="true">
+        <h3>👑 Хувийн өрөө үүсгэх нь GOLD гишүүний эрх</h3>
+        <p class="gxg-lead">Гэхдээ та <b>одоо ч шууд тоглож</b> болно — Нийтийн Room-д орж Moderator эрх аваад өөрөө LAN тоглоом нээгээрэй:</p>
+        <ol class="gxg-steps">
+          <li><b>🌐 Нийтийн Room-д ор</b><span>Лоббигийн «Warcraft III» жагсаалтаас WC3 Room 1–20. 🏆 Room 1–5 нь Ranked — хожил бүр +2 💎.</span></li>
+          <li class="${canHost ? 'done' : ''}"><b>🛡 Moderator эрх хүс</b><span>${canHost ? '✓ Та аль хэдийн LAN нээх эрхтэй.' : pending ? '⏳ Таны хүсэлт хүлээгдэж байна — эзэн/админ батална.' : `Room дотор «Тоглоом дотор өрөө үүсгэх заавар» доорх «Moderator эрх хүсэх» эсвэл доорх товч.${auto ? ' <em>Одоо хүсэлт шууд (автоматаар) батлагдана!</em>' : ' Эзэн/админ батална.'}`}</span></li>
+          <li><b>🎮 LAN тоглоом нээ</b><span>Room-ын доод «START» / баруун талын «LAN НЭЭХ» → WC3 нээгдэнэ → Local Area Network → Create Game. Бусад нь OPEN GAMES-ээс «Нэгдэх» дарж орно.</span></li>
+          <li><b>👑 Өөрийн хувийн өрөө хэрэгтэй бол</b><span>GOLD гишүүнчлэл авбал нууц үгтэй/10 хүний хувийн өрөөгөө нээнэ (Diamond-оор ч авч болно).</span></li>
+        </ol>
+        <div class="gxg-act">
+          <button type="button" class="btn btn-primary" data-g="join">🌐 Нийтийн Room руу орох</button>
+          ${!canHost && !pending ? '<button type="button" class="btn" data-g="mod">🛡 Moderator хүсэлт илгээх</button>' : ''}
+          <button type="button" class="btn gxg-gold" data-g="gold">👑 GOLD авах</button>
+          <button type="button" class="btn gxg-x" data-g="close">Хаах</button>
+        </div></div>`;
+      const close = () => wrap.remove();
+      wrap.addEventListener('click', async (ev) => {
+        if (ev.target === wrap) return close();
+        const b = ev.target.closest('[data-g]'); if (!b) return;
+        const a = b.dataset.g; close();
+        if (a === 'join') window.gxJoinPublic('wc3');
+        else if (a === 'mod') { if (await requestModerator()) { if (me?.can_host_channel) window.gxJoinPublic('wc3'); } }
+        else if (a === 'gold') showTab('premium');
+      });
+      wrap.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') close(); });
+      document.body.appendChild(wrap);
+      wrap.querySelector('[data-g="join"]')?.focus();
+    }
 
     // Эзэн/админ: эзний цэс (рекламын оронд) + самбар + мэдэгдэл
     const t = setInterval(async () => {

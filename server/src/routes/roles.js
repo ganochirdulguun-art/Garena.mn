@@ -163,7 +163,7 @@ router.get('/me', auth, async (req, res) => {
     const staff = await isStaff(req.user);
     const role = await roleOf(req.user.id);
     const p = await db.query("SELECT id, role, created_at FROM role_requests WHERE user_id = $1 AND status = 'pending' ORDER BY id DESC LIMIT 1", [req.user.id]);
-    return res.json({ role, staff, owner: adminMW.isOwnerUser(req.user), can_host_channel: staff || role === 'moderator', pending: p.rows[0] || null, pending_count: staff ? await pendingCount() : undefined });
+    return res.json({ role, staff, owner: adminMW.isOwnerUser(req.user), can_host_channel: staff || role === 'moderator', pending: p.rows[0] || null, auto_approve: await autoActive(), pending_count: staff ? await pendingCount() : undefined });
   } catch (e) { console.error('[roles] me', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 

@@ -68,7 +68,7 @@
       const P = String(path);
       const staff = !q.get('user') && !(window.parent !== window && window.parent.location.search.includes('user=1'));
       if (P.startsWith('/roles/user/')) return { id: 31, username: 'Uka', role: 'moderator', can_set_admin: true, can_set_mod: true };
-      if (P === '/roles/me') return { role: q.get('mod') ? 'moderator' : null, staff, owner: staff, can_host_channel: staff || !!q.get('mod'), pending: null, pending_count: 3 };
+      if (P === '/roles/me') return { role: q.get('mod') ? 'moderator' : null, staff, owner: staff, can_host_channel: staff || !!q.get('mod'), pending: null, pending_count: 3, auto_approve: true };
       if (P.startsWith('/roles/activity/')) return { rooms: [{ room_id: 5, name: 'dota lod 6.74v5e', game_type: 'Warcraft III', created_at: new Date(Date.now() - 864e5).toISOString(), open_sec: 5400 }], games: [{ created_at: new Date(Date.now() - 36e5).toISOString(), game_sec: 2700, ranked: true, xp: 45 }] };
       if (P.startsWith('/roles/activity')) return { users: [
         { id: 2, username: 'Billionaire', tier: '2-3', play_seconds: 412000, games: 188, games_7d: 21, wins: 102, losses: 86, hosted: 64, rooms_created: 40, last_active_at: new Date().toISOString(), online: true, role: 'moderator' },
