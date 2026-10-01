@@ -46,6 +46,8 @@
     request: async (method, path) => {
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
+      if (P === '/wishes') return { counts: { umk3: 214, ctr: 187, goldeneye: 96 }, mine: ['ctr'] };
+      if (P.startsWith('/wishes/')) return { wished: true, counts: { umk3: 215, ctr: 187, goldeneye: 96 }, mine: ['ctr', 'umk3'] };
       if (/\/ipserver$/.test(P)) return q.get('srv') ? { server: { host_user_id: '2', host_username: 'Billionaire', kind: 'cs16', label: 'Counter-Strike 1.6', ip: '100.64.0.4', port: 27015, map: 'de_dust2' } } : { server: null };
       if (P === '/maps') return { can_upload: true, categories: ['DotA', 'LoD', 'IMBA', 'Melee', 'Tower Defense', 'RPG', 'Custom'], maps: [
         { id: 1, name: 'DotA LoD', version: 'v6.74c v5e', category: 'LoD', description: 'Legends of DotA — Garena.mn тэмцээний албан map', filename: 'DotA v6.74c LoD v5e.w3x', size: 8115000, sha256: 'a'.repeat(64), downloads: 412, featured: true },

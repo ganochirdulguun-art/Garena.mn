@@ -8,15 +8,67 @@
   const $ = (id) => document.getElementById(id);
   const esc = (t) => escHtml(t ?? '');
   const CATALOG = [
-    { id: 'wc3', title: 'Warcraft III: The Frozen Throne', short: 'Frozen Throne', ver: '1.26a', genre: 'Стратеги · RTS', net: 'LAN relay + mesh', status: 'ready',
+    { id: 'wc3', title: 'Warcraft III: The Frozen Throne', short: 'Frozen Throne', ver: '1.26a', genre: 'Стратеги · RTS', net: 'УБ relay (~12мс)', status: 'ready',
       desc: 'DotA, LoD, IMBA зэрэг map-тай. Ranked, XP, Diamond бүрэн ажиллана.', buy: 'https://shop.battle.net/product/warcraft-iii-reforged', cls: 'cv-wc3', mark: 'III' },
-    { id: 'cs16', title: 'Counter-Strike 1.6', short: 'Counter-Strike', ver: '1.6', genre: 'Буудлага · FPS', net: 'Mesh (шууд IP)', status: 'ready',
-      desc: 'Хост өөрийн PC дээр сервер нээж, өрөөний гишүүд нэг товчоор нэгдэнэ.', buy: 'https://store.steampowered.com/app/10/CounterStrike/', cls: 'cv-cs', mark: '1.6' },
-    { id: 'q3', title: 'Quake III Arena', short: 'Quake III', ver: '1.32', genre: 'Буудлага · Arena', net: 'Mesh (шууд IP)', status: 'ready',
-      desc: 'Хурдан arena буудлага. Сервер нээх ба нэгдэх нэг товчоор.', buy: 'https://store.steampowered.com/app/2200/Quake_III_Arena/', cls: 'cv-q3', mark: 'III' },
+    { id: 'cs16', title: 'Counter-Strike 1.6', short: 'Counter-Strike', ver: '1.6', genre: 'Буудлага · FPS', net: 'Удахгүй', status: 'soon',
+      desc: 'Хост өөрийн PC дээр сервер нээж, өрөөний гишүүд нэг товчоор нэгдэнэ. УБ relay-ээр холбох хөгжүүлэлтэд байна.', buy: 'https://store.steampowered.com/app/10/CounterStrike/', cls: 'cv-cs', mark: '1.6' },
+    { id: 'q3', title: 'Quake III Arena', short: 'Quake III', ver: '1.32', genre: 'Буудлага · Arena', net: 'Удахгүй', status: 'soon',
+      desc: 'Хурдан arena буудлага. УБ relay-ээр холбох хөгжүүлэлтэд байна.', buy: 'https://store.steampowered.com/app/2200/Quake_III_Arena/', cls: 'cv-q3', mark: 'III' },
     { id: 'ra2', title: "Command & Conquer: Red Alert 2", short: 'Red Alert 2', ver: "Yuri's Revenge", genre: 'Стратеги · RTS', net: 'Удахгүй', status: 'soon',
       desc: 'LAN broadcast гүүр хөгжүүлэлтэд байна. Удахгүй нэмэгдэнэ.', buy: 'https://store.steampowered.com/bundle/39394/', cls: 'cv-ra2', mark: '2' },
   ];
+  // «Хэрэглэгчдийн хүсэж буй тоглоомууд» (2026-10-01): эрх эзэмшигчээс албан ёсны зөвшөөрөл хүсэж буй тоглоомууд.
+  // Худал «удахгүй» амлахгүй — шошго «Зөвшөөрөл хүсэж байна», хэрэглэгч ❤-ээр санал өгнө (сервер /wishes).
+  const WISHES = [
+    { id: 'umk3', title: 'Ultimate Mortal Kombat 3', genre: 'Тулаан · Fighting', year: '1995', owner: 'Warner Bros. Games', desc: 'Sub-Zero, Scorpion, Kabal… Fatality-тай домогт тулааны тоглоом.' },
+    { id: 'ctr', title: 'Crash Team Racing', genre: 'Уралдаан · Kart', year: '1999', owner: 'Activision', desc: 'Crash болон найзуудын карт уралдаан — 4 хүн хамтдаа.' },
+    { id: 'goldeneye', title: 'GoldenEye 007', genre: 'Буудлага · FPS', year: '1997', owner: 'Nintendo · Rare · MGM', desc: 'James Bond — 4 тоглогчийн домогт DeathMatch.' },
+  ];
+  let wishData = null, wishLoading = false;
+  async function loadWishes(force) {
+    if (wishLoading || (wishData && !force)) return;
+    wishLoading = true;
+    try { wishData = await window.api.request('get', '/wishes'); } catch { wishData = wishData || { counts: {}, mine: [] }; }
+    wishLoading = false; renderWishes();
+  }
+  function wishCard(w) {
+    const n = Number(wishData?.counts?.[w.id] || 0); const mine = (wishData?.mine || []).includes(w.id);
+    return `<article class="gxc gxw">
+      <div class="gxc-cover">
+        <img class="gxc-img" src="covers/${w.id}.jpg" alt="${esc(w.title)}" loading="lazy" draggable="false" />
+        <span class="gxc-shade"></span>
+        <span class="gxc-tag wish" title="Garena.mn эрх эзэмшигч (${esc(w.owner)})-ээс албан ёсны зөвшөөрөл хүсэж байна">Зөвшөөрөл хүсэж байна</span>
+      </div>
+      <div class="gxc-body">
+        <h4 title="${esc(w.title)}">${esc(w.title)}</h4>
+        <div class="gxc-meta"><span>${esc(w.genre)}</span><span class="gxc-ver">${esc(w.year)}</span></div>
+        <p>${esc(w.desc)}</p>
+        <div class="gxw-owner">Эрх эзэмшигч: ${esc(w.owner)}</div>
+        <button type="button" class="gxw-btn ${mine ? 'on' : ''}" data-wish="${w.id}" ${wishData ? '' : 'disabled'}>
+          <span class="gxw-heart">${mine ? '❤' : '♡'}</span><span>${mine ? 'Та хүссэн' : 'Тоглохыг хүсэж байна'}</span><b>${wishData ? n : '…'}</b>
+        </button>
+      </div>
+    </article>`;
+  }
+  function renderWishes() {
+    const grid = $('gx-games-grid'); if (!grid) return;
+    let sec = $('gxw-sec');
+    const list = WISHES.filter((w) => !q || `${w.title} ${w.genre}`.toLowerCase().includes(q));
+    if (tab !== 'browse' || !list.length) { sec?.remove(); return; }
+    if (!sec) { sec = document.createElement('section'); sec.id = 'gxw-sec'; sec.className = 'gxw-sec'; grid.insertAdjacentElement('afterend', sec); }
+    const total = Object.values(wishData?.counts || {}).reduce((a, b) => a + Number(b || 0), 0);
+    sec.innerHTML = `<div class="gxw-head"><div><h3>❤ Хэрэглэгчдийн хүсэж буй тоглоомууд</h3>
+      <p>Эдгээр хуучны дурсамжтай тоглоомыг Garena.mn-д нэмэхээр эрх эзэмшигчдээс <b>албан ёсны зөвшөөрөл хүсэж байна</b>. Тоглохыг хүсэж байвал ❤ дарж санал өгөөрэй — таны санал зөвшөөрөл авахад тусална.</p></div>
+      ${wishData ? `<span class="gxw-total"><b>${total}</b> санал</span>` : ''}</div>
+      <div class="gx-games-grid gxc-grid">${list.map(wishCard).join('')}</div>`;
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-wish]'); if (!b) return;
+    e.stopPropagation(); b.disabled = true;
+    try { const r = await window.api.request('post', `/wishes/${encodeURIComponent(b.dataset.wish)}`); wishData = { counts: r.counts, mine: r.mine }; if (r.wished) showToast('❤ Санал тань бүртгэгдлээ. Баярлалаа!', 'success', 3000); }
+    catch (err) { showToast('Санал өгч чадсангүй. Дахин оролдоно уу.', 'error', 3500); }
+    renderWishes();
+  });
   /** exe нэр/зам эсвэл өрөөний game_type → каталогийн id */
   function kindOf(s) {
     const h = String(s || '').toLowerCase();
@@ -67,6 +119,7 @@
       b.classList.toggle('on', b.dataset.gxcTab === tab);
       const n = b.querySelector('i'); if (n) n.textContent = b.dataset.gxcTab === 'library' ? inst : favs().size;
     });
+    renderWishes(); loadWishes();
     grid.innerHTML = list.length ? list.map(card).join('')
       : `<div class="gx-empty"><svg><use href="#gx-i-games"/></svg><b>${tab === 'library' ? 'Таны санд тоглоом алга' : tab === 'fav' ? 'Дуртай тоглоом сонгоогүй байна' : 'Тоглоом олдсонгүй'}</b><span>${tab === 'library' ? 'Компьютер дээрээ суулгасан тоглоомын exe-г «Тоглоом нэмэх»-ээр бүртгэнэ.' : tab === 'fav' ? 'Картын ☆ товчоор дуртай тоглоомоо тэмдэглэ.' : ''}</span></div>`;
     // Статистик: каталогийн тоо, суулгасан

@@ -115,6 +115,7 @@ app.use('/anticheat', require('./routes/anticheat'));
 app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
 const meshRoutes = require('./routes/mesh');
 app.use('/mesh', meshRoutes.router);                     // Tailscale/Headscale mesh: preauth түлхүүр + клиентийн mesh IP тайлан (Ш2, 2026-09-27)
+app.use('/wishes', require('./routes/wishes').router);   // хэрэглэгчдийн хүсэж буй тоглоомуудын санал (2026-10-01)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
 const radarRoutes = require('./routes/radar');           // 📡 Радар: relay capture → hero хөдөлгөөн/kill (replay); саатал: зөвхөн эзэн 0с, бусад 120с (live — Шат 2)
 app.use('/relay', radarRoutes.relayRouter);              // POST /relay/radar (x-relay-key)
@@ -189,7 +190,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
