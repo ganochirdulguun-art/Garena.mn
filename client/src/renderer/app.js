@@ -3931,8 +3931,41 @@ function showGameResult(data) {
 
 // ── Update notification bar ───────────────────────────────
 // ── Portable хувилбар (Garena.mn-x.y.z.exe) — автомат шинэчлэлтгүй тул Setup суулгахыг байнга сануулна (2026-10-02) ──
+// ── «Garena.mn 3.0 — юу шинэ вэ» (2026-10-02): 3.x руу шинэчлэгдсэн хүнд нэг удаа ──
+(async function whatsNew3() {
+  if (new URLSearchParams(location.search).get('mode')) return;
+  let ver = ''; try { ver = await window.api?.getAppVersion?.(); } catch {}
+  if (!/^3\./.test(String(ver))) return;
+  try { if (localStorage.getItem('gx_whatsnew') === '3.0') return; } catch { return; }
+  const show = () => {
+    if (!currentUser) { setTimeout(show, 1500); return; }   // нэвтэрсний дараа
+    if (document.getElementById('gx-whatsnew')) return;
+    const w = document.createElement('div');
+    w.id = 'gx-whatsnew'; w.className = 'gxp-back';
+    w.innerHTML = `<div class="gxp gxw" role="dialog" aria-modal="true">
+      <div class="gxw-hero"><img src="logo.png" alt=""><div><small>ШИНЭ ХУВИЛБАР</small><h3>Garena.mn 3.0</h3><p>Шинэ түвшинд шилжлээ — Garena Plus / RGC шиг нийтийн өрөөнүүд</p></div></div>
+      <ul class="gxw-list">
+        <li><b>🌐 Нийтийн Room-ууд</b><span>WC3 Room 1–20 (200 хүн), CS 1.6 / Quake III / Red Alert 2 Room 1–5 — нэг товшилтоор орно.</span></li>
+        <li><b>🎮 RGC маягийн өрөө</b><span>OPEN / STARTED GAMES, гишүүдийн туг · Tier · Level, том чат, доод цэс MENU · START · LADDER · SHOP.</span></li>
+        <li><b>🏆 Ranked — WC3 Room 1–5</b><span>1v1-ээс дээш бүх тоглолтын дүн автоматаар, хожил бүр +2 💎.</span></li>
+        <li><b>🛡 Moderator эрх</b><span>Room дотор «Moderator эрх хүсэх» → өөрөө LAN тоглоом нээж бусдыг тоглуулна.</span></li>
+        <li><b>💬 Чатын түүх</b><span>Өрөөнөөс гараад буцаж ороход байхгүй үеийнхээ чатыг уншина.</span></li>
+        <li><b>⚡ Монгол дотор relay + автомат шинэчлэлт</b><span>УБ сервер — бага ping; апп нээхэд шинэчлэлт өөрөө орно.</span></li>
+      </ul>
+      <div class="gxw-act"><button type="button" class="btn" data-w="close">Хаах</button><button type="button" class="btn btn-primary" data-w="go">🌐 Нийтийн Room руу орох</button></div></div>`;
+    const done = () => { try { localStorage.setItem('gx_whatsnew', '3.0'); } catch {} w.remove(); };
+    w.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-w]');
+      if (e.target === w || b?.dataset.w === 'close') return done();
+      if (b?.dataset.w === 'go') { done(); try { showTab('lobby'); window.gxJoinPublic?.('wc3'); } catch {} }
+    });
+    document.body.appendChild(w);
+  };
+  setTimeout(show, 2500);
+})();
+
 (async function portableNotice() {
-  try { window._gxPortable = !!(await window.api?.isPortable?.()); } catch { window._gxPortable = false; }
+  try { window._gxPortable = (await window.api?.isPortable?.()) === true; } catch { window._gxPortable = false; }
   if (!window._gxPortable || new URLSearchParams(location.search).get('mode')) return;
   const SETUP_URL = 'https://garenamn-production.up.railway.app/';
   const show = () => {

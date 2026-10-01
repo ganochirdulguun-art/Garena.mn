@@ -39,7 +39,7 @@
     getUser: async () => (loggedIn ? user : null), refreshUser: async () => true, getToken: async () => 'preview',
     getRooms: async () => (q.get('nochan') ? rooms : [...CHANNELS, ...CH_EXTRA, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
-    getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
+    getAppVersion: async () => (q.get('v3') ? '3.0.0' : '2.9.0 (preview)'), getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
     getAd: async () => (q.get('noad') ? null : [{ image_tall: '/dev/ads/gs-ad-1-tall.png', text: 'GarenaSystem' }, { image_tall: '/dev/ads/gmn-ad-zeon-tall.png', text: 'ZEON' }, { image_tall: '/dev/ads/gmn-ad-diamond-tall.png', text: 'Diamond' }]),
     ipGameKind: async (t) => (/counter|cs/i.test(String(t)) ? 'cs16' : /quake/i.test(String(t)) ? 'q3' : null),

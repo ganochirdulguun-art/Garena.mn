@@ -173,3 +173,15 @@ img.gxcl-img { padding: 0; width: 22px; height: 22px; border-radius: 5px; object
 body.gx .gxp.gxg .gxg-gold { background: linear-gradient(135deg, #f5b301, #d97706) !important; color: #fff !important; border: 0 !important; }
 .gxg-act .btn { padding: 0 12px !important; font-size: 13px !important; white-space: nowrap; }
 .gxg-x { margin-right: auto; order: -1; }
+/* «Garena.mn 3.0 — юу шинэ вэ» */
+.gxp.gxw { width: min(600px, calc(100vw - 32px)); padding: 0 0 16px; overflow: hidden; }
+.gxw-hero { display: flex; align-items: center; gap: 16px; padding: 20px 22px; color: #fff; background: radial-gradient(500px 200px at 15% 0%, #3a0d0d 0%, #1a0707 70%), #120505; border-bottom: 2px solid #b91c1c; }
+.gxw-hero img { width: 64px; height: auto; filter: drop-shadow(0 2px 8px rgba(255,60,40,.5)); }
+.gxw-hero small { font: 800 11px var(--gx-font); letter-spacing: .14em; color: #fbbf24; }
+body .gxw-hero h3 { margin: 2px 0 2px !important; font: 900 28px var(--gx-font) !important; color: #fff !important; }
+.gxw-hero p { margin: 0; font-size: 13px; color: #e5d3d3; }
+.gxw-list { list-style: none; margin: 14px 20px 14px; padding: 0; display: grid; gap: 8px; }
+.gxw-list li { padding: 9px 12px; border-radius: 10px; background: var(--gx-surface-2); border: 1px solid var(--gx-line); }
+.gxw-list b { display: block; font-size: 13.5px; color: var(--gx-text); }
+.gxw-list span { display: block; margin-top: 2px; font-size: 12.5px; color: var(--gx-text-2); line-height: 1.45; }
+.gxw-act { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px; }
