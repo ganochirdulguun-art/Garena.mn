@@ -186,7 +186,11 @@
       }).join('');
     }
     const cnt = $('rooms-waiting-count'); if (cnt) cnt.textContent = `${openN} нээлттэй · ${playN} тоглож буй`;
-    const sub = $('gx-lobby-sub'); if (sub) sub.textContent = `${openN + playN} өрөө · ${openN} нээлттэй · ${playN} тоглож буй`;
+    // Тоолуур (2026-10-02): нийтийн Room-уудын тоглогч + явагдаж буй тоглолтыг ч оруулна
+    const allCh = Object.values(roomsCache).filter((r) => r.kind === 'channel');
+    const chPlayers = allCh.reduce((a, r) => a + Number(r.player_count || 0), 0) + rooms.reduce((a, r) => a + Number(r.player_count || 0), 0);
+    const liveGames = allCh.reduce((a, r) => a + Number(r.games_started || 0), 0) + playN;
+    const sub = $('gx-lobby-sub'); if (sub) sub.textContent = `${chPlayers} тоглогч онлайн өрөөнд · ${liveGames} тоглолт явагдаж байна · ${allCh.length + openN + playN} өрөө`;
     const sr = rooms.find((r) => String(r.id) === String(selectedRoomId));
     document.querySelector('.room-board-layout')?.classList.toggle('no-selection', !sr);
     const detail = $('room-detail-panel'); if (detail) detail.innerHTML = sr ? `<button type="button" class="gx-x gx-detail-x" title="Хаах">✕</button>${renderRoomDetail(sr)}` : '';

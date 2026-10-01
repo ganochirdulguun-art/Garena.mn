@@ -262,4 +262,11 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
-module.exports = { router, setIO, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
+// Өрөөний идэвхтэй LAN тоглоомын тоо — лоббийн жагсаалтын «🎮 N тоглолт» (санах ой, DB асуулгагүй)
+function gameCounts(roomId) {
+  const m = roomGames.get(String(roomId)); if (!m || !m.size) return null;
+  let open = 0, started = 0; for (const g of m.values()) { if (g.started_at) started++; else open++; }
+  return { open, started };
+}
+
+module.exports = { router, setIO, gameCounts, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };

@@ -13,6 +13,9 @@
   const M = (id, name, tier) => ({ id, name, tier });
   const CH_EXTRA = [['Counter-Strike 1.6', 'CS 1.6 Room', 941, [34, 12, 3, 0, 0]], ['Quake III Arena', 'Quake III Room', 951, [8, 0, 0, 0, 0]], ['Command & Conquer: Red Alert 2', 'Red Alert 2 Room', 961, [15, 4, 0, 0, 0]]]
     .flatMap(([gt, pre, base, pc]) => pc.map((n, i) => ({ id: base + i, name: `${pre} ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, ranked: false, game_type: gt, status: 'waiting', player_count: n, members: [] })));
+  // ?demo=1 — өдрийн ердийн ачаалал (эзний өгсөн 21 тоглогч: 9/6/4/2, 4 тоглолт) маркетингийн зурагт
+  const DEMO_N = { 1: [9, 1], 2: [6, 1], 3: [4, 1], 6: [2, 1] };
+  const DEMO_CH = [...Array.from({ length: 20 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, ranked: i < 5, game_type: 'Warcraft III: The Frozen Throne', status: 'waiting', player_count: (DEMO_N[i + 1] || [0])[0], ...(DEMO_N[i + 1] ? { games_started: DEMO_N[i + 1][1] } : {}), members: [] }))];
   const CHANNELS = Array.from({ length: 20 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, ranked: i < 5, game_type: 'Warcraft III: The Frozen Throne', status: 'waiting', player_count: [213, 200, 187, 164, 121, 96, 74, 52, 31, 18, 9, 4, 0, 0, 0, 0, 0, 0, 0, 0][i], members: [] }));
   const rooms = [
     { id: 11, name: 'dota lod 6.74v5e', game_type: 'Warcraft III: The Frozen Throne', game_mode: 'LoD', status: 'waiting', ranked: true,
@@ -37,7 +40,7 @@
   const noop = () => {};
   const specific = {
     getUser: async () => (loggedIn ? user : null), refreshUser: async () => true, getToken: async () => 'preview',
-    getRooms: async () => (q.get('nochan') ? rooms : [...CHANNELS, ...CH_EXTRA, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
+    getRooms: async () => (q.get('nochan') ? rooms : q.get('demo') ? DEMO_CH : [...CHANNELS, ...CH_EXTRA, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => (q.get('v3') ? '3.0.0' : '2.9.0 (preview)'), getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),

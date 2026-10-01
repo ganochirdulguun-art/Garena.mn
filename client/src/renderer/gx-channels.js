@@ -150,7 +150,7 @@
             <span class="gxcl-game">${c.ranked ? `${g.short} · <b>Ranked</b>` : `${g.short} · ${g.net}`}</span>
             <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
             <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
-            <span class="gxcl-st">${st === 'full' ? 'Дүүрсэн · ⭐' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
+            <span class="gxcl-st">${(c.games_started || c.games_open) ? `<b class="gxcl-live" title="Энэ Room-д явагдаж буй / нээлттэй LAN тоглоом">🎮 ${c.games_started ? `${c.games_started} тоглолт` : ''}${c.games_started && c.games_open ? ' · ' : ''}${c.games_open ? `${c.games_open} нээлттэй` : ''}</b>` : st === 'full' ? 'Дүүрсэн · ⭐' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
             <button type="button" class="gxcl-fav ${fav ? 'on' : ''}" data-ch-fav="${c.id}" title="${fav ? 'Дуртайгаас хасах' : 'Дуртайд нэмэх'}">${fav ? '★' : '☆'}</button>
           </div>`;
         }).join('');
