@@ -151,3 +151,10 @@ img.gxcl-img { padding: 0; width: 22px; height: 22px; border-radius: 5px; object
 .gxcl-icw { position: relative; display: inline-flex; flex: none; }
 .gxcl-icw.rk img { box-shadow: 0 0 0 2px #f5b301, 0 0 8px rgba(245,179,1,.55); }
 .gxcl-icw.rk::after { content: '🏆'; position: absolute; right: -6px; bottom: -5px; font-size: 10px; line-height: 1; filter: drop-shadow(0 1px 1px rgba(0,0,0,.4)); }
+/* Moderator хүсэлтийн автомат батлалтын төлөв (эзний/админы самбар) */
+.gxo-auto { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--gx-line); background: var(--gx-surface-2); }
+.gxo-auto.on { border-color: color-mix(in srgb, var(--gx-green) 45%, transparent); background: var(--gx-green-soft); }
+.gxo-auto b { display: block; font-size: 13.5px; color: var(--gx-text); }
+.gxo-auto.on b { color: var(--gx-green); }
+.gxo-auto span { font-size: 12.5px; color: var(--gx-text-2); }
+.gxo-auto-act { display: flex; gap: 8px; flex: none; }

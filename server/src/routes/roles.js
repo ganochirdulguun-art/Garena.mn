@@ -29,6 +29,36 @@ function isAdminCached(userId) { return adminSet.has(String(userId)); }
 function cacheRole(userId, role) { const id = String(userId); modSet.delete(id); adminSet.delete(id); if (role === 'moderator') modSet.add(id); if (role === 'admin') adminSet.add(id); }
 
 async function dbOk() { if (!db) return false; try { await db.query('SELECT 1'); return true; } catch { return false; } }
+
+// ── Автомат батлалт: until (ISO) хүртэл шинэ Moderator хүсэлтийг шууд батална ──
+const AUTO_DEFAULT_UNTIL = '2026-10-09T23:59:59+08:00';
+const AUTO_NOTE = 'Автомат батлалт (эзний тохиргоо)';
+let _autoCache = null;   // { until: ms|null, at }
+async function autoUntil() {
+  if (_autoCache && Date.now() - _autoCache.at < 30000) return _autoCache.until;
+  let until = null;
+  try { const r = await db.query("SELECT value FROM platform_settings WHERE key = 'mod_auto_approve_until'"); const t = Date.parse(r.rows[0]?.value || ''); until = Number.isFinite(t) ? t : null; } catch {}
+  _autoCache = { until, at: Date.now() };
+  return until;
+}
+async function autoActive() { const u = await autoUntil(); return !!u && u > Date.now(); }
+async function approveRequest(rq, decidedBy, note) {
+  await db.query(`UPDATE role_requests SET status = 'approved', decided_by = $2, decided_at = NOW(), decision_note = $3 WHERE id = $1 AND status = 'pending'`, [rq.id, decidedBy, note]);
+  await db.query(`INSERT INTO platform_roles (user_id, role, granted_by) VALUES ($1, $2, $3)
+    ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by, granted_at = NOW()`, [rq.user_id, rq.role || 'moderator', decidedBy]);
+  cacheRole(rq.user_id, rq.role || 'moderator');
+  if (_io) _io.to(`user:${rq.user_id}`).emit('role:decided', { role: rq.role || 'moderator', approved: true, note, auto: !decidedBy });
+}
+// Хүлээгдэж буй бүх хүсэлтийг батална (асаах үед / сервер асахад). ADMIN цол хүссэн хүсэлт ирэхгүй (зөвхөн moderator).
+async function sweepAutoApprove() {
+  if (!await dbOk() || !await autoActive()) return 0;
+  const r = await db.query(`SELECT rq.id, rq.user_id, rq.role FROM role_requests rq JOIN users u ON u.id = rq.user_id
+    WHERE rq.status = 'pending' AND rq.role = 'moderator' AND NOT COALESCE(u.banned, FALSE)`);
+  for (const rq of r.rows) { try { await approveRequest(rq, null, AUTO_NOTE); } catch (e) { console.error('[roles] auto', e.message); } }
+  if (r.rows.length) { console.log(`[roles] автоматаар ${r.rows.length} Moderator хүсэлт батлав`); notifyStaff({ type: 'role_decided', pending_count: await pendingCount() }); }
+  return r.rows.length;
+}
+
 async function ensureTables() {
   if (!await dbOk()) return;
   try {
@@ -52,6 +82,13 @@ async function ensureTables() {
     await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS role_requests_one_pending ON role_requests (user_id, role) WHERE status = 'pending'`);
     await loadMods();
   } catch (e) { console.error('[Migration] roles:', e.message); }
+  // Moderator хүсэлтийн АВТОМАТ батлалт (2026-10-02, эзэн: «энэ 7 хоногт» — ADMIN алга тул) — эхлэлийн утга 10-09 23:59 (УБ)
+  try {
+    await db.query(`CREATE TABLE IF NOT EXISTS platform_settings (key VARCHAR(64) PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`);
+    await db.query(`INSERT INTO platform_settings (key, value) VALUES ('mod_auto_approve_until', $1) ON CONFLICT (key) DO NOTHING`, [AUTO_DEFAULT_UNTIL]);
+    _autoCache = null;
+    setTimeout(() => sweepAutoApprove().catch(() => {}), 5000);   // хүлээгдэж буй хүсэлтүүдийг батална
+  } catch (e) { console.error('[Migration] platform_settings:', e.message); }
   // Гишүүдийн идэвх (эзний самбар): сүүлд идэвхтэй байсан цаг + өрөө нээсэн түүх (өрөө устсан ч үлдэнэ)
   try {
     await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ');
@@ -142,6 +179,11 @@ router.post('/request', auth, async (req, res) => {
       `INSERT INTO role_requests (user_id, role, note) VALUES ($1, 'moderator', $2)
        ON CONFLICT (user_id, role) WHERE status = 'pending' DO NOTHING RETURNING id, created_at`, [req.user.id, note]);
     if (!r.rows[0]) return res.status(409).json({ error: 'Таны хүсэлт аль хэдийн хүлээгдэж байна' });
+    if (await autoActive()) {
+      await approveRequest({ id: r.rows[0].id, user_id: req.user.id, role: 'moderator' }, null, AUTO_NOTE);
+      notifyStaff({ type: 'role_auto', id: r.rows[0].id, username: req.user.username, note, pending_count: await pendingCount() });
+      return res.json({ ok: true, id: r.rows[0].id, auto: true, approved: true });
+    }
     notifyStaff({ type: 'role_request', id: r.rows[0].id, username: req.user.username, note, pending_count: await pendingCount() });
     return res.json({ ok: true, id: r.rows[0].id });
   } catch (e) { console.error('[roles] request', e.message); return res.status(500).json({ error: 'Server error' }); }
@@ -181,6 +223,24 @@ async function decide(req, res, approve) {
   } catch (e) { console.error('[roles] decide', e.message); return res.status(500).json({ error: 'Server error' }); }
 }
 router.post('/requests/:id/approve', auth, staffOnly, (req, res) => decide(req, res, true));
+
+// Автомат батлалтын төлөв (ажилтан харна) / тохируулах (зөвхөн эзэн): { days: 0..30 } — 0 = унтраах
+router.get('/auto', auth, staffOnly, async (req, res) => {
+  const until = await autoUntil();
+  return res.json({ until: until ? new Date(until).toISOString() : null, active: !!until && until > Date.now(), can_edit: adminMW.isOwnerUser(req.user) });
+});
+router.post('/auto', auth, staffOnly, async (req, res) => {
+  if (!adminMW.isOwnerUser(req.user)) return res.status(403).json({ error: 'Зөвхөн эзэн тохируулна' });
+  const days = Math.max(0, Math.min(30, Number(req.body?.days) || 0));
+  const until = days ? new Date(Date.now() + days * 864e5).toISOString() : new Date(0).toISOString();
+  try {
+    await db.query(`INSERT INTO platform_settings (key, value, updated_at) VALUES ('mod_auto_approve_until', $1, NOW())
+      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`, [until]);
+    _autoCache = null;
+    const swept = days ? await sweepAutoApprove() : 0;
+    return res.json({ ok: true, until: days ? until : null, active: !!days, swept });
+  } catch (e) { console.error('[roles] auto set', e.message); return res.status(500).json({ error: 'Server error' }); }
+});
 router.post('/requests/:id/reject', auth, staffOnly, (req, res) => decide(req, res, false));
 
 // ── Гишүүдийн идэвх (эзэн/админ) — хамгийн идэвхтэйг олж Moderator олгоход ──

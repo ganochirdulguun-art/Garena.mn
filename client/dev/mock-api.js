@@ -75,6 +75,7 @@
         { id: 3, username: 'Eboshdee', tier: '3-1', play_seconds: 305000, games: 141, games_7d: 30, wins: 70, losses: 71, hosted: 22, rooms_created: 9, last_active_at: new Date(Date.now() - 7200e3).toISOString(), online: false, requested: true },
         { id: 4, username: 'Tom_Noiton', tier: '2-2', play_seconds: 98000, games: 52, games_7d: 8, wins: 30, losses: 22, hosted: 3, rooms_created: 1, last_active_at: new Date(Date.now() - 864e5 * 3).toISOString(), online: false },
       ] };
+      if (P === '/roles/auto') return { until: '2026-10-09T15:59:59.000Z', active: true, can_edit: staff };
       if (P.startsWith('/roles/requests')) return { pending_count: 1, requests: [{ id: 1, user_id: 3, username: 'Eboshdee', tier: '3-1', note: 'Өдөр бүр LoD хостлодог, 10 хүн цуглуулна', created_at: new Date(Date.now() - 3600e3).toISOString(), wins: 70, losses: 71 }] };
       if (P === '/roles/moderators') return { moderators: [{ user_id: 2, username: 'Billionaire', tier: '2-3', granted_at: new Date(Date.now() - 864e5).toISOString(), granted_by_name: 'VitoCorleone' }] };
       if (P === '/roles/kicks') return { kicks: [{ id: 1, room_id: 903, room_name: 'WC3 Room 3', reason: 'AFK 45 мин', created_at: new Date(Date.now() - 1800e3).toISOString(), target_name: 'afk_guy', by_name: 'Billionaire' }] };

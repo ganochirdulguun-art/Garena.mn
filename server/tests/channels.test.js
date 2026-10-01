@@ -18,6 +18,7 @@ let channelCount = 200;               // одоо өрөөнд байгаа хү
 const roles = new Map();              // user_id -> role
 const requests = [];                  // { id, user_id, role, note, status }
 let notice = '';
+let autoUntilVal = null;              // platform_settings.mod_auto_approve_until
 
 async function query(sql, p = []) {
   const s = sql.replace(/\s+/g, ' ');
@@ -38,6 +39,10 @@ async function query(sql, p = []) {
     const r = { id: requests.length + 1, user_id: Number(p[0]), role: 'moderator', note: p[1], status: 'pending' }; requests.push(r); return { rows: [{ id: r.id, created_at: new Date() }] };
   }
   if (s.includes("SELECT id, user_id, role FROM role_requests WHERE id = $1 AND status = 'pending'")) return { rows: requests.filter((r) => r.id === Number(p[0]) && r.status === 'pending') };
+  if (s.includes('FROM platform_settings')) return { rows: autoUntilVal ? [{ value: autoUntilVal }] : [] };
+  if (s.startsWith('INSERT INTO platform_settings')) { if (!s.includes('DO NOTHING')) autoUntilVal = p[0]; return { rows: [] }; }
+  if (s.startsWith("UPDATE role_requests SET status = 'approved'")) { const r = requests.find((x) => x.id === Number(p[0]) && x.status === 'pending'); if (r) r.status = 'approved'; return { rows: [] }; }
+  if (s.includes("FROM role_requests rq JOIN users u ON u.id = rq.user_id WHERE rq.status = 'pending' AND rq.role = 'moderator'")) return { rows: requests.filter((x) => x.status === 'pending') };
   if (s.startsWith('UPDATE role_requests SET status = $2')) { const r = requests.find((x) => x.id === Number(p[0])); if (r) r.status = p[1]; return { rows: [] }; }
   if (s.startsWith('INSERT INTO platform_roles')) { roles.set(Number(p[0]), p[1]); return { rows: [] }; }
   if (s.startsWith('DELETE FROM platform_roles WHERE user_id')) { const had = roles.delete(Number(p[0])); return { rows: had ? [{ role: 'x' }] : [], rowCount: had ? 1 : 0 }; }
@@ -93,6 +98,17 @@ async function main() {
   r = await call(3, 'POST', '/roles/set/1', { role: null }); assert.equal(r.status, 403); ok('Эзний цолд хүрэхгүй');
   r = await call(1, 'POST', '/roles/set/3', { role: null }); assert.equal(r.status, 200); ok('Эзэн ADMIN хураана');
   r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Хураасны дараа ажилтны эрхгүй');
+  // ADMIN апп-аас Moderator хүсэлт батална
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin' }); assert.equal(r.status, 200);
+  r = await call(2, 'POST', '/roles/request', { note: 'дахин хүсье' }); j = await r.json(); assert.equal(r.status, 200); assert.ok(!j.auto); ok('Автомат унтраалттай үед хүсэлт хүлээгдэнэ');
+  r = await call(3, 'POST', `/roles/requests/${j.id}/approve`); assert.equal(r.status, 200); assert.equal(roles.get(2), 'moderator'); ok('ADMIN Moderator хүсэлтийг батална');
+  // Автомат батлалт (7 хоног) — зөвхөн эзэн асаана
+  r = await call(3, 'POST', '/roles/auto', { days: 7 }); assert.equal(r.status, 403); ok('ADMIN автомат батлалтыг асааж чадахгүй');
+  r = await call(1, 'POST', '/roles/auto', { days: 7 }); j = await r.json(); assert.equal(r.status, 200); assert.equal(j.active, true); ok('Эзэн автомат батлалтыг 7 хоног асаана');
+  r = await call(3, 'GET', '/roles/auto'); j = await r.json(); assert.equal(j.active, true); assert.equal(j.can_edit, false); ok('ADMIN төлөвийг харна (засахгүй)');
+  r = await call(1, 'POST', '/roles/set/2', { role: null }); assert.equal(r.status, 200);
+  r = await call(2, 'POST', '/roles/request', { note: 'авто' }); j = await r.json(); assert.equal(j.auto, true); assert.equal(roles.get(2), 'moderator'); ok('Автомат үед хүсэлт шууд батлагдана');
+  r = await call(1, 'POST', '/roles/auto', { days: 0 }); j = await r.json(); assert.equal(j.active, false); ok('Эзэн автомат батлалтыг унтраана');
   console.log(`=== channels: ${pass} PASS ===`);
   process.exit(0);
 }

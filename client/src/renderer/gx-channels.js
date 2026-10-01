@@ -39,7 +39,12 @@
   async function requestModerator() {
     const note = await window.gxPrompt('🛡 Moderator авах хүсэлт', 'Moderator нь нийтийн Room-д LAN тоглоом нээж бусдыг тоглуулна. Өөрийнхөө тухай товч бичнэ үү (заавал биш):', '', { okText: 'Хүсэлт илгээх' });
     if (note == null) return false;
-    try { await api('post', '/roles/request', { note }); toast('✅ Хүсэлт илгээгдлээ — эзэн шалгаад батална', 'success', 5000); await loadMe(); return true; }
+    try {
+      const r = await api('post', '/roles/request', { note });
+      if (r?.auto) toast('✅ Moderator эрх автоматаар олгогдлоо! Одоо нийтийн Room-д LAN тоглоом нээж болно.', 'success', 7000);
+      else toast('✅ Хүсэлт илгээгдлээ — эзэн/админ шалгаад батална', 'success', 5000);
+      await loadMe(); return true;
+    }
     catch (e) { toast(errMsg(e), 'warning', 5000); return false; }
   }
   window.gxRequestModerator = requestModerator;
@@ -242,6 +247,7 @@
     setBadge(me.pending_count || 0);
     onSocket((s) => s.on('staff:notify', (p = {}) => {
       if (typeof p.pending_count === 'number') setBadge(p.pending_count);
+      if (p.type === 'role_auto') toast(`⚡ ${p.username} автоматаар Moderator боллоо${p.note ? ` — «${p.note}»` : ''}`, 'info', 6000);
       if (p.type === 'role_request') {
         toast(`🛡 Шинэ Moderator хүсэлт: ${p.username}${p.note ? ` — «${p.note}»` : ''}`, 'info', 7000);
         try { playSound('notify'); } catch {}
@@ -278,10 +284,14 @@
         let tmr; $('gxo-q').addEventListener('input', (e) => { clearTimeout(tmr); tmr = setTimeout(() => { actQ = e.target.value.trim(); renderOwner(); }, 350); });
       } else if (curTab === 'requests') {
         const r = await api('get', '/roles/requests?status=pending'); setBadge(r.pending_count || 0);
-        body.innerHTML = r.requests.length ? r.requests.map((q) => `<div class="gxo-card"><div class="gxo-card-main"><b>${esc(q.username)}</b> ${q.tier ? `<span class="gxo-tier">${esc(q.tier)}</span>` : ''} <span class="gxo-meta">${fmtAgo(q.created_at)} · ${q.wins}W/${q.losses}L</span>
+        let au = null; try { au = await api('get', '/roles/auto'); } catch {}
+        const auBar = au ? `<div class="gxo-auto ${au.active ? 'on' : ''}"><div><b>⚡ Автомат батлалт: ${au.active ? 'ИДЭВХТЭЙ' : 'унтраалттай'}</b>
+            <span>${au.active ? `${new Date(au.until).toLocaleString('mn-MN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })} хүртэл шинэ Moderator хүсэлт шууд батлагдана.` : 'Хүсэлт бүрийг эзэн/админ гараар батална.'}</span></div>
+            ${au.can_edit ? `<div class="gxo-auto-act">${au.active ? '<button type="button" class="btn btn-sm" data-gxo-act="auto" data-days="0">Унтраах</button>' : ''}<button type="button" class="btn btn-primary btn-sm" data-gxo-act="auto" data-days="7">${au.active ? '7 хоног сунгах' : '7 хоног асаах'}</button></div>` : ''}</div>` : '';
+        body.innerHTML = auBar + (r.requests.length ? r.requests.map((q) => `<div class="gxo-card"><div class="gxo-card-main"><b>${esc(q.username)}</b> ${q.tier ? `<span class="gxo-tier">${esc(q.tier)}</span>` : ''} <span class="gxo-meta">${fmtAgo(q.created_at)} · ${q.wins}W/${q.losses}L</span>
             ${q.note ? `<p>«${esc(q.note)}»</p>` : '<p class="gxo-muted">Тайлбаргүй</p>'}</div>
             <div class="gxo-card-act"><button type="button" class="btn btn-primary btn-sm" data-gxo-act="approve" data-id="${q.id}">✓ Батлах</button><button type="button" class="btn btn-sm" data-gxo-act="reject" data-id="${q.id}">✕ Татгалзах</button></div></div>`).join('')
-          : '<div class="gx-empty"><b>Хүлээгдэж буй хүсэлт алга</b><span>Шинэ хүсэлт ирэхэд энд гарч, дуут мэдэгдэл ирнэ.</span></div>';
+          : '<div class="gx-empty"><b>Хүлээгдэж буй хүсэлт алга</b><span>Шинэ хүсэлт ирэхэд энд гарч, дуут мэдэгдэл ирнэ.</span></div>');
       } else if (curTab === 'mods') {
         const r = await api('get', '/roles/moderators');
         body.innerHTML = r.moderators.length ? `<div class="gxo-table gxo-mods"><div class="gxo-tr gxo-th"><span>Moderator</span><span>Олгосон</span><span>Хэзээ</span><span></span></div>
@@ -318,6 +328,11 @@
     try {
       if (a === 'approve' || a === 'reject') { const r = await api('post', `/roles/requests/${b.dataset.id}/${a}`); setBadge(r.pending_count || 0); toast(a === 'approve' ? '✓ Moderator олголоо' : 'Татгалзлаа', a === 'approve' ? 'success' : 'info'); }
       else if (a === 'grant') { if (!await showConfirm('Moderator өгөх', `${b.dataset.name}-д Moderator эрх өгөх үү?\nНийтийн Room-д LAN тоглоом нээж бусдыг тоглуулах эрхтэй болно.`)) { b.disabled = false; return; } await api('post', `/roles/grant/${b.dataset.uid}`); toast(`✓ ${b.dataset.name} Moderator боллоо`, 'success'); }
+      else if (a === 'auto') {
+        const d = Number(b.dataset.days || 0);
+        const r = await api('post', '/roles/auto', { days: d });
+        toast(d ? `⚡ Автомат батлалт ${d} хоног идэвхтэй${r.swept ? ` — хүлээгдэж байсан ${r.swept} хүсэлт батлагдлаа` : ''}` : 'Автомат батлалт унтарлаа', d ? 'success' : 'info', 6000);
+      }
       else if (a === 'revoke') { if (!await showConfirm('Moderator эрх хасах', `${b.dataset.name}-ийн Moderator эрхийг хасах уу?`)) { b.disabled = false; return; } await api('delete', `/roles/moderators/${b.dataset.uid}`); toast('Эрх хасагдлаа', 'info'); }
       renderOwner();
     } catch (e) { toast(errMsg(e), 'error'); b.disabled = false; }
