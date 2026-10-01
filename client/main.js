@@ -813,6 +813,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
       mode: 'room', roomId: String(roomData.id), roomName: roomData.name, gameType: roomData.gameType,
       isHost: roomData.isHost ? '1' : '0', hostId: String(roomData.hostId || ''), status: roomData.status || '',
       maxPlayers: String(roomData.maxPlayers || roomData.max_players || ''), backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
+      kind: roomData.kind || '', visibleCap: String(roomData.visibleCap || ''),
     });
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
@@ -846,6 +847,7 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
       status:  roomData.status || '',
       maxPlayers: String(roomData.maxPlayers || roomData.max_players || ''),
       backgroundUrl: roomData.backgroundUrl || roomData.background_url || '',
+      kind: roomData.kind || '', visibleCap: String(roomData.visibleCap || ''),
     },
   });
   hardenWindow(roomWindow);

@@ -115,7 +115,8 @@ app.use('/anticheat', require('./routes/anticheat'));
 app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
 const meshRoutes = require('./routes/mesh');
 app.use('/mesh', meshRoutes.router);                     // Tailscale/Headscale mesh: preauth түлхүүр + клиентийн mesh IP тайлан (Ш2, 2026-09-27)
-app.use('/wishes', require('./routes/wishes').router);   // хэрэглэгчдийн хүсэж буй тоглоомуудын санал (2026-10-01)
+app.use('/wishes', require('./routes/wishes').router);
+app.use('/roles', require('./routes/roles').router);   // Moderator хүсэлт/цол (2026-10-02)   // хэрэглэгчдийн хүсэж буй тоглоомуудын санал (2026-10-01)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
 const radarRoutes = require('./routes/radar');           // 📡 Радар: relay capture → hero хөдөлгөөн/kill (replay); саатал: зөвхөн эзэн 0с, бусад 120с (live — Шат 2)
 app.use('/relay', radarRoutes.relayRouter);              // POST /relay/radar (x-relay-key)
@@ -190,7 +191,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); await require('./routes/channels').ensureTables(); await require('./routes/roles').ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
@@ -201,6 +202,9 @@ roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
 // Social router-т io дамжуулах (friend request мэдэгдэлд хэрэг)
 socialRoutes.setIO(io);
 clanRoutes.setIO(io);
+// Эзний самбар: онлайн хэрэглэгчдийн id
+app.set('onlineUserIds', () => new Set([...onlineUsers.values()].map((u) => String(u.userId))));
+require('./routes/roles').setIO(io);
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);
@@ -243,6 +247,41 @@ function checkRateLimit(socket) {
 
 // Хэрэглэгч тухайн өрөөнд өөр амьд socket-той эсэх (олон цонх нээсэн үед
 // нэг цонх хаагдахад grace timer өрөөг нь устгачихгүйн тулд)
+// Өрөөний гишүүний сүүлийн идэвх (AFK харуулахад): `${roomId}:${userId}` → ms
+const roomActivity = new Map();
+function touchRoomActivity(roomId, userId) {
+  if (!roomId || !userId) return;
+  roomActivity.set(`${roomId}:${userId}`, Date.now());
+  if (roomActivity.size > 20000) { const cut = Date.now() - 24 * 3600 * 1000; for (const [k, v] of roomActivity) if (v < cut) roomActivity.delete(k); }
+}
+
+// ── Нийтийн Room 1–20 (channel) — «сүнс» гишүүн цэвэрлэгч (2026-10-02) ──
+// Апп гэнэт хаагдах/сервер restart зэргээс DB-д үлдсэн гишүүнчлэлийг 2 мин тутам устгана: тухайн өрөөнд амьд
+// socket-гүй, grace хүлээлтгүй хэрэглэгчид. Сервер асаад эхний 3 мин хүлээнэ (клиентүүд эргэж холбогдох хугацаа).
+const channelIds = new Set();
+async function refreshChannelIds() {
+  if (!dbForMigration) return;
+  try { const r = await dbForMigration.query("SELECT id FROM rooms WHERE kind = 'channel'"); channelIds.clear(); r.rows.forEach((x) => channelIds.add(String(x.id))); } catch {}
+}
+async function sweepChannelGhosts() {
+  if (!dbForMigration || !channelIds.size) return;
+  try {
+    const r = await dbForMigration.query('SELECT room_id, user_id FROM room_players WHERE room_id = ANY($1::int[])', [[...channelIds].map(Number)]);
+    const ghosts = r.rows.filter((x) => {
+      const t = disconnectTimers[String(x.user_id)];
+      if (t && String(t.roomId) === String(x.room_id)) return false;   // grace хүлээлтэд байна
+      return !userHasLiveSocketInRoom(x.user_id, x.room_id);
+    });
+    for (const g of ghosts) await dbForMigration.query('DELETE FROM room_players WHERE room_id=$1 AND user_id=$2', [g.room_id, g.user_id]);
+    if (ghosts.length) { io.emit('rooms:updated'); console.log(`[Channels] ${ghosts.length} сүнс гишүүн цэвэрлэв`); }
+  } catch (e) { console.error('[Channels] sweep', e.message); }
+}
+if (process.env.NODE_ENV !== 'test') {
+  setTimeout(() => { refreshChannelIds().then(sweepChannelGhosts); }, 3 * 60 * 1000).unref?.();
+  setInterval(() => { refreshChannelIds().then(sweepChannelGhosts); }, 2 * 60 * 1000).unref?.();
+  setTimeout(() => { refreshChannelIds(); }, 15 * 1000).unref?.();
+}
+
 function userHasLiveSocketInRoom(userId, roomId, excludeSocketId = null) {
   const uid = String(userId);
   const rid = String(roomId);
@@ -316,6 +355,7 @@ function membersArray(roomId) {
     id, name, ready: readySet.has(id), tier: userTierById.get(String(id)) || null,
     // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг; MESH_DISABLED үед талбаргүй (хуучин клиент тэмдэг харуулахгүй)
     ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
+    ...(require('./routes/roles').isModCached(id) ? { mod: true } : {}),   // Moderator «MOD» тэмдэг
   }));
 }
 // socketId → { username, userId, status } (лобби дахь онлайн тоглогчид)
@@ -471,6 +511,8 @@ io.on('connection', (socket) => {
     socket.data.username = username;
     socket.data.userId   = userId;
     onlineUsers.set(socket.id, { username, userId, status: 'online' });
+    // Эзний самбарын «сүүлд идэвхтэй» — 5 мин тутамд нэгээс илүүгүй бичнэ
+    if (dbForMigration && userId) dbForMigration.query("UPDATE users SET last_active_at = NOW() WHERE id = $1 AND (last_active_at IS NULL OR last_active_at < NOW() - INTERVAL '5 minutes')", [userId]).catch(() => {});
     if (userId) {
       userSockets.set(userId, socket.id);
       socket.join(`user:${userId}`);
@@ -557,6 +599,7 @@ io.on('connection', (socket) => {
     socket.join(roomId);
     socket.data.roomId   = roomId;
     socket.data.username = username;
+    touchRoomActivity(roomId, userId);
 
     if (!roomMembers[roomId]) roomMembers[roomId] = new Map();
 
@@ -613,6 +656,7 @@ io.on('connection', (socket) => {
     if (checkRateLimit(socket)) return;
     if (!await ensureSocketRoomState(socket, roomId)) return;
     if (!await ensureRoomMembership(socket, roomId)) return;
+    touchRoomActivity(roomId, socket.user.id);
     const reply = socialRoutes.sanitizeReplyTo(replyTo);
     const msg = {
       userId: socket.user.id,
@@ -737,6 +781,21 @@ io.on('connection', (socket) => {
   });
 
   // Тоглолт эхлэхэд статус 'in_game' болгох
+  // ── AFK (2026-10-02): гишүүний сүүлийн идэвх — чат, өрөөнд орох, клиентийн хулгана/гар (≥60с тутам) ──
+  // Автоматаар ГАРГАХГҮЙ; зөвхөн эзэн/админд AFK хугацааг харуулж, тэд шийдээд kick хийнэ.
+  socket.on('room:activity', () => { if (socket.data.roomId && socket.user?.id) touchRoomActivity(socket.data.roomId, socket.user.id); });
+  socket.on('room:afk_list', async (ack) => {
+    if (typeof ack !== 'function') return;
+    const rid = socket.data.roomId ? String(socket.data.roomId) : '';
+    if (!rid || !await require('./middleware/admin').isAdminUser(socket.user)) return ack({ ok: false });
+    const out = {};
+    for (const uid of (roomMembers[rid] ? [...roomMembers[rid].values()] : [])) {
+      const inGame = [...onlineUsers.values()].some((u) => String(u.userId) === String(uid) && u.status === 'in_game');
+      out[String(uid)] = { active_at: roomActivity.get(`${rid}:${uid}`) || null, in_game: inGame };
+    }
+    ack({ ok: true, now: Date.now(), members: out });
+  });
+
   socket.on('room:game_started', () => {
     const username = socket.user.username;
     const userId   = String(socket.user.id);
@@ -866,6 +925,11 @@ io.on('connection', (socket) => {
             return;
           }
           // Хугацаа дуусав — өрөөнөөс бүрмөсөн гарна
+          // Нийтийн Room 1–20 хэзээ ч устдаггүй тул гишүүнчлэлийг DB-с устгана (эс бөгөөс «сүнс» гишүүд 200 slot-ыг дүүргэнэ)
+          if (dbForMigration && channelIds.has(String(roomId))) {
+            dbForMigration.query('DELETE FROM room_players WHERE room_id=$1 AND user_id=$2', [roomId, userId])
+              .then(() => io.emit('rooms:updated')).catch(() => {});
+          }
           if (roomMembers[roomId]) {
             roomMembers[roomId].delete(username);
             io.to(roomId).emit('room:user_left', { username });

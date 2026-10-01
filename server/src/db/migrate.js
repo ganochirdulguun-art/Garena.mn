@@ -243,6 +243,8 @@ async function runMigrations(db) {
   await require('../routes/banner').ensureTables(); // профайлын дэвсгэр
   await require('../routes/social').ensureTables(); // lobby_messages.reply_to (чатын хариулт)
   await require('../routes/wishes').ensureTables(); // game_wishes (хүсэж буй тоглоомын санал)
+  await require('../routes/channels').ensureTables(); // нийтийн Room 1–20 (rooms.kind='channel' + trigger)
+  await require('../routes/roles').ensureTables(); // Moderator цол + хүсэлт
 }
 
 module.exports = { runMigrations };

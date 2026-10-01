@@ -157,7 +157,9 @@
   renderFilteredRooms = function () {
     const list = $('rooms-waiting'); if (!list) return;
     const playing = $('rooms-playing'); if (playing) playing.innerHTML = '';
-    let rooms = getFilteredRooms(Object.values(roomsCache));
+    // Нийтийн Room 1–20 (channel) — тусдаа карт хэсэг; доорх бүлгүүдэд зөвхөн энгийн/GOLD өрөөнүүд
+    const channels = Object.values(roomsCache).filter((r) => r.kind === 'channel').sort((a, b) => Number(a.channel_no) - Number(b.channel_no));
+    let rooms = getFilteredRooms(Object.values(roomsCache).filter((r) => r.kind !== 'channel'));
     const openN = rooms.filter((r) => r.status === 'waiting').length;
     const playN = rooms.filter((r) => r.status === 'playing').length;
     if (gxState !== 'all') rooms = rooms.filter((r) => r.status === gxState);
@@ -169,10 +171,11 @@
     rooms.filter((r) => !r.clan_id).forEach((r) => { const k = r.game_type || 'Бусад'; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
     // Хүлээж буйг эхэнд
     groups.forEach((arr) => arr.sort((a, b) => (a.status === b.status ? 0 : a.status === 'waiting' ? -1 : 1)));
+    const chHTML = window.gxChannels?.sectionHTML(channels) || '';
     if (!rooms.length) {
-      list.innerHTML = `<div class="gx-empty"><svg><use href="#gx-i-lobby"/></svg><b>${hasFilter ? 'Тохирох өрөө олдсонгүй' : 'Одоогоор нээлттэй өрөө алга'}</b><span>${hasFilter ? 'Шүүлтүүрээ өөрчилж үзнэ үү.' : 'Эхний өрөөг та үүсгээрэй — найзууд тань шууд харна.'}</span>${hasFilter ? '' : '<button type="button" class="btn btn-primary" data-gx-click="btn-create-room">+ Өрөө үүсгэх</button>'}</div>`;
+      list.innerHTML = chHTML + (chHTML && !hasFilter ? '' : `<div class="gx-empty"><svg><use href="#gx-i-lobby"/></svg><b>${hasFilter ? 'Тохирох өрөө олдсонгүй' : 'Одоогоор нээлттэй өрөө алга'}</b><span>${hasFilter ? 'Шүүлтүүрээ өөрчилж үзнэ үү.' : 'Эхний өрөөг та үүсгээрэй — найзууд тань шууд харна.'}</span>${hasFilter ? '' : '<button type="button" class="btn btn-primary" data-gx-click="btn-create-room">+ Өрөө үүсгэх</button>'}</div>`);
     } else {
-      list.innerHTML = [...groups.entries()].map(([g, arr]) => {
+      list.innerHTML = chHTML + (chHTML ? '<h3 class="gxch-sub">👑 Хувийн өрөөнүүд <span>GOLD гишүүдийн нээсэн</span></h3>' : '') + [...groups.entries()].map(([g, arr]) => {
         const c = collapsed.has(g);
         return `<section class="gx-group ${c ? 'collapsed' : ''}" data-game="${esc(g)}">
           <button type="button" class="gx-group-head" data-gx-group="${esc(g)}"><i class="gx-gi ${g.startsWith('🛡') ? 'clan' : ''}" style="--gc:${gameTypeColor(g)}">${g.startsWith('🛡') ? '🛡' : esc(initials(g))}</i><b>${esc(g)}</b><span class="gx-count">${arr.length}</span><svg class="gx-chev"><use href="#gx-i-chev"/></svg></button>

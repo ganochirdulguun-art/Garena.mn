@@ -11,6 +11,7 @@
     play_seconds_total: 184000, play_next_diamond_sec: 1400, name_effect: 'neon', is_owner: true, unlimited_diamonds: false, banner_ver: q.get('banner') ? 1 : null,
   };
   const M = (id, name, tier) => ({ id, name, tier });
+  const CHANNELS = Array.from({ length: 20 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, kind: 'channel', channel_no: i + 1, visible_cap: 200, max_players: 300, game_type: 'Warcraft III: The Frozen Throne', status: 'waiting', player_count: [213, 200, 187, 164, 121, 96, 74, 52, 31, 18, 9, 4, 0, 0, 0, 0, 0, 0, 0, 0][i], members: [] }));
   const rooms = [
     { id: 11, name: 'dota lod 6.74v5e', game_type: 'Warcraft III: The Frozen Throne', game_mode: 'LoD', status: 'waiting', ranked: true,
       host_id: 1, host_name: 'VitoCorleone', player_count: 7, max_players: 10, has_password: false, description: 'Ranked 5v5 · -ff 12 мин',
@@ -34,7 +35,7 @@
   const noop = () => {};
   const specific = {
     getUser: async () => (loggedIn ? user : null), refreshUser: async () => true, getToken: async () => 'preview',
-    getRooms: async () => rooms, getMyRoom: async () => ({ id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
+    getRooms: async () => (q.get('nochan') ? rooms : [...CHANNELS, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => '2.9.0 (preview)', getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
     getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
@@ -46,6 +47,17 @@
     request: async (method, path) => {
       if (String(path).startsWith('/membership/public')) return [2, 3, 8].map((id) => ({ id, tier: id === 2 ? 'gold' : 'silver', name_effect: 'gradient', level: 9 }));
       const P = String(path);
+      const staff = !q.get('user') && !(window.parent !== window && window.parent.location.search.includes('user=1'));
+      if (P === '/roles/me') return { role: q.get('mod') ? 'moderator' : null, staff, owner: staff, can_host_channel: staff || !!q.get('mod'), pending: null, pending_count: 3 };
+      if (P.startsWith('/roles/activity/')) return { rooms: [{ room_id: 5, name: 'dota lod 6.74v5e', game_type: 'Warcraft III', created_at: new Date(Date.now() - 864e5).toISOString(), open_sec: 5400 }], games: [{ created_at: new Date(Date.now() - 36e5).toISOString(), game_sec: 2700, ranked: true, xp: 45 }] };
+      if (P.startsWith('/roles/activity')) return { users: [
+        { id: 2, username: 'Billionaire', tier: '2-3', play_seconds: 412000, games: 188, games_7d: 21, wins: 102, losses: 86, hosted: 64, rooms_created: 40, last_active_at: new Date().toISOString(), online: true, role: 'moderator' },
+        { id: 3, username: 'Eboshdee', tier: '3-1', play_seconds: 305000, games: 141, games_7d: 30, wins: 70, losses: 71, hosted: 22, rooms_created: 9, last_active_at: new Date(Date.now() - 7200e3).toISOString(), online: false, requested: true },
+        { id: 4, username: 'Tom_Noiton', tier: '2-2', play_seconds: 98000, games: 52, games_7d: 8, wins: 30, losses: 22, hosted: 3, rooms_created: 1, last_active_at: new Date(Date.now() - 864e5 * 3).toISOString(), online: false },
+      ] };
+      if (P.startsWith('/roles/requests')) return { pending_count: 1, requests: [{ id: 1, user_id: 3, username: 'Eboshdee', tier: '3-1', note: 'Өдөр бүр LoD хостлодог, 10 хүн цуглуулна', created_at: new Date(Date.now() - 3600e3).toISOString(), wins: 70, losses: 71 }] };
+      if (P === '/roles/moderators') return { moderators: [{ user_id: 2, username: 'Billionaire', tier: '2-3', granted_at: new Date(Date.now() - 864e5).toISOString(), granted_by_name: 'VitoCorleone' }] };
+      if (P === '/roles/kicks') return { kicks: [{ id: 1, room_id: 903, room_name: 'WC3 Room 3', reason: 'AFK 45 мин', created_at: new Date(Date.now() - 1800e3).toISOString(), target_name: 'afk_guy', by_name: 'Billionaire' }] };
       if (P === '/wishes') return { counts: { umk3: 214, ctr: 187, goldeneye: 96 }, mine: ['ctr'] };
       if (P.startsWith('/wishes/')) return { wished: true, counts: { umk3: 215, ctr: 187, goldeneye: 96 }, mine: ['ctr', 'umk3'] };
       if (/\/ipserver$/.test(P)) return q.get('srv') ? { server: { host_user_id: '2', host_username: 'Billionaire', kind: 'cs16', label: 'Counter-Strike 1.6', ip: '100.64.0.4', port: 27015, map: 'de_dust2' } } : { server: null };
@@ -81,12 +93,13 @@
   window.addEventListener('load', () => setTimeout(() => {
     if (q.get('noconfirm')) showConfirm = async () => false;
     if (q.get('tab')) showTab(q.get('tab'));
+    if (q.get('owner')) setTimeout(() => document.querySelector('[data-gxo="' + q.get('owner') + '"]')?.click(), 1500);
     if (q.get('drawer')) window.gx?.openDrawer(q.get('drawer'));
     if (q.get('create')) document.getElementById('btn-create-room')?.click();
     if (q.get('select')) { selectedRoomId = q.get('select'); renderFilteredRooms(); }
     if (q.get('chat')) { showTab('chat'); [['Bibi','gg wp'],['Uka','Өрөө нээлээ, орцгоо'],['FaSi','@VitoCorleone ирлээ']].forEach(([u,t],i)=>appendLobbyMessage({ userId: 30+i, username: u, text: t, time: Date.now()-i*6e4 })); appendLobbyMessage({ userId: 1, username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: Date.now() }); appendLobbyMessage({ userId: 2, username: 'Billionaire', text: '@everyone 20:00 цагт LoD тэмцээн эхэлнэ!', time: Date.now()+500 }, true); appendLobbyMessage({ userId: 41, username: 'Тэмүүжин Бат', text: 'Сайн, @VitoCorleone өрөөнд ор. @Uka чи бас', time: Date.now()+1000, replyTo: { username: 'VitoCorleone', text: 'Сайн байна уу бүгдээрээ', time: String(Date.now()) } }, true); document.querySelector('#lobby-chat-messages .msg.other .msg-reply')?.click(); const li=document.getElementById('lobby-chat-input'); if (li && q.get('mention')) { li.value='@Тэ'; li.dispatchEvent(new Event('input')); } }
-    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); try { renderMembers([{ id: 1, name: 'VitoCorleone', tier: '1-1', mesh: true }, { id: 2, name: 'Billionaire', tier: '2-3', mesh: false }, { id: 3, name: 'Eboshdee', mesh: true }]); } catch {} }, 900);
-    if (q.get('room')) window.gxRoom?.openRoom({ mode: 'room', roomId: '11', roomName: 'dota lod 6.74v5e', gameType: 'Warcraft III: The Frozen Throne', isHost: '1', hostId: '1', maxPlayers: '10', theme: q.get('theme') || '', backgroundUrl: q.get('bg') || '' });
+    if (q.get('mode') === 'room') setTimeout(() => { const t0 = new Date(Date.now()-9e4).toISOString(); appendMessage({ userId: 2, username: 'Billionaire', text: 'Бүгд бэлэн үү?', time: t0 }); appendMessage({ userId: 3, username: 'Eboshdee', text: '@VitoCorleone map татчихлаа', time: new Date().toISOString(), replyTo: { username: 'VitoCorleone', text: 'Map-аа татаарай', time: t0 } }); document.querySelector('#chat-messages .msg.other .msg-reply')?.click(); try { renderMembers([{ id: 1, name: 'VitoCorleone', tier: '1-1' }, { id: 2, name: 'Billionaire', tier: '2-3', mod: true }, { id: 3, name: 'Eboshdee' }, { id: 4, name: 'Tom_Noiton', tier: '2-2' }]); } catch {} }, 900);
+    if (q.get('room')) window.gxRoom?.openRoom({ mode: 'room', roomId: '11', roomName: 'dota lod 6.74v5e', gameType: 'Warcraft III: The Frozen Throne', isHost: '1', hostId: '1', maxPlayers: q.get('ch') ? '300' : '10', theme: q.get('theme') || '', backgroundUrl: q.get('bg') || '', ...(q.get('ch') ? { roomId: '901', roomName: 'WC3 Room 1', isHost: '0', hostId: '', kind: 'channel', visibleCap: '200', gameType: 'Warcraft III: The Frozen Throne' } : {}) });
     if (q.get('clantab')) document.querySelector(`[data-clan-tab="${q.get('clantab')}"]`)?.click();
     if (q.get('clan')) window.gxClans?.openClan(q.get('clan'));
     if (q.get('info')) window.gxClans?.showLobbyInfo(roomsCache[q.get('info')]);

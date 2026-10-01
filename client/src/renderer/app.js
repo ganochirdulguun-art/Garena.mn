@@ -677,6 +677,10 @@ async function init() {
     const maxPlayers = Number(p.get('maxPlayers') || 10);
 
     _enterRoomUI(id, name, gameType, isHost, hostId, status, maxPlayers);
+    // Нийтийн Room 1–20: хостгүй, 200 харагдах багтаамж
+    currentRoom.kind = p.get('kind') || 'room';
+    currentRoom.visibleCap = Number(p.get('visibleCap') || 0) || null;
+    if (currentRoom.kind === 'channel') { currentRoom.isHost = false; currentRoom.hostId = ''; document.body.classList.add('channel-room'); }
 
     // Цонх хаагдахад өрөөнөөс гарах + relay зогсоох
     window.addEventListener('beforeunload', () => {
@@ -1531,6 +1535,8 @@ function enterRoom(id, name, gameType, isHost, hostId, status) {
     status: status || '',
     maxPlayers: cached.max_players || cached.maxPlayers || 10,
     backgroundUrl: cached.background_url || '',
+    kind: cached.kind || '',                       // 'channel' = нийтийн Room 1–20
+    visibleCap: cached.visible_cap || '',
   });
 }
 
@@ -1914,7 +1920,9 @@ function renderMembers(members) {
     const safeName = escHtml(name);
     const safeId   = escHtml(id);
     const displayName = escHtml(withTier(name, m.tier));   // харагдах нэр = "3-1 Нэр" (Tier nickname)
-    const kickBtn = (isHost && !isMe)
+    // Нийтийн Room 1–20: хост байхгүй — эзэн/админ (шалтгаантай) kick хийнэ
+    const staffKick = currentRoom?.kind === 'channel' && currentRoom?.staff && !isMe && id;
+    const kickBtn = ((isHost && !isMe) || staffKick)
       ? `<button class="btn btn-sm btn-danger kick-btn" data-id="${safeId}" data-name="${safeName}">Kick</button>`
       : '';
     // 👑 Хост шилжүүлэх (GameRanger маяг) — өрөөгөө хаалгүй хостоо солино (2026-09-06)
@@ -1924,7 +1932,7 @@ function renderMembers(members) {
     const nameSpan = (!isMe && id) ? `<span class="clickable-name" data-user-id="${safeId}">${displayName}</span>` : displayName;
     return `<li class="${isMe ? 'me' : ''}">
       <div class="member-info">
-        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}</div>
+        <div>${isRoomHost ? '👑 ' : ''}${nameSpan}${isMe ? ' (Та)' : ''}${m.mod ? '<span class="mod-badge" title="Moderator — нийтийн Room-д тоглоом нээх эрхтэй">MOD</span>' : ''} ${id ? pingBadge(String(id)) : ''}${meshBadge(m)}${id && currentRoom?.staff ? `<span class="afk-badge" data-afk-uid="${safeId}"></span>` : ''}</div>
       </div>
       ${hostBtn}${kickBtn}
     </li>`;
@@ -2049,6 +2057,15 @@ function applyHostRoleUi() {
 
 async function kickPlayer(targetId, targetName) {
   if (!currentRoom || !targetId) return;
+  if (currentRoom.kind === 'channel') {
+    // Нийтийн Room: шалтгаан ЗААВАЛ — эзний самбарын kick бүртгэлд хадгалагдана (хувийн сэтгэл хөдлөлөөр kick хийхийг хянана)
+    const reason = await gxPrompt(`${targetName}-г өрөөнөөс гаргах`, 'Шалтгаан (заавал) — жишээ: «AFK 40 мин», «бүдүүлэг үг»', '');
+    if (reason == null) return;
+    if (reason.trim().length < 3) { showToast('Шалтгаанаа бичнэ үү', 'warning'); return; }
+    try { await window.api.request('post', `/rooms/${currentRoom.id}/kick/${targetId}`, { reason: reason.trim() }); appendSysMsg(`✓ ${targetName} гаргагдлаа (${reason.trim()})`); }
+    catch (err) { appendSysMsg(`⚠️ ${String(err?.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')}`); }
+    return;
+  }
   if (!await showConfirm('Гаргах', `${targetName}-г өрөөнөөс гаргах уу?`)) return;
   try {
     await window.api.kickPlayer(currentRoom.id, targetId);
@@ -5498,8 +5515,8 @@ init();
   function setHostState(txt, state) {
     const s = el('lan-host-state'); if (s) { s.textContent = state ? state.toUpperCase() : 'БЭЛЭН'; s.dataset.state = state || 'idle'; }
     const t = el('lan-host-text'); if (t && txt) t.textContent = txt;
-    // "LAN тоглоом нээх" зөвхөн ХОСТ-д (өрөө үүсгэсэн хүн) харагдана. Joiner зөвхөн "Нэгдэх" харна.
-    const amHost = !!currentRoom?.isHost;
+    // "LAN тоглоом нээх" зөвхөн ХОСТ-д (өрөө үүсгэсэн хүн); нийтийн Room 1–20-д Moderator/ажилтан. Бусад нь "Нэгдэх".
+    const amHost = !!currentRoom?.isHost || !!currentRoom?.canHostChannel;
     el('btn-lan-host')?.classList.toggle('hidden', !amHost || !!hosting);
     el('btn-lan-stop')?.classList.toggle('hidden', !amHost || !hosting);
   }
@@ -5564,6 +5581,16 @@ init();
     } catch (e) { showToast(errMsg(e), 'error'); }
   }
 
+  // Нийтийн Room-д эрх (Moderator) тодорхой болмогц товч/зөвлөмжийг дахин тааруулна
+  document.addEventListener('garena:host-changed', () => {
+    const amHost = !!currentRoom?.isHost || !!currentRoom?.canHostChannel;
+    el('btn-lan-host')?.classList.toggle('hidden', !amHost || !!hosting);
+    const hintEl = el('lan-host-text');
+    if (hintEl && !hosting) hintEl.textContent = amHost
+      ? (currentRoom?.kind === 'channel' ? 'Та Moderator — «LAN тоглоом нээх» дарж тоглоомоо нээ, өрөөний бүх гишүүн харна.' : 'Өөрийн WC3 LAN тоглоом нээж, өрөөнийхнөө урина. Ямар ч интернэтээс холбогдоно.')
+      : (currentRoom?.kind === 'channel' ? 'Moderator-уудын нээсэн тоглоом доор гарч ирнэ — «Нэгдэх» дарж WC3-даа ор. Өөрөө нээх бол зарлалын самбараас «Moderator авах».' : 'Хост тоглоом нээхэд доор гарч ирнэ — "Нэгдэх" дарж WC3-даа ор.');
+  });
+
   function attach(s) {
     s.on('room:lan_lobby', (g) => {
       if (!g?.game_token) return;
@@ -5586,8 +5613,8 @@ init();
       const r = await api('get', `/rooms/${currentRoom.id}/lan-host`);
       if (!r?.relay_configured) { panel.classList.add('hidden'); return; }
       panel.classList.remove('hidden');
-      // Товч/зөвлөмжийг ролиор нь: зөвхөн хост "LAN тоглоом нээх" харна
-      const amHost = !!currentRoom?.isHost;
+      // Товч/зөвлөмжийг ролиор нь: зөвхөн хост (нийтийн Room-д Moderator) "LAN тоглоом нээх" харна
+      const amHost = !!currentRoom?.isHost || !!currentRoom?.canHostChannel;
       el('btn-lan-host')?.classList.toggle('hidden', !amHost);
       el('btn-lan-stop')?.classList.add('hidden');
       const hintEl = el('lan-host-text');

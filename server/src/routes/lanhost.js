@@ -139,6 +139,15 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   const roomId = String(req.params.id);
   if (!relayConfigured()) return res.status(503).json({ error: 'LAN relay тохируулаагүй' });
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
+  // Нийтийн Room 1–20: LAN тоглоом нээх (host) эрх зөвхөн Moderator / эзэн / админ (2026-10-02)
+  if (db) {
+    try {
+      const k = await db.query("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1", [roomId]);
+      if (k.rows[0]?.kind === 'channel' && !await require('./roles').canHostInChannel(req.user)) {
+        return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д. Зарлалын самбар дээрх «Moderator авах» товчоор хүсэлт илгээнэ үү.', code: 'MODERATOR_REQUIRED' });
+      }
+    } catch {}
+  }
   const token = crypto.randomBytes(18).toString('hex');   // санамсаргүй, таамаглах боломжгүй → зөвхөн өрөөнд тарна
   const r = shardFor(currentRelay(), token);
   rememberBegin(token, r);

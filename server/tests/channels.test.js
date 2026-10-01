@@ -1,0 +1,85 @@
+'use strict';
+// Нийтийн Room 1–20 + Moderator: багтаамж (200 харагдах / Premium нөөц slot), Moderator хүсэлт→батлах,
+// нийтийн Room-д LAN нээх эрх, бэхэлсэн зарлал (ажилтан), гишүүдийн идэвх (ажилтан).
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const jwt = require('jsonwebtoken');
+const serverDir = path.resolve(__dirname, '..');
+const dbModulePath = path.join(serverDir, 'src', 'config', 'db.js');
+function clearSrc() { const p = path.join(serverDir, 'src'); for (const k of Object.keys(require.cache)) if (k.startsWith(p)) delete require.cache[k]; }
+const tok = (u) => jwt.sign(u, 'test-secret', { expiresIn: '1h' });
+let pass = 0; const ok = (n) => { pass++; console.log('PASS ' + n); };
+const future = new Date(Date.now() + 864e5).toISOString();
+
+// Хуурамч DB төлөв
+const users = { 1: { id: 1, username: 'owner' }, 2: { id: 2, username: 'bronze', membership: 'bronze' }, 3: { id: 3, username: 'silver', membership: 'silver', membership_until: future } };
+const channel = { id: 901, name: 'WC3 Room 1', kind: 'channel', status: 'waiting', has_password: false, max_players: 300, visible_cap: 200, host_id: null, clan_id: null };
+let channelCount = 200;               // одоо өрөөнд байгаа хүн
+const roles = new Map();              // user_id -> role
+const requests = [];                  // { id, user_id, role, note, status }
+let notice = '';
+
+async function query(sql, p = []) {
+  const s = sql.replace(/\s+/g, ' ');
+  if (s.includes('SELECT 1') && !s.includes('FROM')) return { rows: [{}] };
+  if (s.includes('FROM admin_whitelist')) return { rows: [] };
+  if (s.includes('SELECT id, username, membership, membership_until')) return { rows: [users[p[0]]].filter(Boolean) };
+  if (s.includes('SELECT COALESCE(banned,FALSE) AS banned, ban_reason FROM users')) return { rows: [{ banned: false }] };
+  if (s.includes('SELECT COALESCE(banned,FALSE) AS banned FROM users')) return { rows: [{ banned: false }] };
+  if (s.startsWith('SELECT * FROM rooms WHERE id = $1')) return { rows: String(p[0]) === '901' ? [channel] : [] };
+  if (s.includes('JOIN room_players rp ON r.id = rp.room_id WHERE rp.user_id = $1')) return { rows: [] };
+  if (s.startsWith('SELECT COUNT(*) FROM room_players WHERE room_id = $1')) return { rows: [{ count: String(channelCount) }] };
+  if (s.startsWith('INSERT INTO room_players')) { channelCount++; return { rows: [], rowCount: 1 }; }
+  if (s.includes('SELECT role FROM platform_roles WHERE user_id')) return { rows: roles.has(Number(p[0])) ? [{ role: roles.get(Number(p[0])) }] : [] };
+  if (s.includes("FROM role_requests WHERE user_id = $1 AND status = 'pending'")) return { rows: requests.filter((r) => r.user_id === Number(p[0]) && r.status === 'pending') };
+  if (s.includes("SELECT COUNT(*)::int AS n FROM role_requests WHERE status = 'pending'")) return { rows: [{ n: requests.filter((r) => r.status === 'pending').length }] };
+  if (s.startsWith('INSERT INTO role_requests')) {
+    if (requests.some((r) => r.user_id === Number(p[0]) && r.status === 'pending')) return { rows: [] };
+    const r = { id: requests.length + 1, user_id: Number(p[0]), role: 'moderator', note: p[1], status: 'pending' }; requests.push(r); return { rows: [{ id: r.id, created_at: new Date() }] };
+  }
+  if (s.includes("SELECT id, user_id, role FROM role_requests WHERE id = $1 AND status = 'pending'")) return { rows: requests.filter((r) => r.id === Number(p[0]) && r.status === 'pending') };
+  if (s.startsWith('UPDATE role_requests SET status = $2')) { const r = requests.find((x) => x.id === Number(p[0])); if (r) r.status = p[1]; return { rows: [] }; }
+  if (s.startsWith('INSERT INTO platform_roles')) { roles.set(Number(p[0]), p[1]); return { rows: [] }; }
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
+  if (s.includes('FROM room_players rp JOIN rooms r') || s.includes('isUserInRoom')) return { rows: [{}] };
+  if (s.startsWith('UPDATE rooms SET pinned_notice')) { notice = p[1]; return { rows: [{ id: 901 }] }; }
+  return { rows: [], rowCount: 0 };
+}
+
+async function main() {
+  const port = 6150 + Math.floor(Math.random() * 40);
+  Object.assign(process.env, { PORT: String(port), JWT_SECRET: 'test-secret', NODE_ENV: 'test', SKIP_DB_MIGRATIONS: 'true', OWNER_USER_IDS: '1', LAN_RELAY_IP: '127.0.0.1', DISCORD_CLIENT_ID: 'x', DISCORD_CLIENT_SECRET: 'x', DISCORD_REDIRECT_URI: 'http://localhost/cb' });
+  clearSrc();
+  require.cache[dbModulePath] = { id: dbModulePath, filename: dbModulePath, loaded: true, exports: { query } };
+  const srv = require(path.join(serverDir, 'src', 'index.js'));
+  await srv.start(port);
+  const call = (uid, method, p, body) => fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { Authorization: `Bearer ${tok({ id: uid, username: users[uid].username })}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+
+  // Багтаамж
+  let r = await call(2, 'POST', '/rooms/901/join', {}); let j = await r.json();
+  assert.equal(r.status, 403); assert.equal(j.code, 'PREMIUM_SLOT'); ok('200/200 дүүрсэн Room-д Bronze орохгүй (PREMIUM_SLOT)');
+  r = await call(3, 'POST', '/rooms/901/join', {}); assert.equal(r.status, 200); ok('Silver Premium нөөц slot-оор орно');
+  channelCount = 300; r = await call(3, 'POST', '/rooms/901/join', {}); assert.equal(r.status, 400); ok('300 бодит дээд хязгаарт Premium ч орохгүй');
+  channelCount = 150; r = await call(2, 'POST', '/rooms/901/join', {}); assert.equal(r.status, 200); ok('Сул Room-д Bronze орно');
+
+  // Moderator: LAN нээх эрх, хүсэлт → батлах
+  r = await call(2, 'POST', '/rooms/901/lan-host/begin'); j = await r.json();
+  assert.equal(r.status, 403); assert.equal(j.code, 'MODERATOR_REQUIRED'); ok('Moderator-гүй хүн нийтийн Room-д LAN нээж чадахгүй');
+  r = await call(2, 'POST', '/roles/request', { note: 'идэвхтэй тоглогч' }); assert.equal(r.status, 200); ok('Moderator хүсэлт илгээнэ');
+  r = await call(2, 'POST', '/roles/request', { note: 'дахин' }); assert.equal(r.status, 409); ok('Давхар хүсэлт хориглоно');
+  r = await call(2, 'GET', '/roles/requests'); assert.equal(r.status, 403); ok('Энгийн хэрэглэгч хүсэлтүүдийг харахгүй');
+  r = await call(2, 'POST', '/roles/requests/1/approve'); assert.equal(r.status, 403); ok('Энгийн хэрэглэгч батлахгүй');
+  r = await call(1, 'POST', '/roles/requests/1/approve'); assert.equal(r.status, 200); assert.equal(roles.get(2), 'moderator'); ok('Эзэн батална → Moderator');
+  r = await call(2, 'GET', '/roles/me'); j = await r.json(); assert.equal(j.can_host_channel, true); ok('/roles/me: can_host_channel');
+  r = await call(2, 'POST', '/rooms/901/lan-host/begin'); assert.notEqual(r.status, 403); ok('Moderator нийтийн Room-д LAN нээнэ');
+
+  // Зарлал
+  r = await call(2, 'PATCH', '/rooms/901/notice', { notice: 'hack' }); assert.equal(r.status, 403); ok('Энгийн хэрэглэгч зарлал засахгүй');
+  r = await call(1, 'PATCH', '/rooms/901/notice', { notice: 'Сайн байна уу' }); assert.equal(r.status, 200); assert.equal(notice, 'Сайн байна уу'); ok('Эзэн зарлал засна');
+
+  // Гишүүдийн идэвх
+  r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Гишүүдийн идэвх зөвхөн ажилтанд');
+  console.log(`=== channels: ${pass} PASS ===`);
+  process.exit(0);
+}
+main().catch((e) => { console.error('FAIL', e); process.exit(1); });

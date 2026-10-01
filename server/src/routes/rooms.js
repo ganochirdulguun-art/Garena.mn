@@ -89,18 +89,20 @@ router.get('/', optAuth, async (req, res) => {
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
           r.status, r.has_password, r.zerotier_network_id, r.playing_since, r.created_at,
           r.clan_id, c.name AS clan_name, c.tag AS clan_tag,
+          COALESCE(r.kind, 'room') AS kind, r.channel_no, r.visible_cap,
           COUNT(rp.user_id) AS player_count,
+          -- Нийтийн Room 1–20 (channel): 300 хүртэлх гишүүнийг жагсаалтад агрегатлахгүй (зөвхөн тоо)
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
-            ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
+            ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL AND COALESCE(r.kind, 'room') <> 'channel') AS members
         FROM rooms r
-        JOIN users u ON r.host_id = u.id
+        LEFT JOIN users u ON r.host_id = u.id
         LEFT JOIN clans c ON c.id = r.clan_id
         LEFT JOIN room_players rp ON r.id = rp.room_id
         LEFT JOIN users u2 ON rp.user_id = u2.id
         WHERE r.status IN ('waiting','playing')
           AND (r.clan_id IS NULL OR r.clan_id = ANY($1::int[]))
         GROUP BY r.id, u.username, c.name, c.tag
-        ORDER BY r.created_at DESC
+        ORDER BY (COALESCE(r.kind, 'room') = 'channel') DESC, r.channel_no ASC NULLS LAST, r.created_at DESC
       `, [myClans]);
       return res.json(result.rows.map((row) => ({ ...row, members: row.members || [] })));
     } catch (e) {
@@ -120,13 +122,14 @@ router.get('/mine', optAuth, async (req, res) => {
       const result = await db.query(`
         SELECT r.id, r.name, r.host_id, u.username AS host_name,
           r.max_players, r.game_type, r.description, r.game_mode, r.background_url, r.ranked,
-          r.status, r.has_password, r.zerotier_network_id, r.playing_since, r.clan_id,
+          r.status, r.has_password, r.zerotier_network_id, r.playing_since, r.clan_id, r.description,
+          COALESCE(r.kind, 'room') AS kind, r.channel_no, r.visible_cap, r.pinned_notice,
           (SELECT c.tag FROM clans c WHERE c.id = r.clan_id) AS clan_tag,
           COUNT(rp2.user_id) AS player_count,
           JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
             ORDER BY rp2.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
         FROM rooms r
-        JOIN users u ON r.host_id = u.id
+        LEFT JOIN users u ON r.host_id = u.id
         JOIN room_players rp ON r.id = rp.room_id AND rp.user_id = $1
         LEFT JOIN room_players rp2 ON r.id = rp2.room_id
         LEFT JOIN users u2 ON rp2.user_id = u2.id
@@ -153,6 +156,15 @@ router.post('/', strictAuth, async (req, res) => {
   const clanId = req.body?.clan_id ? Number(req.body.clan_id) : null;
   if (clanId && !await clans.clanAccess(req.user.id, clanId)) {
     return res.status(403).json({ error: 'Зөвхөн кланы гишүүд кланы өрөө үүсгэнэ', code: 'CLAN_ONLY' });
+  }
+
+  // 2026-10-02 (эзэн): өөрийн өрөө үүсгэх эрх зөвхөн GOLD (энгийн/Silver нь нийтийн Room 1–20-оор тоглоно).
+  // Кланы өрөө (кланы гишүүн) болон эзэн/админ чөлөөлөгдөнө.
+  if (!clanId) {
+    let allowed = false;
+    try { allowed = await require('../middleware/admin').isAdminUser(req.user); } catch {}
+    if (!allowed) { try { const { tierOf } = require('./membership'); allowed = (await tierOf(req.user.id)) === 'gold'; } catch {} }
+    if (!allowed) return res.status(403).json({ error: 'Өөрийн өрөө үүсгэх нь GOLD гишүүнчлэлийн эрх. Нийтийн Room 1–20-оор тоглоорой.', code: 'TIER_REQUIRED', need_tier: 'gold' });
   }
 
   // Өрөөний дэвсгэр зураг — зөвхөн GOLD, зөвхөн https зураг (≤500 тэмдэгт)
@@ -294,8 +306,15 @@ router.post('/:id/join', strictAuth, async (req, res) => {
       }
 
       const countResult = await db.query('SELECT COUNT(*) FROM room_players WHERE room_id = $1', [id]);
-      if (Number(countResult.rows[0].count) >= room.max_players) {
-        return res.status(400).json({ error: 'Room is full' });
+      const cnt = Number(countResult.rows[0].count);
+      if (cnt >= room.max_players) {
+        return res.status(400).json({ error: room.kind === 'channel' ? 'Өрөө бүрэн дүүрсэн байна — өөр Room сонгоно уу' : 'Room is full' });
+      }
+      // Нийтийн Room: visible_cap (200) дүүрсэн бол зөвхөн Silver/Gold/ажилтан Premium нөөц slot-оор орно
+      if (room.kind === 'channel' && cnt >= Number(room.visible_cap || room.max_players)) {
+        if (!await require('./channels').hasPremiumSlot(req.user)) {
+          return res.status(403).json({ error: `Өрөө дүүрсэн (${cnt}/${room.visible_cap}). Silver/Gold гишүүд Premium нөөц slot-оор шууд орно.`, code: 'PREMIUM_SLOT', need_tier: 'silver' });
+        }
       }
 
       await db.query('INSERT INTO room_players (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, userId]);
@@ -444,17 +463,27 @@ router.post('/:id/kick/:targetId', strictAuth, async (req, res) => {
 
   if (await dbOk()) {
     try {
-      const result = await db.query('SELECT host_id FROM rooms WHERE id = $1', [id]);
+      const result = await db.query("SELECT host_id, COALESCE(kind,'room') AS kind FROM rooms WHERE id = $1", [id]);
       if (!result.rows[0]) return res.status(404).json({ error: 'Room not found' });
-      if (String(result.rows[0].host_id) !== String(userId)) {
+      // Нийтийн Room-д хост байхгүй — эзэн/админ гаргана (Ш2: шалтгаан заавал + лог)
+      const staffKick = result.rows[0].kind === 'channel' && await require('../middleware/admin').isAdminUser(req.user);
+      if (String(result.rows[0].host_id) !== String(userId) && !staffKick) {
         return res.status(403).json({ error: 'Only the host can kick players' });
       }
       if (String(targetId) === String(userId)) {
         return res.status(400).json({ error: 'Cannot kick yourself' });
       }
+      // Нийтийн Room-оос гаргахад шалтгаан ЗААВАЛ (хувийн сэтгэл хөдлөлөөр kick хийхийг хянах) — kick_log-д бүртгэнэ
+      const reason = String(req.body?.reason || '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (result.rows[0].kind === 'channel' && reason.length < 3) {
+        return res.status(400).json({ error: 'Гаргах шалтгаанаа бичнэ үү (жишээ: «AFK 40 мин», «бүдүүлэг үг»)', code: 'REASON_REQUIRED' });
+      }
 
       await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [id, targetId]);
-      if (_io) _io.to(id).emit('room:kicked', { userId: String(targetId) });
+      if (result.rows[0].kind === 'channel') {
+        await db.query('INSERT INTO kick_log (room_id, target_id, by_id, reason) VALUES ($1, $2, $3, $4)', [id, targetId, userId, reason]).catch((e) => console.error('[kick_log]', e.message));
+      }
+      if (_io) _io.to(id).emit('room:kicked', { userId: String(targetId), reason: reason || undefined });
       return res.json({ message: 'Player kicked' });
     } catch (e) {
       console.error(e);
@@ -617,6 +646,19 @@ router.patch('/:id', strictAuth, async (req, res) => {
   return res.json({ ok: true, room: roomToPublic(room) });
 });
 
+// Бэхэлсэн зарлал (чатын дээд самбар) — эзэн/админ засна
+router.patch('/:id/notice', strictAuth, async (req, res) => {
+  if (!await dbOk()) return requireOperationalDb(res);
+  try {
+    if (!await require('../middleware/admin').isAdminUser(req.user)) return res.status(403).json({ error: 'Зөвхөн эзэн/админ' });
+    const notice = String(req.body?.notice ?? '').replace(/\r/g, '').slice(0, 1500);
+    const r = await db.query('UPDATE rooms SET pinned_notice = $2 WHERE id = $1 RETURNING id', [req.params.id, notice]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'Room not found' });
+    if (_io) _io.to(String(req.params.id)).emit('room:notice', { notice });
+    return res.json({ ok: true, notice });
+  } catch (e) { console.error('[notice]', e.message); return res.status(500).json({ error: 'Server error' }); }
+});
+
 router.post('/quickmatch', strictAuth, async (req, res) => {
   const { game_type } = req.body;
   if (!game_type) return res.status(400).json({ error: 'game_type is required' });
@@ -643,10 +685,10 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
         LEFT JOIN room_players rp ON r.id = rp.room_id
         WHERE r.status='waiting' AND r.has_password=FALSE AND r.clan_id IS NULL AND r.game_type=$1
         GROUP BY r.id
-        HAVING COUNT(rp.user_id) < r.max_players
-        ORDER BY player_count DESC
+        HAVING COUNT(rp.user_id) < CASE WHEN COALESCE(r.kind,'room') = 'channel' AND NOT $2::boolean THEN COALESCE(r.visible_cap, r.max_players) ELSE r.max_players END
+        ORDER BY (COALESCE(r.kind,'room') = 'channel') DESC, player_count DESC
         LIMIT 1
-      `, [game_type]);
+      `, [game_type, await require('./channels').hasPremiumSlot(req.user)]);   // Нийтийн Room 1–20 эхэлж
 
       if (available.rows[0]) {
         const roomId = available.rows[0].id;
@@ -658,7 +700,7 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
             JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
               ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
           FROM rooms r
-          JOIN users u ON r.host_id=u.id
+          LEFT JOIN users u ON r.host_id=u.id
           LEFT JOIN room_players rp ON r.id=rp.room_id
           LEFT JOIN users u2 ON rp.user_id=u2.id
           WHERE r.id=$1

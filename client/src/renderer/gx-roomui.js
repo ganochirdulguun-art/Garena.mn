@@ -116,7 +116,8 @@
   const vis = (el) => !!el && el.offsetParent !== null && !el.classList.contains('hidden');
   const startBtn = $('gxr-start'); const startLbl = startBtn.querySelector('span');
   function startTarget() {
-    const host = !!(typeof currentRoom !== 'undefined' && currentRoom?.isHost);
+    const host = !!(typeof currentRoom !== 'undefined' && (currentRoom?.isHost || currentRoom?.canHostChannel));
+    const isCh = typeof currentRoom !== 'undefined' && currentRoom?.kind === 'channel';
     if (document.body.classList.contains('ipgame-room')) {
       if (host) { const row = $('ipg-host-row'); return row && !row.classList.contains('hidden') ? [$('btn-ipg-host'), 'Сервер нээх'] : [$('btn-ipg-relaunch'), 'Тоглоом дахин нээх']; }
       return [$('btn-ipg-join'), 'Нэгдэх'];
@@ -126,7 +127,11 @@
       return lh && !lh.classList.contains('hidden') ? [lh, 'Тоглоом эхлүүлэх'] : [null, 'Тоглоом нээлттэй'];
     }
     const j = document.querySelector('#lan-games-list [data-join]:not(.joined)');
-    return j ? [j, 'Нэгдэх'] : [null, document.querySelector('#lan-games-list .joined') ? 'WC3-д нээгдсэн' : 'Хостыг хүлээж байна'];
+    if (j) return [j, 'Нэгдэх'];
+    if (document.querySelector('#lan-games-list .joined')) return [null, 'WC3-д нээгдсэн'];
+    // Нийтийн Room: тоглоом алга, эрхгүй бол «Moderator авах» (зарлалын самбарын товч)
+    if (isCh) { const mr = $('gxn-modreq'); return mr ? [mr, 'Moderator авах'] : [null, 'Moderator тоглоом нээхийг хүлээж байна']; }
+    return [null, 'Хостыг хүлээж байна'];
   }
   startBtn.addEventListener('click', () => { const [t] = startTarget(); t?.click(); });
 
@@ -140,15 +145,16 @@
     const n = document.querySelectorAll('#members-list > li').length;
     $('gxr-count').textContent = String(n);
     $('gxr-game').textContent = cr.gameType || '-';
-    $('gxr-max').textContent = String(cr.maxPlayers || '-');
+    $('gxr-max').textContent = String((cr.kind === 'channel' ? cr.visibleCap : cr.maxPlayers) || '-');
     $('gxr-status').textContent = cr.status === 'playing' ? 'Тоглолт явагдаж байна' : 'Хүлээлгийн өрөө';
-    $('gxr-role').textContent = cr.isHost ? 'Хост' : 'Оролцогч';
+    $('gxr-role').textContent = cr.isHost ? 'Хост' : cr.staff ? 'Админ' : cr.canHostChannel ? 'Moderator' : 'Оролцогч';
     $('gxr-roomno').textContent = cr.id ? `#${cr.id}` : '-';
     if (meta && String(meta.id) === String(cr.id)) {
       $('gxr-mode').textContent = (meta.game_mode || 'Custom').toUpperCase() + (meta.ranked ? ' · 🏆 Ranked' : '');
       const p = $('gxr-privacy');
-      p.textContent = meta.clan_id ? `🛡 ${meta.clan_tag || 'Клан'}` : meta.has_password ? '🔒 Нууц үгтэй' : 'Нийтийн';
-      p.dataset.kind = meta.clan_id ? 'clan' : meta.has_password ? 'lock' : 'public';
+      p.textContent = meta.kind === 'channel' ? `🌐 Нийтийн Room · ${n}/${meta.visible_cap || 200}` : meta.clan_id ? `🛡 ${meta.clan_tag || 'Клан'}` : meta.has_password ? '🔒 Нууц үгтэй' : 'Нийтийн';
+      p.dataset.kind = meta.kind === 'channel' ? 'public' : meta.clan_id ? 'clan' : meta.has_password ? 'lock' : 'public';
+      if (meta.kind === 'channel') $('gxr-mode').textContent = 'LAN · Нийтийн Room';
     }
     const st = $('ipg-state')?.closest('.ip-game-panel:not(.hidden)') ? $('ipg-state') : $('lan-host-state');
     const cs = $('gxr-conn-state');

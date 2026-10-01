@@ -127,6 +127,17 @@ async function testSmokeFlow() {
     assert.equal(meJson.username, 'Tester');
     assert.equal(meJson.email, email);
 
+    // 2026-10-02: өөрийн өрөө үүсгэх зөвхөн GOLD/ажилтан — энгийн хэрэглэгч 403 TIER_REQUIRED
+    const bronzeRes = await fetch(`${server.baseUrl}/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${loginJson.token}` },
+      body: JSON.stringify({ name: 'Bronze test', game_type: 'DotA', max_players: 10 }),
+    });
+    assert.equal(bronzeRes.status, 403);
+    assert.equal((await bronzeRes.json()).code, 'TIER_REQUIRED');
+    const prevOwnerIds = process.env.OWNER_USER_IDS;
+    process.env.OWNER_USER_IDS = String(meJson.id);   // эзэн болгож үргэлжлүүлнэ (доор сэргээнэ)
+
     // 🏆 Ranked өрөө: create → ranked:true буцаана, жагсаалтад ч харагдана (v2.7.8 / Алхам 3)
     const rankedRes = await fetch(`${server.baseUrl}/rooms`, {
       method: 'POST',
@@ -135,6 +146,7 @@ async function testSmokeFlow() {
     });
     assert.ok([200, 201].includes(rankedRes.status), `rooms create ${rankedRes.status}`);
     const rankedJson = await rankedRes.json();
+    if (prevOwnerIds === undefined) delete process.env.OWNER_USER_IDS; else process.env.OWNER_USER_IDS = prevOwnerIds;
     assert.equal(rankedJson.ranked, true, 'create хариунд ranked=true байх ёстой');
     const listRes = await fetch(`${server.baseUrl}/rooms`, { headers: { Authorization: `Bearer ${loginJson.token}` } });
     const listJson = await listRes.json();
