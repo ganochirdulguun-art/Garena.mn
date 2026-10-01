@@ -184,7 +184,7 @@ async function connectSocket() {
   const token = await window.api.getToken().catch(() => null);
   socket = io(SERVER, {
     transports: ['websocket'],
-    auth: { token },
+    auth: { token, portable: window._gxPortable === true },   // portable бол сервер «Setup суулга» мэдэгдэнэ
   });
 
   socket.on('connect', () => {
@@ -3930,6 +3930,22 @@ function showGameResult(data) {
 }
 
 // ── Update notification bar ───────────────────────────────
+// ── Portable хувилбар (Garena.mn-x.y.z.exe) — автомат шинэчлэлтгүй тул Setup суулгахыг байнга сануулна (2026-10-02) ──
+(async function portableNotice() {
+  try { window._gxPortable = !!(await window.api?.isPortable?.()); } catch { window._gxPortable = false; }
+  if (!window._gxPortable || new URLSearchParams(location.search).get('mode')) return;
+  const SETUP_URL = 'https://garenamn-production.up.railway.app/';
+  const show = () => {
+    if (document.getElementById('portable-bar') || !document.body) return;
+    const bar = document.createElement('div');
+    bar.id = 'portable-bar';
+    bar.innerHTML = '<span>⚠️ Та <b>portable</b> хувилбар ашиглаж байна — автоматаар шинэчлэгддэггүй. Бүх Garena.mn цонхоо хаагаад <b>Setup</b> хувилбарыг суулгана уу.</span><button type="button" id="portable-bar-dl">⬇ Setup татах</button>';
+    document.body.appendChild(bar);
+    document.getElementById('portable-bar-dl').addEventListener('click', () => { try { window.api.openExternal(SETUP_URL); } catch { window.open(SETUP_URL, '_blank'); } });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+})();
+
 function showUpdateBar(message, showInstallBtn, percent = null) {
   let bar = document.getElementById('update-bar');
   if (!bar) {

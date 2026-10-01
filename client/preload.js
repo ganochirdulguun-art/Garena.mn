@@ -159,6 +159,7 @@ contextBridge.exposeInMainWorld('api', {
   onUpdateError:     (cb) => ipcRenderer.on('update:error', (_, msg) => cb(msg)),
   checkForUpdates:   ()   => ipcRenderer.invoke('update:check'),
   getAppVersion:     ()   => ipcRenderer.invoke('update:version'),
+  isPortable:        ()   => ipcRenderer.invoke('app:isPortable'),
 
   // Ерөнхий API хүсэлт (Diamond 💎, гишүүнчлэл, бот хост)
   request: (method, path, body) => ipcRenderer.invoke('api:request', { method, path, body }),

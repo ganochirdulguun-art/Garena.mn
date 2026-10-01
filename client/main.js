@@ -488,6 +488,8 @@ ipcMain.handle('update:install', async () => {
 
 // App хувилбар буцаах
 ipcMain.handle('update:version', () => app.getVersion());
+// Portable (Garena.mn-x.y.z.exe) эсэх — electron-builder portable нь PORTABLE_EXECUTABLE_FILE тохируулдаг; автомат шинэчлэлтгүй
+ipcMain.handle('app:isPortable', () => !!process.env.PORTABLE_EXECUTABLE_FILE);
 
 // Гараар шинэчлэл шалгах
 ipcMain.handle('update:check', async () => {

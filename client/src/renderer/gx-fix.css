@@ -172,3 +172,8 @@ body.gx #ranking-table tbody tr:nth-child(-n+3) td:nth-child(2) { font-weight: 8
 body.gx .ymdm-input, body.gx .dm-popup-input { color: #f3f4f6 !important; caret-color: #ff6b5e; background: rgba(255,255,255,.07) !important; border-color: rgba(255,255,255,.18) !important; }
 body.gx .ymdm-input::placeholder, body.gx .dm-popup-input::placeholder { color: rgba(255,255,255,.45) !important; }
 body.gx .ymdm-input:focus, body.gx .dm-popup-input:focus { border-color: rgba(255,107,94,.65) !important; background: rgba(255,255,255,.1) !important; }
+
+/* Portable хувилбарын байнгын сануулга (Setup суулгах) */
+#portable-bar { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 9500; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 8px 10px 8px 14px; border-radius: 10px; background: #b91c1c; color: #fff; font: 600 13px var(--gx-font, sans-serif); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
+#portable-bar b { font-weight: 800; }
+#portable-bar button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: #fff; color: #b91c1c; font: 800 12.5px var(--gx-font, sans-serif); cursor: pointer; }

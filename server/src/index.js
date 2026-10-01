@@ -480,7 +480,41 @@ app.post('/relay/rtt', (req, res) => {
   return res.json({ ok: true, peers: peers.length, matched: sent });
 });
 
+// ── Хуучин / portable клиентэд «Setup суулга» мэдэгдэл (2026-10-02, эзэн) ──
+// Portable (Garena.mn-x.y.z.exe) автоматаар шинэчлэгддэггүй. Electron-ий User-Agent-д «Garena.mn/2.8.11» гэж хувилбар явдаг тул
+// PORTABLE_NOTICE_BELOW-оос хуучин клиентэд (portable байх магадлал өндөр) зөвхөн тэр хүнд лобби чатад мэдэгдэнэ.
+// Шинэ клиент (2.9.28+) өөрөө auth.portable илгээнэ. Нэг хэрэглэгчид 6 цагт нэг удаа.
+const PORTABLE_NOTICE_BELOW = process.env.PORTABLE_NOTICE_BELOW || '2.9.23';
+const SETUP_URL = 'https://garenamn-production.up.railway.app/';
+const _oldNoticeAt = new Map();
+function _verLt(a, b) {
+  const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) { if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) < (pb[i] || 0); }
+  return false;
+}
+function clientVersionOf(socket) {
+  const ua = String(socket.handshake?.headers?.['user-agent'] || '');
+  const m = /\bGarena\.mn\/(\d+\.\d+\.\d+)\b/i.exec(ua) || /\bgarena-mn-client\/(\d+\.\d+\.\d+)\b/i.exec(ua);
+  return m ? m[1] : null;
+}
+function oldClientNotice(socket) {
+  try {
+    const v = socket.data.appVersion; const uid = String(socket.user?.id || '');
+    const portable = !!socket.data.portable;
+    if (!uid || (!portable && !(v && _verLt(v, PORTABLE_NOTICE_BELOW)))) return;
+    const last = _oldNoticeAt.get(uid) || 0;
+    if (Date.now() - last < 6 * 3600e3) return;
+    _oldNoticeAt.set(uid, Date.now());
+    const text = portable
+      ? `⚠️ Та Garena.mn-ийн PORTABLE хувилбар (v${v || '?'}) ашиглаж байна — энэ нь автоматаар шинэчлэгддэггүй. Бүх Garena.mn цонхоо хаагаад ${SETUP_URL} хаягаас «Setup» хувилбарыг татаж суулгана уу. Цаашид шинэчлэлт өөрөө орно.`
+      : `⚠️ Таны Garena.mn хуучин хувилбар (v${v}) байна. Хэрэв «Garena.mn-${v}.exe» нэртэй PORTABLE хувилбар (Setup биш) ашиглаж байгаа бол автоматаар шинэчлэгддэггүй — бүх Garena.mn цонхоо хаагаад ${SETUP_URL} хаягаас «Setup» хувилбарыг татаж суулгана уу. Setup хувилбартай бол апп-аа хаагаад нээхэд л шинэчлэгдэнэ.`;
+    socket.emit('lobby:chat', { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true });
+  } catch { /* мэдэгдэл эмзэг биш */ }
+}
+
 io.on('connection', (socket) => {
+  socket.data.appVersion = clientVersionOf(socket);
+  socket.data.portable = socket.handshake?.auth?.portable === true;
   // Улс: холбогдох үед НЭГ удаа офлайн GeoIP-ээр (микросекунд) — ping тэмдэгт "хол зай (улс)" харуулахад
   let clientIp = '';
   try {
@@ -526,7 +560,8 @@ io.on('connection', (socket) => {
     io.emit('lobby:online_users', onlineUsersList());
     // Лобби чатын сүүлийн 50 мессеж илгээх
     socket.emit('lobby:history', lobbyHistory.slice(-50));
-    console.log(`[Socket] ${username} онлайн (нийт: ${onlineUsers.size})`);
+    console.log(`[Socket] ${username} онлайн (нийт: ${onlineUsers.size})${socket.data.appVersion ? ` v${socket.data.appVersion}${socket.data.portable ? ' portable' : ''}` : ''}`);
+    setTimeout(() => oldClientNotice(socket), 4000);   // lobby:history-ийн дараа харагдана
   });
 
   // Нийтийн лобби чат (бүх хэрэглэгчид харна)
