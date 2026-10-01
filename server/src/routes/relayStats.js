@@ -90,7 +90,9 @@ function postRoomNotice(roomId, text) {
   try {
     const { io } = require('../index');
     if (!io || !roomId || !text) return;
-    io.to(String(roomId)).emit('chat:message', { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true });
+    const msg = { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true };
+    io.to(String(roomId)).emit('chat:message', msg);
+    require('./roomChat').save(roomId, msg);   // тоглолтын дүн чатын түүхэнд үлдэнэ
   } catch { /* мэдэгдэл эмзэг биш */ }
 }
 

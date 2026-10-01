@@ -245,6 +245,7 @@ async function runMigrations(db) {
   await require('../routes/wishes').ensureTables(); // game_wishes (хүсэж буй тоглоомын санал)
   await require('../routes/channels').ensureTables(); // нийтийн Room 1–20 (rooms.kind='channel' + trigger)
   await require('../routes/roles').ensureTables(); // Moderator цол + хүсэлт
+  await require('../routes/roomChat').ensureTables(); // өрөөний чатын байнгын түүх
 }
 
 module.exports = { runMigrations };

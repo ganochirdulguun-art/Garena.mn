@@ -191,7 +191,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); await require('./routes/channels').ensureTables(); await require('./routes/roles').ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); await require('./routes/channels').ensureTables(); await require('./routes/roles').ensureTables(); await require('./routes/roomChat').ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
@@ -641,8 +641,9 @@ io.on('connection', (socket) => {
     }
 
     io.to(roomId).emit('room:members', membersArray(roomId));
-    // Өрөөний чатын түүх илгээх (хожуу нэгдсэн тоглогчид)
-    socket.emit('room:history', roomMessages[roomId] || []);
+    // Өрөөний чатын түүх (2026-10-02): DB-д байнга хадгалсан сүүлийн 200 — гараад удсан хүн ч байхгүй үеийнхээ чатыг уншина
+    const hist = await require('./routes/roomChat').history(roomId).catch(() => null);
+    socket.emit('room:history', hist && hist.length ? hist : (roomMessages[roomId] || []));
   });
 
   // Өрөөний урилга
@@ -676,6 +677,17 @@ io.on('connection', (socket) => {
     roomMessages[roomId].push(msg);
     if (roomMessages[roomId].length > 100) roomMessages[roomId].shift();
     io.to(String(roomId)).emit('chat:message', msg);
+    require('./routes/roomChat').save(roomId, msg);   // байнгын түүх (await хийхгүй — чат саатахгүй)
+  });
+
+  // Өмнөх чатыг дээш гүйлгэхэд ачаална (зөвхөн тухайн өрөөний гишүүн)
+  socket.on('room:history_more', async ({ roomId, before } = {}, ack) => {
+    const reply = (p) => { if (typeof ack === 'function') ack(p); };
+    if (!roomId || !before || Number.isNaN(Date.parse(before))) return reply({ ok: false });
+    if (String(socket.data.roomId) !== String(roomId)) return reply({ ok: false, error: 'room-not-joined' });
+    const rc = require('./routes/roomChat');
+    const msgs = await rc.history(roomId, { limit: rc.PAGE_LIMIT, before }).catch(() => null);
+    reply({ ok: !!msgs, messages: msgs || [], more: !!msgs && msgs.length >= rc.PAGE_LIMIT });
   });
 
   // Өрөөний чат мессеж устгах (зөвхөн өөрийн)
@@ -693,12 +705,14 @@ io.on('connection', (socket) => {
     const userId = String(socket.user.id);
     const messages = roomMessages[roomKey] || [];
     const idx = messages.findIndex(m => m.time === time && String(m.userId) === userId);
-    if (idx === -1) {
+    // Байнгын түүхэнд ч тэмдэглэнэ (сервер дахин асаад санах ойд байхгүй хуучин мессежийг ч устгана)
+    const dbDeleted = await require('./routes/roomChat').markDeleted(roomKey, userId, time);
+    if (idx === -1 && !dbDeleted) {
       reply({ ok: false, error: 'message-not-found' });
       return;
     }
 
-    messages[idx].text = '[Устгагдсан мессеж]';
+    if (idx !== -1) messages[idx].text = '[Устгагдсан мессеж]';
     io.to(roomKey).emit('chat:deleted', { time });
     reply({ ok: true });
   });
@@ -983,6 +997,9 @@ function roomHasActiveMembers(roomId) {
   return !!(members && members.size > 0);
 }
 
+// Устгагдсан өрөөний хуучин чат (30 хоног+) — 24 цаг тутам
+const roomChatCleanup = setInterval(() => { require('./routes/roomChat').cleanupOrphans(); }, 24 * 60 * 60 * 1000);
+if (typeof roomChatCleanup.unref === 'function') roomChatCleanup.unref();
 const autoExpireInterval = setInterval(async () => {
   if (!dbForMigration) return;
   try {

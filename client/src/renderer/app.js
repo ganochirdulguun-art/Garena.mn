@@ -337,7 +337,7 @@ async function connectSocket() {
 
   // Өрөөний чатын түүх
   socket.on('room:history', (msgs) => {
-    msgs.forEach(msg => appendMessage(msg));
+    renderRoomHistory(msgs);
     // Өрөөнд ороход шууд холболтгүй бол сануулна (2.9.11)
     if (window.GX_MESH_UI !== false && window._meshState && !(window._meshState.state === 'Running' && window._meshState.ip) && !['ForeignTailnet', 'Disabled'].includes(window._meshState.state)) {
       appendSysMsg('⚠ Таны «Шууд холболт» идэвхгүй — тоглолт серверээр (Сингапур) дамжиж ping ~100мс+ болно. Үндсэн цонхны зүүн доод «Шууд холболт идэвхжүүлэх»-ийг дарж Монгол дотор ~10мс болгоорой.');
@@ -1847,7 +1847,7 @@ function formatChatTime(time) {
   return date.toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
-function appendMessage({ userId, username, text, time, replyTo }) {
+function appendMessage({ userId, username, text, time, replyTo, quiet }) {
   const box  = document.getElementById('chat-messages');
   const isMe = username === currentUser?.username;
   const t    = formatChatTime(time);
@@ -1858,13 +1858,13 @@ function appendMessage({ userId, username, text, time, replyTo }) {
   div.dataset.userId = userId || '';
   const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
-  const body = parseMentions(escHtml(text), !isMe && !toMe);
+  const body = parseMentions(escHtml(text), !isMe && !toMe && !quiet);
   if (body.includes('mention-all')) div.classList.add('mention-all-row');
   div.innerHTML = `
     <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
     ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
   `;
-  if (toMe) playSound('notify');
+  if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'room', { username, text, time });
   if (!isMe && userId) {
     div.querySelector('.clickable-name')?.addEventListener('click', () => openUserProfile(userId));
@@ -1892,6 +1892,67 @@ function appendSysMsg(text) {
   div.textContent = text;
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+}
+
+// ── Өрөөний чатын байнгын түүх (2026-10-02) ──
+// Сервер DB-ээс сүүлийн 200-г өгнө. Дахин холбогдоход давхардуулахгүй; «таныг байхгүй үед» хуваагч;
+// дээш гүйлгэхэд өмнөх 100-г room:history_more-оор ачаална.
+function _roomSeenKey() { return currentRoom?.id ? `gx_room_seen_${currentRoom.id}` : null; }
+function _roomHasMsg(box, m) {
+  return [...box.querySelectorAll('.msg[data-time]')].some((el) => el.dataset.time === m.time && String(el.dataset.userId || '') === String(m.userId || ''));
+}
+function markRoomSeen() {
+  const box = document.getElementById('chat-messages'); const key = _roomSeenKey(); if (!box || !key) return;
+  const last = [...box.querySelectorAll('.msg[data-time]')].pop();
+  const t = last ? Date.parse(last.dataset.time) : 0;
+  if (t) { try { localStorage.setItem(key, String(t)); } catch {} }
+}
+function renderRoomHistory(msgs) {
+  const box = document.getElementById('chat-messages'); if (!box || !Array.isArray(msgs)) return;
+  let seen = 0; try { seen = Number(localStorage.getItem(_roomSeenKey()) || 0); } catch {}
+  const me = currentUser?.username;
+  const fresh = msgs.filter((m) => m && m.time && !_roomHasMsg(box, m));
+  const isUnseen = (m) => seen && Date.parse(m.time) > seen && m.username !== me;
+  const unseenN = fresh.filter(isUnseen).length;
+  let divider = null;
+  fresh.forEach((m) => {
+    if (!divider && unseenN && isUnseen(m)) {
+      appendSysMsg(`── Таныг байхгүй үед ${unseenN} мессеж бичигдсэн ──`);
+      divider = box.lastElementChild; divider?.classList.add('unread-divider');
+    }
+    appendMessage({ ...m, quiet: true });
+  });
+  if (divider) divider.scrollIntoView({ block: 'start' });
+  if (!box.dataset.histWired) {
+    box.dataset.histWired = '1';
+    box.dataset.more = msgs.length >= 200 ? '1' : '';
+    box.addEventListener('scroll', () => { if (box.scrollTop < 40) loadOlderRoomMessages(); }, { passive: true });
+    window.addEventListener('beforeunload', markRoomSeen);
+    setInterval(markRoomSeen, 15000);
+  }
+  markRoomSeen();
+}
+let _olderLoading = false;
+function loadOlderRoomMessages() {
+  const box = document.getElementById('chat-messages');
+  if (!box || _olderLoading || box.dataset.more !== '1' || !socket || !currentRoom?.id) return;
+  const first = box.querySelector('.msg[data-time]'); if (!first) return;
+  _olderLoading = true;
+  socket.emit('room:history_more', { roomId: currentRoom.id, before: first.dataset.time }, (r) => {
+    _olderLoading = false;
+    if (!r?.ok) return;
+    box.dataset.more = r.more ? '1' : '';
+    const older = (r.messages || []).filter((m) => m && m.time && !_roomHasMsg(box, m));
+    if (!older.length) return;
+    const prevH = box.scrollHeight, prevTop = box.scrollTop;
+    const anchor = box.firstChild;
+    const startN = box.childNodes.length;
+    older.forEach((m) => appendMessage({ ...m, quiet: true }));
+    const added = [...box.childNodes].slice(startN);
+    added.forEach((n) => box.insertBefore(n, anchor));
+    if (!r.more) { appendSysMsg('── Чатын эхлэл ──'); box.insertBefore(box.lastElementChild, box.firstChild); }
+    box.scrollTop = box.scrollHeight - prevH + prevTop;
+  });
 }
 
 function sendMessage() {

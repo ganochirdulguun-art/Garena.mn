@@ -295,7 +295,9 @@ async function lagSentry(g, s) {
       }
     }
     const text = `⚡ Гацалт илэрлээ: **${name}** — ${lagCauseText(rtt)}. Бусад тоглогчид хэвийн.`;
-    io.to(String(g.room_id)).emit('chat:message', { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true });
+    const sysMsg = { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true };
+    io.to(String(g.room_id)).emit('chat:message', sysMsg);
+    require('./roomChat').save(g.room_id, sysMsg);
     console.log(`[LagSentry] token=${g.token.slice(0, 12)} room=${g.room_id} pid=${pid} name=${name} rtt=${rtt}`);
   }
 }

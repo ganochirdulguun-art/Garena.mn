@@ -219,3 +219,6 @@ body.rgc-wc3 .rgc-banner { background-position: center, center 42% !important; b
 /* 👑 Эзэн — гишүүдийн жагсаалтын хамгийн дээр */
 #rgc #members-list li.r-owner .member-info > div { color: #ffd25a; }
 .mod-badge.owner { background: linear-gradient(135deg, #f5b301, #b7791f) !important; color: #1a1205 !important; }
+
+/* Чатын түүх: «Таныг байхгүй үед N мессеж» хуваагч */
+#chat-messages .sys-msg.unread-divider { color: #d03a2f !important; font-weight: 800 !important; text-align: center !important; margin: 6px 0 !important; }
