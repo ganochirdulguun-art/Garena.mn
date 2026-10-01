@@ -40,6 +40,14 @@ router.post('/:id/ipserver', auth, async (req, res) => {
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Өрөөний гишүүн биш' });
   const kind = String(req.body?.kind || '');
   if (!KINDS[kind]) return res.status(400).json({ error: 'Дэмжигдээгүй тоглоом' });
+  // Нийтийн Room (CS 1.6 / Quake III Room 1–5): сервер нээх эрх зөвхөн Moderator / эзэн / админ — WC3-тэй ижил
+  try {
+    const db = require('../config/db');
+    const k = await db.query("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1", [roomId]);
+    if (k.rows[0]?.kind === 'channel' && !await require('./roles').canHostInChannel(req.user)) {
+      return res.status(403).json({ error: 'Нийтийн Room-д сервер нээх эрх зөвхөн Moderator-д. «Moderator хүсэлт илгээх» товчоор хүсэлт илгээнэ үү.', code: 'MODERATOR_REQUIRED' });
+    }
+  } catch { /* DB алга (тест) — шалгалтгүй */ }
   const ip = String(req.body?.ip || '');
   if (!isMeshIp(ip)) return res.status(400).json({ error: 'Mesh IP (100.64.x.x) шаардлагатай — Тохиргоо → Апп → Mesh холбогдсон байх ёстой', code: 'MESH_REQUIRED' });
   const port = Number(req.body?.port || KINDS[kind].port);

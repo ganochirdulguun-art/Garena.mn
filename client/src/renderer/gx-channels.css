@@ -137,3 +137,9 @@ body.gx-staff .gx-side-fill .gxo-menu { margin: 0; }
 .gxcl-row.ranked .gxcl-ico { background: linear-gradient(135deg, #f5b301, #b7791f); font-size: 11px; }
 .gxcl-rk { margin-left: 2px; font: 800 9.5px var(--gx-font); letter-spacing: .06em; padding: 1px 6px; border-radius: 5px; background: linear-gradient(135deg, #f5b301, #d97706); color: #fff; }
 .gxcl-row.ranked .gxcl-game b { color: #d97706; }
+
+/* Тоглоом бүрийн нийтийн Room хэсэг (2026-10-02) */
+.gxch-sec + .gxch-sec { margin-top: 22px; }
+.gxcl-ico.k-cs16 { background: linear-gradient(135deg, #f59e0b, #b45309); }
+.gxcl-ico.k-q3 { background: linear-gradient(135deg, #8b5cf6, #5b21b6); }
+.gxcl-ico.k-ra2 { background: linear-gradient(135deg, #ef4444, #1e3a8a); }

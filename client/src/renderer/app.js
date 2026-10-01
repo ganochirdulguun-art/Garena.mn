@@ -1022,17 +1022,34 @@ async function loadRooms() {
 }
 let _roomsRetry = 0, _roomsRetryTimer = null;
 
-// Тоглоомын төрлийн filter dropdown-г populate хийх
+// Тоглоомын төрөл (2026-10-02): game_type / exe нэр → каталогийн id. «Frozen Throne», «Warcraft III: The Frozen Throne»
+// гэх мэт ижил тоглоомын өөр нэрүүдийг нэг төрөлд нэгтгэнэ (gx-catalog.js kindOf-той ижил).
+const GAME_KINDS = [
+  { id: 'wc3', label: 'Warcraft III' },
+  { id: 'cs16', label: 'Counter-Strike 1.6' },
+  { id: 'q3', label: 'Quake III Arena' },
+  { id: 'ra2', label: 'Red Alert 2' },
+];
+function gameKindOf(s) {
+  const h = String(s || '').toLowerCase();
+  if (/war3|warcraft|frozen throne|wc3|dota|\blod\b|imba/.test(h)) return 'wc3';
+  if (/cstrike|counter[-\s]?strike|\bcs\s?1\.6|hl\.exe|\bhl\b/.test(h)) return 'cs16';
+  if (/quake\s?(3|iii)|ioquake3|quake3|\bq3/.test(h)) return 'q3';
+  if (/red alert|ra2|gamemd|yuri/.test(h)) return 'ra2';
+  return 'other';
+}
+
+// Тоглоомын төрлийн filter dropdown — тоглоомоор ялгана (Бүх төрөл / WC3 / CS 1.6 / Quake III / Red Alert 2)
 function populateGameTypeFilter(rooms) {
   const sel = document.getElementById('room-filter-type');
   if (!sel) return;
   const prev = sel.value;
-  const types = new Set();
-  rooms.forEach(r => { if (r.game_type) types.add(r.game_type); });
-  configuredGames.forEach(g => { if (g.name) types.add(g.name); });
-  const sorted = [...types].sort();
+  const count = {};
+  rooms.forEach(r => { const k = gameKindOf(r.game_type); count[k] = (count[k] || 0) + 1; });
+  const kinds = GAME_KINDS.filter(k => count[k.id]);
+  if (count.other) kinds.push({ id: 'other', label: 'Бусад' });
   sel.innerHTML = '<option value="">Бүх төрөл</option>'
-    + sorted.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('');
+    + kinds.map(k => `<option value="${k.id}">${escHtml(k.label)}</option>`).join('');
   if (prev && [...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
@@ -1091,9 +1108,10 @@ function getFilteredRooms(rooms) {
     );
   }
 
-  // Тоглоомын төрлөөр шүүх
+  // Тоглоомын төрлөөр шүүх (каталогийн id; хуучин бүтэн нэр ирвэл түүнийг төрөлд хөрвүүлнэ)
   if (filterType) {
-    result = result.filter(r => r.game_type === filterType);
+    const fk = GAME_KINDS.some(k => k.id === filterType) || filterType === 'other' ? filterType : gameKindOf(filterType);
+    result = result.filter(r => gameKindOf(r.game_type) === fk);
   }
 
   // Эрэмбэлэх

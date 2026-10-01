@@ -143,7 +143,11 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   // Нийтийн Room 1–20: LAN тоглоом нээх (host) эрх зөвхөн Moderator / эзэн / админ (2026-10-02)
   if (db) {
     try {
-      const k = await db.query("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1", [roomId]);
+      const k = await db.query("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id=$1", [roomId]);
+      // WC3 LAN relay зөвхөн Warcraft III-ийн нийтийн Room-д (CS/Q3 — ipserver, Red Alert 2 — хараахан алга)
+      if (k.rows[0]?.kind === 'channel' && k.rows[0]?.game_type && !/warcraft|frozen throne/i.test(k.rows[0].game_type)) {
+        return res.status(400).json({ error: 'Энэ тоглоомын онлайн холболт удахгүй нээгдэнэ.', code: 'GAME_NOT_READY' });
+      }
       if (k.rows[0]?.kind === 'channel' && !await require('./roles').canHostInChannel(req.user)) {
         return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д. Зарлалын самбар дээрх «Moderator авах» товчоор хүсэлт илгээнэ үү.', code: 'MODERATOR_REQUIRED' });
       }

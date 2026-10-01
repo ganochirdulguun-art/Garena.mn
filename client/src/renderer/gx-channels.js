@@ -102,6 +102,13 @@
   mainMode();
 
   // ══════════════════ Үндсэн цонх ══════════════════
+  // Нийтийн Room-той тоглоомууд (лоббид энэ дарааллаар): id = gameKindOf() (app.js)
+  const CH_GAMES = [
+    { id: 'wc3', title: 'Warcraft III: The Frozen Throne', short: 'Warcraft III', ico: 'W3', emoji: '🌐', net: 'LAN' },
+    { id: 'cs16', title: 'Counter-Strike 1.6', short: 'CS 1.6', ico: 'CS', emoji: '🎯', net: 'Сервер' },
+    { id: 'q3', title: 'Quake III Arena', short: 'Quake III', ico: 'Q3', emoji: '⚡', net: 'Сервер' },
+    { id: 'ra2', title: 'Red Alert 2', short: 'Red Alert 2', ico: 'RA', emoji: '🪖', net: 'LAN' },
+  ];
   function chFavs() { try { return new Set(JSON.parse(localStorage.getItem('gx_ch_favs') || '[]')); } catch { return new Set(); } }
   function mainMode() {
     document.addEventListener('click', (e) => {
@@ -114,11 +121,18 @@
     // Лобби: Room 1–20 хэсэг (gx.js renderFilteredRooms дуудна)
     window.gxChannels = {
       // Garena Plus маяг: дээрээс доош цувсан жагсаалт — Өрөөний нэр | Тоглоом | Тоглогч | Дүүргэлт | ★
+      // Тоглоом бүр тусдаа хэсэг (2026-10-02): WC3 Room 1–20 → CS 1.6 → Quake III → Red Alert 2 (тус бүр Room 1–5)
       sectionHTML(channels) {
+        if (!channels.length) return '';
+        const kindOf = (c) => (typeof gameKindOf === 'function' ? gameKindOf(c.game_type) : 'wc3');
+        return CH_GAMES.map((g) => this.gameSectionHTML(g, channels.filter((c) => kindOf(c) === g.id))).join('');
+      },
+      gameSectionHTML(g, channels) {
         if (!channels.length) return '';
         const mine = String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '');
         const favs = chFavs();
         const total = channels.reduce((a, c) => a + Number(c.player_count || 0), 0);
+        const rankedN = channels.filter((c) => c.ranked).length;
         const sorted = channels.slice().sort((a, b) => (favs.has(String(b.id)) - favs.has(String(a.id))) || (Number(a.channel_no) - Number(b.channel_no)));
         const rows = sorted.map((c) => {
           const n = Number(c.player_count || 0); const cap = Number(c.visible_cap || c.max_players || 200);
@@ -127,15 +141,15 @@
           const fav = favs.has(String(c.id));
           const no = String(c.channel_no).padStart(2, '0');
           return `<div class="gxcl-row st-${st} ${String(c.id) === mine ? 'mine' : ''} ${c.ranked ? 'ranked' : ''}" role="row" tabindex="0" data-ch-join="${c.id}" title="${c.ranked ? '🏆 Ranked Room — хүчинтэй хожил бүр +2 💎. ' : ''}Дарж орох">
-            <span class="gxcl-name"><i class="gxcl-ico">${c.ranked ? '🏆' : 'W3'}</i>${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
-            <span class="gxcl-game">${c.ranked ? 'Warcraft III · <b>Ranked</b>' : 'Warcraft III · LAN'}</span>
+            <span class="gxcl-name"><i class="gxcl-ico k-${g.id}">${c.ranked ? '🏆' : g.ico}</i>${esc(c.name)}${c.ranked ? '<b class="gxcl-rk">RANKED</b>' : ''}${String(c.id) === mine ? '<em>Та энд</em>' : ''}</span>
+            <span class="gxcl-game">${c.ranked ? `${g.short} · <b>Ranked</b>` : `${g.short} · ${g.net}`}</span>
             <span class="gxcl-num">${n}<small>/${cap}</small>${extra ? `<b title="Premium нөөц slot-оор орсон">⭐+${extra}</b>` : ''}</span>
             <span class="gxcl-bar"><i style="width:${pct}%"></i></span>
             <span class="gxcl-st">${st === 'full' ? 'Дүүрсэн · ⭐' : st === 'busy' ? 'Дүүрэх дөхсөн' : 'Чөлөөтэй'}</span>
             <button type="button" class="gxcl-fav ${fav ? 'on' : ''}" data-ch-fav="${c.id}" title="${fav ? 'Дуртайгаас хасах' : 'Дуртайд нэмэх'}">${fav ? '★' : '☆'}</button>
           </div>`;
         }).join('');
-        return `<section class="gxch-sec"><div class="gxch-head"><h3>🌐 Нийтийн өрөөнүүд <span>Warcraft III · Room 1–${channels.length} · 🏆 Ranked: Room 1–${channels.filter((c) => c.ranked).length || 5}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
+        return `<section class="gxch-sec k-${g.id}"><div class="gxch-head"><h3>${g.emoji} ${esc(g.title)} <span>Нийтийн Room 1–${channels.length}${rankedN ? ` · 🏆 Ranked: Room 1–${rankedN}` : ''}</span></h3><span class="gxch-total"><b>${total}</b> тоглогч өрөөнүүдэд</span></div>
           <div class="gxcl"><div class="gxcl-row gxcl-th" role="row"><span>Өрөөний нэр</span><span>Тоглоом</span><span>Тоглогч</span><span>Дүүргэлт</span><span>Төлөв</span><span>★</span></div>${rows}</div></section>`;
       },
     };

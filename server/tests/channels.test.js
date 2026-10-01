@@ -43,6 +43,7 @@ async function query(sql, p = []) {
   if (s.startsWith('DELETE FROM platform_roles WHERE user_id')) { const had = roles.delete(Number(p[0])); return { rows: had ? [{ role: 'x' }] : [], rowCount: had ? 1 : 0 }; }
   if (s.includes('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean).map((u) => ({ ...u, banned: false })) };
   if (s.includes('SELECT id, username, discord_id FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean) };
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : String(p[0]) === '941' ? [{ kind: 'channel', game_type: 'Counter-Strike 1.6' }] : [{ kind: 'room' }] };
   if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
   if (s.includes('FROM room_players rp JOIN rooms r') || s.includes('isUserInRoom')) return { rows: [{}] };
   if (s.startsWith('UPDATE rooms SET pinned_notice')) { notice = p[1]; return { rows: [{ id: 901 }] }; }
@@ -75,6 +76,7 @@ async function main() {
   r = await call(1, 'POST', '/roles/requests/1/approve'); assert.equal(r.status, 200); assert.equal(roles.get(2), 'moderator'); ok('Эзэн батална → Moderator');
   r = await call(2, 'GET', '/roles/me'); j = await r.json(); assert.equal(j.can_host_channel, true); ok('/roles/me: can_host_channel');
   r = await call(2, 'POST', '/rooms/901/lan-host/begin'); assert.notEqual(r.status, 403); ok('Moderator нийтийн Room-д LAN нээнэ');
+  r = await call(1, 'POST', '/rooms/941/lan-host/begin'); j = await r.json(); assert.equal(j.code, 'GAME_NOT_READY'); ok('CS 1.6 Room-д WC3 LAN relay нээгдэхгүй');
 
   // Зарлал
   r = await call(2, 'PATCH', '/rooms/901/notice', { notice: 'hack' }); assert.equal(r.status, 403); ok('Энгийн хэрэглэгч зарлал засахгүй');

@@ -15,14 +15,20 @@
   const esc = (t) => (typeof escHtml === 'function' ? escHtml(t ?? '') : String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
   const post = (type, extra) => { if (inFrame) { try { window.parent.postMessage({ gx: true, type, roomId: q.get('roomId'), ...(extra || {}) }, '*'); } catch {} } };
 
-  document.body.classList.add('rgc');
+  // Тоглоом (2026-10-02): WC3 / CS 1.6 / Quake III / Red Alert 2 — баннер зураг, гарчиг, холболтын төлөв
+  const GAME = { wc3: ['Warcraft III', 'wc3'], cs16: ['Counter-Strike 1.6', 'cs16'], q3: ['Quake III Arena', 'q3'], ra2: ['Red Alert 2', 'ra2'] };
+  const gk = (typeof gameKindOf === 'function' ? gameKindOf(q.get('gameType')) : 'wc3');
+  const [gameLabel, cover] = GAME[gk] || GAME.wc3;
+  const isWc3 = gk === 'wc3' || !GAME[gk];
+  document.body.classList.add('rgc', `rgc-${GAME[gk] ? gk : 'wc3'}`);
   const root = document.createElement('div');
   root.id = 'rgc';
+  root.style.setProperty('--rgc-cover', `url('covers/${cover}.jpg')`);
   root.innerHTML = `
     <header class="rgc-top">
       <div class="rgc-banner">
         <img class="rgc-logo" src="logo.png" alt="" />
-        <div class="rgc-btitle"><b id="rgc-title">${esc(q.get('roomName') || 'WC3 Room')}</b><span>Garena.mn · Warcraft III · Нийтийн өрөө</span></div>
+        <div class="rgc-btitle"><b id="rgc-title">${esc(q.get('roomName') || 'Room')}</b><span id="rgc-bsub">Garena.mn · ${esc(gameLabel)} · Нийтийн өрөө</span></div>
         <span id="rgc-privacy-slot"></span>
         <span class="rgc-rk" title="Ranked Room: хүчинтэй хожил бүр +2 💎 (1v1-ээс дээш, ≥12 мин, ялагчтай)">🏆 RANKED</span>
         <span class="rgc-fill"></span>
@@ -71,6 +77,14 @@
   const move = (el, dest) => { if (el && dest) dest.appendChild(el); return el; };
   move(gxr.querySelector('.gxr-game-card'), $('rgc-l-game'));
   move(gxr.querySelector('.gxr-conn'), $('rgc-l-conn'));
+  // WC3 бус тоглоом: онлайн холболт хараахан бүрэн бэлэн биш — шударгаар мэдэгдэнэ (WC3 LAN relay-г ашиглахгүй)
+  if (!isWc3) {
+    const n = document.createElement('p'); n.className = 'rgc-soon';
+    n.textContent = gk === 'ra2'
+      ? `⏳ ${gameLabel}-ын онлайн холболт хөгжүүлэгдэж байна — удахгүй нээгдэнэ. Одоогоор өрөөнд цуглаж, чатлаж болно.`
+      : `⏳ ${gameLabel}-ын сервер холболт туршилтын шатанд — удахгүй бүрэн нээгдэнэ. Одоогоор өрөөнд цуглаж, чатлаж болно.`;
+    $('gxr-conn-body')?.prepend(n);
+  }
   move(gxr.querySelector('.gxr-chat'), $('rgc-chat'));
   move($('gxr-privacy'), $('rgc-privacy-slot'));
   [...($('gxr-actions')?.children || [])].forEach((b) => move(b, $('rgc-actions')));
@@ -86,7 +100,10 @@
     else if (a === 'forum') post('tab', { tab: 'discord' });
     else if (a === 'ladder') post('tab', { tab: 'ranking' });
     else if (a === 'shop') post('tab', { tab: 'premium' });
-    else if (a === 'start') $('gxr-start')?.click();
+    else if (a === 'start') {
+      if (isWc3) $('gxr-start')?.click();
+      else { try { showToast(`⏳ ${gameLabel}-ын онлайн холболт удахгүй нээгдэнэ`, 'info', 4000); } catch {} }
+    }
   });
 
   // ── W3GS GAMEINFO (0x30) задлах: тоглоомын нэр, map, тоглогч [used/total] ──
@@ -174,6 +191,7 @@
 
   // ── [НЭГДЭХ] товч (RGC-ийн SIGN шиг): сонгосон тоглоомд нэгдэх / өөрийнхөө тоглоомыг зогсоох / LAN нээх / Moderator хүсэлт ──
   function signState() {
+    if (!isWc3) return ['none', 'УДАХГҮЙ', true];   // CS/Q3/RA2 — тоглоомын холболт удахгүй
     const lan = window.gxLan; const myId = String((typeof currentUser !== 'undefined' && currentUser?.id) || '');
     const x = selected && lan?.games.get(selected);
     const me = window.gxRoleMe?.();
@@ -272,17 +290,18 @@
   // 🏆 Ranked Room 1–5 — баннерт тэмдэг, тайлбарт Ranked/энгийн
   (async () => {
     let meta = null; try { meta = await window.api.getMyRoom?.(); } catch {}
-    const ranked = meta ? !!meta.ranked : /Room\s*[1-5]$/i.test(q.get('roomName') || '');
+    const own = meta && String(meta.id) === String(q.get('roomId'));
+    const ranked = isWc3 && (own ? !!meta.ranked : /\bRoom\s*[1-5]$/i.test(q.get('roomName') || ''));
     root.classList.toggle('ranked', ranked);
     const sub = root.querySelector('.rgc-btitle span');
-    if (sub) sub.textContent = ranked ? 'Garena.mn · Warcraft III · Ranked өрөө · хожил бүр +2 💎' : 'Garena.mn · Warcraft III · Нийтийн өрөө · XP';
+    if (sub) sub.textContent = ranked ? `Garena.mn · ${gameLabel} · Ranked өрөө · хожил бүр +2 💎` : `Garena.mn · ${gameLabel} · Нийтийн өрөө${isWc3 ? ' · XP' : ''}`;
   })();
 
   // ── Тогтмол синк ──
   function tick() {
     paintMe();
     const gs = $('gxr-start'); const sub = $('rgc-start-sub');
-    if (gs && sub) { const t = gs.querySelector('span')?.textContent || ''; sub.textContent = t; $('rgc-start').title = t; $('rgc-start').classList.toggle('dim', gs.disabled); }
+    if (gs && sub) { const t = isWc3 ? (gs.querySelector('span')?.textContent || '') : 'Удахгүй'; sub.textContent = t; $('rgc-start').title = t; $('rgc-start').classList.toggle('dim', gs.disabled); }
     const rt = $('room-title')?.textContent; if (rt) { $('rgc-title').textContent = rt; $('rgc-tree-name').textContent = rt; }
     document.querySelectorAll('#rgc-started [data-st]').forEach((b) => { b.textContent = `[${mmss(Date.now() - Number(b.dataset.st))}]`; });
     syncSign();

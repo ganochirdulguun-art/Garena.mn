@@ -15,7 +15,7 @@
   const mine = () => server && String(server.host_user_id) === String(currentUser?.id);
   function setState(txt, state) { const s = $('ipg-state'); if (s) { s.textContent = state === 'live' ? 'НЭЭЛТТЭЙ' : 'БЭЛЭН'; s.dataset.state = state === 'live' ? 'hosting' : 'idle'; } const t = $('ipg-text'); if (t) t.textContent = txt; }
   function render() {
-    const amHost = !!currentRoom?.isHost;
+    const amHost = !!currentRoom?.isHost || !!currentRoom?.canHostChannel;   // нийтийн Room: Moderator/ажилтан
     const box = $('ipg-server');
     $('ipg-host-row')?.classList.toggle('hidden', !amHost || !!server);
     if (!server) {

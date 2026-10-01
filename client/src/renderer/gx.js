@@ -117,9 +117,9 @@
   function initials(t) {
     const s = String(t || '');
     if (/imba/i.test(s)) return 'IM';
-    if (/counter|cstrike|cs|hl\.exe|^hl$/i.test(s)) return 'CS';
-    if (/quake|ioq3|q3/i.test(s)) return 'Q3';
-    if (/red alert|ra2?/i.test(s)) return 'RA';
+    if (/counter|cstrike|\bcs\b|hl\.exe|^hl$/i.test(s)) return 'CS';
+    if (/quake|ioq3|\bq3/i.test(s)) return 'Q3';
+    if (/red alert|\bra2?\b/i.test(s)) return 'RA';
     if (/frozen|warcraft|w3|dota/i.test(s)) return 'W3';
     return s.replace(/[^A-Za-zА-Яа-яӨөҮү0-9 ]/g, '').split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || '?';
   }
@@ -158,7 +158,9 @@
     const list = $('rooms-waiting'); if (!list) return;
     const playing = $('rooms-playing'); if (playing) playing.innerHTML = '';
     // Нийтийн Room 1–20 (channel) — тусдаа карт хэсэг; доорх бүлгүүдэд зөвхөн энгийн/GOLD өрөөнүүд
-    const channels = Object.values(roomsCache).filter((r) => r.kind === 'channel').sort((a, b) => Number(a.channel_no) - Number(b.channel_no));
+    // «Төрөл» шүүлтүүр нийтийн Room-уудад ч үйлчилнэ (хайлт/эрэмбэлэлт биш — Room-ууд тогтмол дараалалтай)
+    const fType = $('room-filter-type')?.value || '';
+    const channels = Object.values(roomsCache).filter((r) => r.kind === 'channel' && (!fType || gameKindOf(r.game_type) === fType)).sort((a, b) => Number(a.channel_no) - Number(b.channel_no));
     let rooms = getFilteredRooms(Object.values(roomsCache).filter((r) => r.kind !== 'channel'));
     const openN = rooms.filter((r) => r.status === 'waiting').length;
     const playN = rooms.filter((r) => r.status === 'playing').length;
@@ -173,7 +175,7 @@
     groups.forEach((arr) => arr.sort((a, b) => (a.status === b.status ? 0 : a.status === 'waiting' ? -1 : 1)));
     const chHTML = window.gxChannels?.sectionHTML(channels) || '';
     if (!rooms.length) {
-      list.innerHTML = chHTML + (chHTML && !hasFilter ? '' : `<div class="gx-empty"><svg><use href="#gx-i-lobby"/></svg><b>${hasFilter ? 'Тохирох өрөө олдсонгүй' : 'Одоогоор нээлттэй өрөө алга'}</b><span>${hasFilter ? 'Шүүлтүүрээ өөрчилж үзнэ үү.' : 'Эхний өрөөг та үүсгээрэй — найзууд тань шууд харна.'}</span>${hasFilter ? '' : '<button type="button" class="btn btn-primary" data-gx-click="btn-create-room">+ Өрөө үүсгэх</button>'}</div>`);
+      list.innerHTML = chHTML + (chHTML ? '' : `<div class="gx-empty"><svg><use href="#gx-i-lobby"/></svg><b>${hasFilter ? 'Тохирох өрөө олдсонгүй' : 'Одоогоор нээлттэй өрөө алга'}</b><span>${hasFilter ? 'Шүүлтүүрээ өөрчилж үзнэ үү.' : 'Эхний өрөөг та үүсгээрэй — найзууд тань шууд харна.'}</span>${hasFilter ? '' : '<button type="button" class="btn btn-primary" data-gx-click="btn-create-room">+ Өрөө үүсгэх</button>'}</div>`);
     } else {
       list.innerHTML = chHTML + (chHTML ? '<h3 class="gxch-sub">👑 Хувийн өрөөнүүд <span>GOLD гишүүдийн нээсэн</span></h3>' : '') + [...groups.entries()].map(([g, arr]) => {
         const c = collapsed.has(g);
@@ -247,7 +249,7 @@
     const c = e.target.closest('[data-gx-create]');
     if (c) { showTab('lobby'); $('btn-create-room')?.click(); setTimeout(() => { const s = $('room-type'); if (s) s.value = c.dataset.gxCreate; }, 30); return; }
     const r = e.target.closest('[data-gx-rooms]');
-    if (r) { showTab('lobby'); const f = $('room-filter-type'); if (f) { f.value = r.dataset.gxRooms; f.dispatchEvent(new Event('change')); } }
+    if (r) { showTab('lobby'); const f = $('room-filter-type'); if (f) { f.value = gameKindOf(r.dataset.gxRooms); f.dispatchEvent(new Event('change')); } }
   });
   $('gx-add-game')?.addEventListener('click', () => $('btn-add-game')?.click());
   const gl = $('games-list'); if (gl) new MutationObserver(() => { if ($('tab-games')?.classList.contains('active')) renderGames(); }).observe(gl, { childList: true });
