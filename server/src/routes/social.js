@@ -202,6 +202,8 @@ router.post('/friend/request', authMW, perUser('friend-req', 60, 60 * 60 * 1000,
   const { toUserId } = req.body;
   if (!toUserId) return res.status(400).json({ error: 'toUserId is required' });
   if (String(toUserId) === String(myId)) return res.status(400).json({ error: 'Cannot friend yourself' });
+  // Хаасан хэрэглэгч найзын хүсэлтээр (дуутай мэдэгдэл) тойрч гарахгүй
+  try { if (await isUserBlocked(String(toUserId), String(myId))) return res.status(403).json({ error: 'Энэ хэрэглэгч рүү найзын хүсэлт илгээх боломжгүй' }); } catch {}
 
   if (await dbOk()) {
     try {

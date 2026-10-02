@@ -296,7 +296,7 @@ async function lagSentry(g, s) {
         if (String(sock.user?.id) === uid && Number.isFinite(sock.data?.relayRtt)) { rtt = sock.data.relayRtt; break; }
       }
     }
-    const text = `⚡ Гацалт илэрлээ: **${name}** — ${lagCauseText(rtt)}. Бусад тоглогчид хэвийн.`;
+    const text = `⚡ Гацалт илэрлээ: «${name}» — ${lagCauseText(rtt)}. Бусад тоглогчид хэвийн.`;
     const sysMsg = { userId: 0, username: 'Garena.mn', text, time: new Date().toISOString(), system: true };
     io.to(String(g.room_id)).emit('chat:message', sysMsg);
     require('./roomChat').save(g.room_id, sysMsg);

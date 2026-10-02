@@ -24,6 +24,8 @@ async function loadMods() {
     r.rows.forEach((x) => (x.role === 'admin' ? adminSet : modSet).add(String(x.user_id)));
   } catch {}
 }
+// Кэшийг 5 мин тутам DB-ээс сэргээнэ — асах үед DB түр унасан / миграц алгассан үед ADMIN цолтнууд эрхгүй үлддэг байв
+if (db) setInterval(() => { loadMods(); }, 5 * 60 * 1000).unref();
 function isModCached(userId) { return modSet.has(String(userId)); }
 function isAdminCached(userId) { return adminSet.has(String(userId)); }
 function cacheRole(userId, role) { const id = String(userId); modSet.delete(id); adminSet.delete(id); if (role === 'moderator') modSet.add(id); if (role === 'admin') adminSet.add(id); }
@@ -85,8 +87,13 @@ async function ensureTables() {
       decision_note TEXT DEFAULT ''
     )`);
     await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS role_requests_one_pending ON role_requests (user_id, role) WHERE status = 'pending'`);
-    await loadMods();
   } catch (e) { console.error('[Migration] roles:', e.message); }
+  await loadMods();   // хүснэгт үүсгэлт алдсан ч кэшийг ачаална
+  // /roles/activity-ийн дэд асуулгууд бүтэн скан хийдэг байв
+  try {
+    await db.query('CREATE INDEX IF NOT EXISTS idx_lan_games_host ON lan_games (host_user_id)');
+    await db.query('CREATE INDEX IF NOT EXISTS idx_play_awards_user ON play_awards (user_id, created_at DESC)');
+  } catch (e) { console.error('[Migration] roles idx:', e.message); }
   // Moderator хүсэлтийн АВТОМАТ батлалт (2026-10-02, эзэн: «энэ 7 хоногт» — ADMIN алга тул) — эхлэлийн утга 10-09 23:59 (УБ)
   try {
     await db.query(`CREATE TABLE IF NOT EXISTS platform_settings (key VARCHAR(64) PRIMARY KEY, value TEXT, updated_at TIMESTAMPTZ DEFAULT NOW())`);
@@ -146,6 +153,16 @@ async function roleOf(userId) {
 async function canHostInChannel(user) {
   if (await isStaff(user)) return true;
   return (await roleOf(user.id)) === 'moderator';
+}
+/** Бан авсан хэрэглэгчийн Moderator/ADMIN цолыг хураана (anticheat.js дуудна). */
+async function revokeOnBan(userId) {
+  if (!db || !userId) return;
+  try {
+    const r = await db.query('DELETE FROM platform_roles WHERE user_id = $1 RETURNING role', [userId]);
+    cacheRole(userId, null);
+    await db.query("UPDATE role_requests SET status = 'rejected', decided_at = NOW(), decision_note = 'banned' WHERE user_id = $1 AND status = 'pending'", [userId]);
+    if (r.rows[0]) { await markRevoked(userId, null); if (_io) _io.to(`user:${userId}`).emit('role:decided', { role: 'moderator', approved: false, revoked: true, note: 'ban' }); }
+  } catch (e) { console.error('[roles] revokeOnBan', e.message); }
 }
 
 async function pendingCount() {
@@ -390,4 +407,4 @@ router.delete('/moderators/:userId', auth, staffOnly, async (req, res) => {
   } catch (e) { console.error('[roles] revoke', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, loadMods };
+module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, loadMods, revokeOnBan };

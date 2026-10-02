@@ -320,17 +320,23 @@
   let curTab = 'activity', actQ = '', actSort = 'active';
   function openOwner(tabName) {
     curTab = tabName || curTab;
+    document.body.classList.remove('gx-roomview-on');   // өрөөний харагдацаас нээхэд самбар гүйлгэгдэнэ
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.id === 'tab-owner'));
     document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
     document.querySelectorAll('[data-gxo-tab]').forEach((b) => b.classList.toggle('on', b.dataset.gxoTab === curTab));
     renderOwner();
   }
+  let ownerSeq = 0;
   async function renderOwner() {
     const body = $('gxo-body'); if (!body) return;
-    body.innerHTML = '<div class="gx-empty"><b>Ачааллаж байна…</b></div>';
+    const seq = ++ownerSeq;   // хоцорсон хариу өөр табын агуулгыг дарахгүй
+    const typing = document.activeElement?.id === 'gxo-q';
+    if (!typing) body.innerHTML = '<div class="gx-empty"><b>Ачааллаж байна…</b></div>';
     try {
       if (curTab === 'activity') {
         const r = await api('get', `/roles/activity?sort=${encodeURIComponent(actSort)}&q=${encodeURIComponent(actQ)}`);
+        if (seq !== ownerSeq) return;
+        const live = typing && $('gxo-q') ? $('gxo-q').value : null;   // ачаалах хооронд бичсэн тэмдэгтүүд алдагдахгүй
         body.innerHTML = `<div class="gxo-tools"><label class="gx-search"><svg><use href="#gx-i-search"/></svg><input id="gxo-q" type="text" placeholder="Хэрэглэгч хайх…" value="${esc(actQ)}" /></label>
           <select id="gxo-sort" class="input"><option value="active">Тоглосон цагаар</option><option value="games">Тоглолтын тоогоор</option><option value="hosted">LAN нээсэн тоогоор</option><option value="recent">Сүүлд идэвхтэйгээр</option><option value="new">Шинэ бүртгэлээр</option></select>
           <span class="gxo-hint">Мөр дээр дарвал өрөө нээсэн түүх, сүүлийн тоглолтууд</span></div>
@@ -339,8 +345,9 @@
         $('gxo-sort').value = actSort;
         $('gxo-sort').addEventListener('change', (e) => { actSort = e.target.value; renderOwner(); });
         let tmr; $('gxo-q').addEventListener('input', (e) => { clearTimeout(tmr); tmr = setTimeout(() => { actQ = e.target.value.trim(); renderOwner(); }, 350); });
+        if (live != null) { const i = $('gxo-q'); i.value = live; i.focus(); i.setSelectionRange(live.length, live.length); if (live.trim() !== actQ) i.dispatchEvent(new Event('input')); }
       } else if (curTab === 'requests') {
-        const r = await api('get', '/roles/requests?status=pending'); setBadge(r.pending_count || 0);
+        const r = await api('get', '/roles/requests?status=pending'); if (seq !== ownerSeq) return; setBadge(r.pending_count || 0);
         let au = null; try { au = await api('get', '/roles/auto'); } catch {}
         const auBar = au ? `<div class="gxo-auto ${au.active ? 'on' : ''}"><div><b>⚡ Автомат батлалт: ${au.active ? 'ИДЭВХТЭЙ' : 'унтраалттай'}</b>
             <span>${au.active ? `${new Date(au.until).toLocaleString('mn-MN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })} хүртэл шинэ Moderator хүсэлт шууд батлагдана.` : 'Хүсэлт бүрийг эзэн/админ гараар батална.'}</span></div>
@@ -404,6 +411,8 @@
       await loadMe();
       currentRoom.staff = !!me?.staff;
       currentRoom.canHostChannel = isChannel && !!me?.can_host_channel;
+      // эрх хожуу ирсэн бол Kick товч / AFK тэмдэг шууд гарна (дараагийн гишүүний өөрчлөлтийг хүлээхгүй)
+      try { if (currentRoom.staff && Array.isArray(currentRoom.members) && typeof renderMembers === 'function') renderMembers(currentRoom.members); } catch {}
       document.dispatchEvent(new CustomEvent('garena:host-changed', { detail: { isHost: !!currentRoom.isHost } }));
       let meta = null; try { meta = await window.api.getMyRoom?.(); } catch {}
       mountNotice(isChannel, meta && String(meta.id) === String(currentRoom.id) ? meta : null);

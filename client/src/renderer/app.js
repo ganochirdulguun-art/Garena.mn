@@ -71,6 +71,7 @@ function showDesktopNotif(title, body) {
 const dmConversations = {};
 let activeDmUserId = null;
 let chatUnreadCount = 0;
+let dmUnreadTotal = 0;   // chatUnreadCount доторх DM-ийн хэсэг (loadUnreadDMCounts)
 
 // ── DM Popup төлөв ────────────────────────────────────────
 const MAX_DM_POPUPS = 3;
@@ -367,7 +368,7 @@ async function connectSocket() {
         indicator.textContent = `${fromUsername} бичиж байна...`;
         indicator.style.display = 'block';
         clearTimeout(indicator._hideTimer);
-        indicator._hideTimer = setTimeout(() => { indicator.style.display = 'none'; }, 2000);
+        indicator._hideTimer = setTimeout(() => { indicator.style.display = 'none'; }, 8000);
       }
       return;
     }
@@ -379,7 +380,7 @@ async function connectSocket() {
         typingEl.textContent = `${fromUsername} бичиж байна...`;
         typingEl.style.display = 'block';
         clearTimeout(typingEl._hideTimer);
-        typingEl._hideTimer = setTimeout(() => { typingEl.style.display = 'none'; }, 2000);
+        typingEl._hideTimer = setTimeout(() => { typingEl.style.display = 'none'; }, 8000);
       }
     }
   });
@@ -546,7 +547,7 @@ function showTab(name) {
   if (name === 'warkey' || name === 'ranked') window.infoTabs?.wire();
   if (name === 'radar')    window.radarTab?.load();   // 📡 Радар — дууссан тоглолтын жагсаалт (radar.js)
   if (name === 'chat') {
-    chatUnreadCount = 0;
+    chatUnreadCount = 0; dmUnreadTotal = 0;
     updateChatBadge();
     loadSocialData();
     rerenderLobbyMessages();
@@ -767,6 +768,9 @@ async function init() {
   window.api.onUpdateError?.((msg) => {
     setUpdateMsg(`Шинэчлэлийн алдаа: ${msg}`, 'error');
     showToast(`Шинэчлэлийн алдаа: ${msg}`, 'error', 6000);
+    // «Татаж байна… N%» тууз гацаж үлдэхгүй (суулгах товчтой — аль хэдийн татагдсан бол хэвээр)
+    const ub = document.getElementById('update-bar');
+    if (ub && !ub.querySelector('#btn-install-update')) ub.remove();
   });
 
   // ── Хувилбар харуулах + гараар шалгах ─────────────────
@@ -1165,7 +1169,7 @@ function roomActionButton(r, inProgress, isMyRoom, myId) {
     return `<button class="btn btn-sm btn-primary room-action-btn" data-action="rejoin" data-id="${r.id}" data-host="${r.host_id}" data-ishost="${String(r.host_id) === myId}">Буцах</button>`;
   }
   if (inProgress) {
-    return `<button class="btn btn-sm btn-primary btn-with-icon room-action-btn" data-action="join-playing" data-id="${r.id}" data-host="${r.host_id}"><svg class="btn-icon-svg" style="width:13px;height:13px"><use href="#ico-join"/></svg> Нэгдэх</button>`;
+    return '<button class="btn btn-sm btn-secondary" disabled title="Тоглолт эхэлсэн — дуусахыг хүлээнэ үү">Тоглолт эхэлсэн</button>';
   }
   return `<button class="btn btn-primary btn-sm room-action-btn" data-action="join" data-id="${r.id}" data-host="${r.host_id}" data-pass="${r.has_password}">Нэгдэх</button>`;
 }
@@ -1493,21 +1497,36 @@ document.getElementById('btn-submit-room').onclick = async () => {
   try {
     await _doCreateRoom();
   } catch (err) {
-    if (err.message?.includes('аль хэдийн')) {
-      // Хуучин өрөө DB-д үлдсэн — хэрэглэгчээс хаах зөвшөөрөл авах
+    if (/аль хэдийн|Leave your current room/i.test(err.message || '')) {
+      // Одоо өөр өрөөнд байна (нийтийн Room эсвэл хуучин өрөө) — гарах/хаах зөвшөөрөл авна
       const myRoom = await window.api.getMyRoom().catch(() => null);
       const oldName = myRoom?.name || 'хуучин өрөө';
-      const ok = await showConfirm('Хуучин өрөө байна', `"${oldName}" гэсэн хуучин өрөөтэй байна. Хаагаад шинэ өрөө үүсгэх үү?`);
+      const mineAsHost = myRoom && myRoom.kind !== 'channel' && String(myRoom.host_id) === String(currentUser?.id);
+      const ok = await showConfirm('Та өөр өрөөнд байна', mineAsHost
+        ? `"${oldName}" гэсэн өөрийн өрөөтэй байна. Хаагаад шинэ өрөө үүсгэх үү?`
+        : `Та "${oldName}" өрөөнд байна. Гараад шинэ өрөө үүсгэх үү?`);
       if (!ok) return;
       try {
-        if (myRoom) await window.api.closeRoom(myRoom.id);
+        if (myRoom) await (mineAsHost ? window.api.closeRoom(myRoom.id) : window.api.leaveRoom(myRoom.id));
+        try { window.gxRoom?.closeFrame(); } catch {}
         await _doCreateRoom();
-      } catch (err2) { showToast(`Алдаа: ${err2.message}`, 'error'); }
+      } catch (err2) { showToast(`Алдаа: ${ipcErr(err2)}`, 'error'); }
     } else {
-      showToast(`Алдаа: ${err.message}`, 'error');
+      showToast(`Алдаа: ${ipcErr(err)}`, 'error');
     }
   }
 };
+
+// IPC-ийн «Error invoking remote method …» угтварыг арилгаж, серверийн түгээмэл англи алдааг монголоор харуулна
+function ipcErr(e) {
+  const m = String(e?.message || e || 'Алдаа гарлаа').replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+  const MN = {
+    'Password required': 'Нууц үг шаардлагатай', 'Invalid password': 'Нууц үг буруу байна', 'Room is full': 'Өрөө дүүрсэн байна',
+    'Leave your current room first': 'Эхлээд одоогийн өрөөнөөсөө гарна уу', 'Room not found': 'Өрөө олдсонгүй',
+    'Service temporarily unavailable': 'Сервер түр ажиллахгүй байна — дахин оролдоно уу', 'Server error': 'Серверийн алдаа — дахин оролдоно уу',
+  };
+  return MN[m] || m;
+}
 
 // ── Өрөөнд нэгдэх ────────────────────────────────────────
 let _pendingJoin = null;
@@ -1528,10 +1547,10 @@ async function doJoinRoom(id, name, gameType, password, hostId) {
     await window.api.joinRoom(id, password);
     enterRoom(id, name, gameType, false, hostId);
   } catch (err) {
-    if (err.message?.includes('Нууц үг шаардлагатай')) {
+    if (/Нууц үг шаардлагатай|Password required/i.test(err.message || '')) {
       joinRoom(id, name, gameType, true, hostId);
     } else {
-      showToast(`Алдаа: ${err.message}`, 'error');
+      showToast(`Алдаа: ${ipcErr(err)}`, 'error');
     }
   }
 }
@@ -1547,7 +1566,7 @@ document.getElementById('btn-join-confirm').onclick = async () => {
     enterRoom(_pendingJoin.id, _pendingJoin.name, _pendingJoin.gameType, false, _pendingJoin.hostId);
     _pendingJoin = null;
   } catch (err) {
-    errEl.textContent = err.message || 'Нууц үг буруу';
+    errEl.textContent = ipcErr(err) || 'Нууц үг буруу';
   }
 };
 document.getElementById('btn-join-cancel').onclick = () => {
@@ -1783,7 +1802,7 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, maxPlayers = 1
 
   showPage('page-room');
 
-  if (socket && currentUser) {
+  if (socket && currentUser && socket.connected) {   // холбогдоогүй бол 'connect' handler илгээнэ — «X нэгдлээ» давхардахгүй
     socket.emit('room:join', { roomId: id });
   }
   appendSysMsg(`"${name}" өрөөнд нэгдлээ.`);
@@ -1873,7 +1892,7 @@ function appendMessage({ userId, username, text, time, replyTo, quiet }) {
   const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
   const body = parseMentions(escHtml(text), !isMe && !toMe && !quiet);
-  if (body.includes('mention-all')) div.classList.add('mention-all-row');
+  if (body.includes('<span class="mention mention-me mention-all">')) div.classList.add('mention-all-row');
   div.innerHTML = `
     <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
     ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
@@ -2217,7 +2236,7 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quie
   const nameEl = isMe ? '<span class="g-name">Та</span>' : `<span class="g-name clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete g-x" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
   const body = parseMentions(escHtml(text), !isMe && !quiet && !toMe);
-  if (body.includes('mention-all')) div.classList.add('mention-all-row');
+  if (body.includes('<span class="mention mention-me mention-all">')) div.classList.add('mention-all-row');
   div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
   if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'lobby', { username, text, time });
@@ -2232,8 +2251,9 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quie
       });
     });
   }
+  const stick = isMe || quiet || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
   box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+  if (stick) box.scrollTop = box.scrollHeight;
 }
 
 function rerenderLobbyMessages() {
@@ -2274,7 +2294,8 @@ function updateChatBadge() {
 // ── Уншаагүй DM тоог серверээс авах ─────────────────────
 async function loadUnreadDMCounts() {
   try {
-    const counts = await window.api.getUnreadCount();
+    const counts = (await window.api.getUnreadCount()) || {};
+    Object.keys(dmConversations).forEach((uid) => { if (!(uid in counts)) dmConversations[uid].unread = 0; });
     Object.entries(counts).forEach(([userId, count]) => {
       if (!dmConversations[userId]) {
         dmConversations[userId] = { username: '', messages: [], unread: 0 };
@@ -2283,10 +2304,9 @@ async function loadUnreadDMCounts() {
     });
     renderDMUsersBadges();
     const total = Object.values(counts).reduce((s, c) => s + c, 0);
-    if (total > 0) {
-      chatUnreadCount += total;
-      updateChatBadge();
-    }
+    chatUnreadCount = Math.max(0, chatUnreadCount - dmUnreadTotal) + total;   // өмнөх DM нийлбэрийг сольж онооно (давхар нэмэхгүй)
+    dmUnreadTotal = total;
+    updateChatBadge();
   } catch {}
 }
 

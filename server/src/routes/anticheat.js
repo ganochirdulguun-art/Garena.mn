@@ -68,6 +68,7 @@ async function recordMaphackWarning(userId, tool) {
         [userId, `MapHack: ${t}`]
       );
       banned = true;
+      try { await require('./roles').revokeOnBan(userId); } catch {}   // бантай хүн Moderator/ADMIN цолтой үлдэхгүй
     }
     try {
       await db.query('INSERT INTO maphack_events (user_id, tool, warnings, banned) VALUES ($1, $2, $3, $4)', [userId, t, warnings, banned]);

@@ -232,6 +232,14 @@ adminRoutes.setPresence(onlineUsersList);
 // энд давхар escape хийвэл хэрэглэгчид "&lt;" гэх мэт зүйл харагдана
 
 // ── Socket rate limiting ──────────────────────────────────
+// Чат биш event-үүдийн (room:game_started, net:report г.м.) хөнгөн throttle — event тус бүр өөрийн цагтай
+function evThrottled(socket, key, ms) {
+  const now = Date.now();
+  const t = socket.data.evAt || (socket.data.evAt = {});
+  if (t[key] && now - t[key] < ms) return true;
+  t[key] = now;
+  return false;
+}
 function checkRateLimit(socket) {
   const now = Date.now();
   // 30 секундийн хоригтой эсэх
@@ -335,6 +343,7 @@ function cleanupRoomState(roomId) {
 async function setRoomWaitingIfNoPlayersInGame(roomId) {
   if (!roomId) return false;
   if (roomHasInGamePlayer(roomId)) return false;
+  try { if (lanHostRoutes.gameCounts(roomId)) return false; } catch {}   // LAN тоглоом идэвхтэй — статусыг lanhost.syncRoomStatus удирдана
 
   if (dbForMigration) {
     try {
@@ -711,13 +720,16 @@ io.on('connection', (socket) => {
   });
 
   // Өрөөний урилга
-  socket.on('room:invite', ({ toUserId, roomId, roomName }) => {
+  socket.on('room:invite', async ({ toUserId, roomId, roomName } = {}) => {
+    if (!toUserId || !roomId) return;
     if (checkRateLimit(socket)) return;   // урилгын spam
+    // Хаасан хэрэглэгч рүү урилга (дуутай мэдэгдэл) явуулахгүй — DM-тэй ижил бодлого
+    try { if (await socialRoutes.isUserBlocked(String(toUserId), String(socket.user.id))) return; } catch {}
     io.to(`user:${String(toUserId)}`).emit('room:invited', {
       fromUsername: socket.user.username,
       fromUserId:   String(socket.user.id),
-      roomId,
-      roomName,
+      roomId:       String(roomId).slice(0, 32),
+      roomName:     String(roomName || '').slice(0, 80),
     });
   });
 
@@ -782,24 +794,24 @@ io.on('connection', (socket) => {
   });
 
   // Лобби чат мессеж устгах (зөвхөн өөрийн)
-  socket.on('lobby:delete', ({ time }, ack) => {
+  socket.on('lobby:delete', async ({ time } = {}, ack) => {
     const reply = (payload) => {
       if (typeof ack === 'function') ack(payload);
     };
     if (!time) { reply({ ok: false, error: 'missing-data' }); return; }
     const userId = String(socket.user.id);
     const idx = lobbyHistory.findIndex(m => m.time === time && String(m.userId) === userId);
-    if (idx === -1) {
+    // DB-д ч устгалыг тэмдэглэх (restart-ын дараа буцаж гарч ирэхгүй; санах ойн сүүлийн 100-аас хуучин мессежийг ч устгана)
+    let dbDeleted = false;
+    try { dbDeleted = await socialRoutes.deleteLobbyMessage(userId, time); } catch (e) { console.error('[Lobby] delete:', e.message); }
+    if (idx === -1 && !dbDeleted) {
       reply({ ok: false, error: 'message-not-found' });
       return;
     }
 
-    lobbyHistory[idx].text = '[Устгагдсан мессеж]';
+    if (idx !== -1) lobbyHistory[idx].text = '[Устгагдсан мессеж]';
     io.emit('lobby:deleted', { time });
     reply({ ok: true });
-    // DB-д ч устгалыг тэмдэглэх (restart-ын дараа буцаж гарч ирэхгүй)
-    socialRoutes.deleteLobbyMessage(userId, time)
-      .catch(e => console.error('[Lobby] delete:', e.message));
   });
 
   // Host-ын IP хаягийг өрөөний тоглогчдод дамжуулах
@@ -833,7 +845,7 @@ io.on('connection', (socket) => {
   });
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
-    if (!roomId) return;
+    if (!roomId || evThrottled(socket, 'net', 4000)) return;   // клиент 8с тутам илгээдэг — io.emit үерлүүлэхээс хамгаална
     // 2026-09-06: relay-ийн kernel RTT (POST /relay/rtt) сүүлийн 30 с-д ирсэн бол клиентийн probe-ийг ҮЛ ТООНО —
     // probe нь PC ачаалал/стрим орж 120–160 мс харагдаж "гацаж байна" гэсэн буруу сэтгэгдэл төрүүлдэг байсан.
     if (socket.data.relayRttAt && Date.now() - socket.data.relayRttAt < 30000) return;
@@ -854,8 +866,8 @@ io.on('connection', (socket) => {
   });
 
   // Тоглогчийн бэлэн/бэлэн биш төлөв
-  socket.on('room:ready', async ({ roomId, ready }) => {
-    if (!roomId || String(socket.data.roomId) !== String(roomId)) return;
+  socket.on('room:ready', async ({ roomId, ready } = {}) => {
+    if (!roomId || String(socket.data.roomId) !== String(roomId) || evThrottled(socket, 'ready', 300)) return;
     if (!await ensureRoomMembership(socket, roomId)) return;
     const userId = String(socket.user.id);
     if (!roomReady[roomId]) roomReady[roomId] = new Set();
@@ -873,14 +885,21 @@ io.on('connection', (socket) => {
     const rid = socket.data.roomId ? String(socket.data.roomId) : '';
     if (!rid || !await require('./middleware/admin').isAdminUser(socket.user)) return ack({ ok: false });
     const out = {};
+    // LAN урсгал room:game_started илгээдэггүй тул идэвхтэй LAN тоглоомын хост/joiner-ийг тоглож буйд тооцно (sweepChannelGhosts-той ижил эх)
+    const playing = lanHostRoutes.activeHostIds();
+    try {
+      const toks = lanHostRoutes.activeTokens();
+      if (toks.length && dbForMigration) (await dbForMigration.query('SELECT DISTINCT user_id FROM lan_game_players WHERE token = ANY($1::text[])', [toks])).rows.forEach((x) => playing.add(String(x.user_id)));
+    } catch {}
     for (const uid of (roomMembers[rid] ? [...roomMembers[rid].values()] : [])) {
-      const inGame = [...onlineUsers.values()].some((u) => String(u.userId) === String(uid) && u.status === 'in_game');
+      const inGame = playing.has(String(uid)) || [...onlineUsers.values()].some((u) => String(u.userId) === String(uid) && u.status === 'in_game');
       out[String(uid)] = { active_at: roomActivity.get(`${rid}:${uid}`) || null, in_game: inGame };
     }
     ack({ ok: true, now: Date.now(), members: out });
   });
 
   socket.on('room:game_started', () => {
+    if (evThrottled(socket, 'gstart', 2000)) return;
     const username = socket.user.username;
     const userId   = String(socket.user.id);
     if (onlineUsers.has(socket.id)) {
@@ -922,14 +941,15 @@ io.on('connection', (socket) => {
   });
 
   // Тоглогч (host биш) тоглоом хаагдсан → online статус in_room болгох
-  socket.on('room:game_ended_player', async ({ roomId } = {}) => {
+  socket.on('room:game_ended_player', async () => {
+    if (evThrottled(socket, 'gend', 2000)) return;
     const username = socket.user.username;
     const userId   = String(socket.user.id);
     if (onlineUsers.has(socket.id)) {
       onlineUsers.set(socket.id, { username, userId, status: 'in_room' });
       io.emit('lobby:online_users', onlineUsersList());
     }
-    await setRoomWaitingIfNoPlayersInGame(roomId || socket.data.roomId);
+    await setRoomWaitingIfNoPlayersInGame(socket.data.roomId);   // зөвхөн өөрийн өрөө (клиентийн roomId-д итгэхгүй)
   });
 
   // Typing indicator (DM)
@@ -948,7 +968,8 @@ io.on('connection', (socket) => {
   });
 
   // Өрөөнөөс гарах
-  socket.on('room:leave', ({ roomId }) => {
+  socket.on('room:leave', ({ roomId } = {}) => {
+    if (!roomId || evThrottled(socket, 'leave', 500)) return;
     const username = socket.user.username;
     const userId   = String(socket.user.id);
     // Grace period байвал цуцлах (санаатай гарч байна)
@@ -967,8 +988,8 @@ io.on('connection', (socket) => {
     }
     // Гарсан тоглогчийн ready state устгах
     if (!stillInRoom && roomReady[roomId]) roomReady[roomId].delete(userId);
-    // Гарсан тоглогчийн LAN тоглоомуудыг өрөөнөөс устгах (room:lan_lobby_gone)
-    try { lanHostRoutes.removeUserGames(roomId, userId); } catch {}
+    // Гарсан тоглогчийн LAN тоглоомуудыг өрөөнөөс устгах (room:lan_lobby_gone) — өөр амьд цонхтой бол хөндөхгүй
+    if (!stillInRoom) { try { lanHostRoutes.removeUserGames(roomId, userId); } catch {} }
     // Онлайн статус шинэчлэх
     if (onlineUsers.has(socket.id)) {
       onlineUsers.set(socket.id, { username, userId, status: 'online' });
@@ -989,8 +1010,8 @@ io.on('connection', (socket) => {
     if (userId && userSockets.get(userId) === socket.id) userSockets.delete(userId);
     io.emit('lobby:online_users', onlineUsersList());
 
-    // Өрөөнд байсан бол grace period эхлүүлэх
-    if (roomId && username && roomMembers[roomId]) {
+    // Өрөөнд байсан бол grace period эхлүүлэх (өөр амьд цонхоор өрөөндөө байвал юу ч хийхгүй)
+    if (roomId && username && roomMembers[roomId] && !userHasLiveSocketInRoom(userId, roomId, socket.id)) {
       // Өмнө нь grace period байсан бол цуцлах
       if (disconnectTimers[userId]) {
         clearTimeout(disconnectTimers[userId].timer);
@@ -1064,8 +1085,11 @@ function roomHasActiveMembers(roomId) {
 }
 
 // Устгагдсан өрөөний хуучин чат (30 хоног+) — 24 цаг тутам
-const roomChatCleanup = setInterval(() => { require('./routes/roomChat').cleanupOrphans(); }, 24 * 60 * 60 * 1000);
+const roomChatCleanup = setInterval(() => { require('./routes/roomChat').cleanupOrphans(); }, 6 * 60 * 60 * 1000);
 if (typeof roomChatCleanup.unref === 'function') roomChatCleanup.unref();
+// Процесс 24ц-аас өмнө дахин асдаг (deploy) тул асснаас 5 мин дараа нэг удаа ажиллуулна
+const roomChatCleanupOnce = setTimeout(() => { try { require('./routes/roomChat').cleanupOrphans(); } catch {} }, 5 * 60 * 1000);
+if (typeof roomChatCleanupOnce.unref === 'function') roomChatCleanupOnce.unref();
 const autoExpireInterval = setInterval(async () => {
   if (!dbForMigration) return;
   try {

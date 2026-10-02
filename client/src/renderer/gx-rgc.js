@@ -258,13 +258,16 @@
   async function fetchLv(ids) {
     if (fetching || !ids.length || !window.api?.request) return;
     fetching = true;
+    // Нэг удаад 200 (серверийн хязгаар) — үлдсэнийг дараагийн paintMembers асууна; алдаа гарвал кэшлэхгүй, 5с дараа дахин оролдоно
+    const batch = ids.slice(0, 200); let ok = false;
     try {
-      const rows = await window.api.request('get', `/membership/public?ids=${ids.slice(0, 200).join(',')}`);
+      const rows = await window.api.request('get', `/membership/public?ids=${batch.join(',')}`);
       (rows || []).forEach((r) => lvCache.set(String(r.id), { level: Number(r.level) || 1, xp: Number(r.xp) || 0, wins: Number(r.wins) || 0, tier: r.tier || 'bronze' }));
-      ids.forEach((id) => { if (!lvCache.has(id)) lvCache.set(id, { level: 1, xp: 0, tier: 'bronze' }); });
-    } catch { ids.forEach((id) => lvCache.set(id, lvCache.get(id) || { level: 1, xp: 0, tier: 'bronze' })); }
+      batch.forEach((id) => { if (!lvCache.has(id)) lvCache.set(id, { level: 1, xp: 0, tier: 'bronze' }); });
+      ok = true;
+    } catch {}
     fetching = false;
-    paintMembers();
+    if (ok) paintMembers(); else setTimeout(paintMembers, 5000);
   }
   let painting = false;
   function paintMembers() {
