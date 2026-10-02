@@ -41,8 +41,39 @@ const DIAMOND_PACKS = [
   { key: 'd2000', diamonds: 2000, price: 44000 },
 ];
 // Хэрэглэгч хоорондын шилжүүлгийн хязгаар (спам/алдаанаас хамгаална)
-const TRANSFER = { MIN: 1, MAX: 50000, PER_HOUR: 30 };
+// 2026-10-03 (эзэн): өдөр / 7 хоног / сарын (30 хоног) нийт дүнгийн хязгаар — ИЛГЭЭХ болон ХҮЛЭЭН АВАХ хоёр талд
+// (олон хуурамч бүртгэлийн урамшууллыг нэг хэрэглэгч рүү цуглуулахаас хамгаална). Эзний олголт хязгаарт орохгүй.
+const envInt = (k, d) => { const n = parseInt(process.env[k] || '', 10); return Number.isInteger(n) && n > 0 ? n : d; };
+const TRANSFER = {
+  MIN: 1, MAX: 50000, PER_HOUR: 30,
+  PER_DAY: envInt('TRANSFER_DAY_LIMIT', 200), PER_WEEK: envInt('TRANSFER_WEEK_LIMIT', 500), PER_MONTH: envInt('TRANSFER_MONTH_LIMIT', 1000),
+};
 const transferLog = new Map();   // userId -> [timestamps]
+
+/** Сүүлийн 1 / 7 / 30 хоногт шилжүүлсэн ('transfer_out') эсвэл хүлээн авсан ('transfer_in') нийт 💎. Эзний олголт (transfer_out = 0) тооцохгүй. */
+async function transferUsage(userId, type) {
+  const r = await db.query(
+    `SELECT COALESCE(SUM(ABS(t.amount)) FILTER (WHERE t.created_at > NOW() - INTERVAL '1 day'), 0)::int AS day,
+            COALESCE(SUM(ABS(t.amount)) FILTER (WHERE t.created_at > NOW() - INTERVAL '7 days'), 0)::int AS week,
+            COALESCE(SUM(ABS(t.amount)), 0)::int AS month
+       FROM diamond_transactions t
+      WHERE t.user_id = $1 AND t.type = $2 AND t.created_at > NOW() - INTERVAL '30 days'
+        AND NOT EXISTS (SELECT 1 FROM diamond_transactions o WHERE o.ref = t.ref AND o.type = 'transfer_out' AND o.amount = 0)`,
+    [userId, type]
+  );
+  const u = r.rows[0] || {};
+  return { day: Number(u.day) || 0, week: Number(u.week) || 0, month: Number(u.month) || 0 };
+}
+/** Хязгаар давах бол { key, limit, left } буцаана (хамгийн бага үлдэгдэлтэй цонх), эс бөгөөс null. */
+function transferOver(usage, amount) {
+  const wins = [['day', TRANSFER.PER_DAY, 'Өдрийн'], ['week', TRANSFER.PER_WEEK, '7 хоногийн'], ['month', TRANSFER.PER_MONTH, 'Сарын']];
+  let hit = null;
+  for (const [key, limit, label] of wins) {
+    const left = Math.max(0, limit - usage[key]);
+    if (amount > left && (!hit || left < hit.left)) hit = { key, limit, left, label };
+  }
+  return hit;
+}
 
 let _io = null;
 function setIO(io) { _io = io; }
@@ -340,6 +371,7 @@ diamondsRouter.get('/me', authMW, async (req, res) => {
       diamonds: row?.diamonds || 0, unlimited: isOwner(req), ...levelProgress(row?.xp || 0),
       block_games: row?.block_games || 0, block_wins: row?.block_wins || 0, rules: RULES,
       packs: DIAMOND_PACKS, transfer: TRANSFER, payments_enabled: qpay.configured(),
+      transfer_usage: { sent: await transferUsage(req.user.id, 'transfer_out'), received: await transferUsage(req.user.id, 'transfer_in') },
     });
   } catch (e) {
     console.error(e);
@@ -385,6 +417,24 @@ diamondsRouter.post('/transfer', authMW, async (req, res) => {
     const to = found.user;
     if (!to) return res.status(404).json({ error: 'Хүлээн авагч олдсонгүй' });
     if (String(to.id) === String(fromId)) return res.status(400).json({ error: 'Өөртөө шилжүүлэх боломжгүй' });
+
+    // Өдөр / 7 хоног / сарын хязгаар (эзэнд хамаарахгүй): илгээгч болон хүлээн авагч хоёуланд
+    if (!unlimited) {
+      const sent = transferOver(await transferUsage(fromId, 'transfer_out'), amount);
+      if (sent) {
+        return res.status(429).json({
+          error: `${sent.label} шилжүүлгийн хязгаар ${fmt(sent.limit)} 💎 — одоо ${sent.left > 0 ? `дээд тал нь ${fmt(sent.left)} 💎 шилжүүлэх боломжтой` : 'шилжүүлэх боломжгүй, дараа дахин оролдоно уу'}`,
+          code: 'TRANSFER_LIMIT', window: sent.key, limit: sent.limit, left: sent.left,
+        });
+      }
+      const got = transferOver(await transferUsage(to.id, 'transfer_in'), amount);
+      if (got) {
+        return res.status(429).json({
+          error: `${to.username} хүлээн авах ${got.label.toLowerCase()} хязгаартаа (${fmt(got.limit)} 💎) хүрсэн — ${got.left > 0 ? `одоо дээд тал нь ${fmt(got.left)} 💎 авах боломжтой` : 'дараа дахин оролдоно уу'}`,
+          code: 'RECEIVE_LIMIT', window: got.key, limit: got.limit, left: got.left,
+        });
+      }
+    }
 
     const ref = `tx:${now.toString(36)}-${fromId}-${to.id}`;
     const out = await withTx(async (client) => {

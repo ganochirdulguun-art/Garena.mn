@@ -56,7 +56,7 @@ body.gx #page-room:not(.has-custom-bg)::before { display: none !important; }
 
 /* ── Шигтгэсэн өрөө (gx-room.js) ── */
 body.gx #gx-content:has(#tab-roomview.active) { padding: 0; overflow: hidden; }
-body.gx #tab-roomview.active { display: block; height: 100%; animation: none; }
+body.gx #tab-roomview.active { display: block; height: 100%; padding: 0 !important; animation: none; }   /* өрөө агуулгын талбайн ирмэгт тулна (цагаан завсаргүй) */
 .gx-room-frame { display: block; width: 100%; height: 100%; border: 0; background: var(--gx-bg); }
 html.gx-embedded body.gx #page-room .room-layout { padding: 16px 18px; }
 .gx-room-back { margin-right: 10px; flex: none; }

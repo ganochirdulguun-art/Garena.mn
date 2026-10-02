@@ -872,6 +872,11 @@ function makeDiamondMockDb(users) {
       ledger.push({ user_id: params[0], amount: params[1], type: params[2], ref: params[3], note: params[4] });
       return { rows: [], rowCount: 1 };
     }
+    if (s.includes('AS day') && s.includes('FROM diamond_transactions t')) {   // transferUsage (хугацааны цонхгүй — бүгд тооцогдоно)
+      const minted = new Set(ledger.filter((l) => l.type === 'transfer_out' && l.amount === 0).map((l) => l.ref));
+      const sum = ledger.filter((l) => String(l.user_id) === String(params[0]) && l.type === params[1] && !minted.has(l.ref)).reduce((a, l) => a + Math.abs(l.amount), 0);
+      return { rows: [{ day: sum, week: sum, month: sum }], rowCount: 1 };
+    }
     if (s.startsWith('INSERT INTO payment_orders')) { orders.push(params); return { rows: [], rowCount: 1 }; }
     if (s.startsWith('UPDATE users SET membership = $1, membership_until = $2')) {
       const u = users.get(Number(params[2]));
@@ -896,7 +901,7 @@ async function testDiamondTransfer() {
   });
   try {
     // Хүрэлцэхгүй
-    let res = await post(alice, { to: 2, amount: 500 });
+    let res = await post(alice, { to: 2, amount: 150 });
     assert.equal(res.status, 402);
     assert.equal(users.get(1).diamonds, 100);
     assert.equal(mockDb.ledger.length, 0);
@@ -922,6 +927,51 @@ async function testDiamondTransfer() {
     // Олдохгүй
     res = await post(alice, { to: 'Nobody', amount: 1 });
     assert.equal(res.status, 404);
+  } finally {
+    await server.stop();
+  }
+}
+
+// Өдөр / 7 хоног / сарын хязгаар: илгээгч ба хүлээн авагч хоёр талд; эзний олголт хязгаарт орохгүй
+async function testDiamondTransferLimits() {
+  const mk = (id, username, discord_id, diamonds) => [id, { id, username, discord_id, diamonds, membership: 'bronze', xp: 0, level: 1, block_games: 0, block_wins: 0 }];
+  const users = new Map([mk(1, 'Alice', '111', 5000), mk(2, 'Bob', '222', 0), mk(3, 'Carol', '333', 5000), mk(4, 'Dave', '444', 0), mk(9, 'Owner', '999', 0)]);
+  const mockDb = makeDiamondMockDb(users);
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999' }, { mockDb });
+  const tok = (id) => { const u = users.get(id); return makeAuthToken({ id, username: u.username, discord_id: u.discord_id }); };
+  const post = (id, body) => fetch(`${server.baseUrl}/diamonds/transfer`, {
+    method: 'POST', headers: { Authorization: `Bearer ${tok(id)}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    // Өдрийн хязгаар 200: 150 болно, дараагийн 60 → 429 (үлдэгдэл 50), 50 болно
+    let res = await post(1, { to: 2, amount: 150 });
+    assert.equal(res.status, 200);
+    res = await post(1, { to: 2, amount: 60 });
+    assert.equal(res.status, 429);
+    let body = await res.json();
+    assert.equal(body.code, 'TRANSFER_LIMIT'); assert.equal(body.window, 'day'); assert.equal(body.left, 50);
+    assert.equal(users.get(1).diamonds, 4850);
+    res = await post(1, { to: 2, amount: 50 });
+    assert.equal(res.status, 200);
+    // Нэг удаад хязгаараас их дүн
+    res = await post(3, { to: 4, amount: 201 });
+    assert.equal(res.status, 429);
+    // Хүлээн авагчийн хязгаар: Bob өнөөдөр 200 авсан → Carol-оос 1 ч авахгүй
+    res = await post(3, { to: 2, amount: 1 });
+    assert.equal(res.status, 429);
+    body = await res.json();
+    assert.equal(body.code, 'RECEIVE_LIMIT');
+    assert.equal(users.get(3).diamonds, 5000);
+    // Эзний олголт хязгааргүй, мөн хүлээн авагчийн хязгаарт тооцогдохгүй
+    res = await post(9, { to: 4, amount: 1500 });
+    assert.equal(res.status, 200);
+    res = await post(3, { to: 4, amount: 200 });
+    assert.equal(res.status, 200);
+    assert.equal(users.get(4).diamonds, 1700);
+    // /diamonds/me — хязгаар ба хэрэглээ
+    const me = await (await fetch(`${server.baseUrl}/diamonds/me`, { headers: { Authorization: `Bearer ${tok(1)}` } })).json();
+    assert.equal(me.transfer.PER_DAY, 200); assert.equal(me.transfer.PER_WEEK, 500); assert.equal(me.transfer.PER_MONTH, 1000);
+    assert.equal(me.transfer_usage.sent.day, 200);
   } finally {
     await server.stop();
   }
@@ -1207,6 +1257,7 @@ async function testBotAdminOverview() {
   await runTest('stats/result rejects players outside the room roster', testStatsResultRejectsPlayersOutsideRoom);
   await runTest('social block checks use DB-backed blocked_users data', testDbBackedBlockCheck);
   await runTest('diamonds/transfer moves balance atomically and writes a double ledger', testDiamondTransfer);
+  await runTest('diamonds/transfer enforces day/week/month limits for sender and receiver (owner exempt)', testDiamondTransferLimits);
   await runTest('platform owner has unlimited diamonds (transfer + membership without deduction)', testOwnerUnlimitedDiamonds);
   await runTest('admin diamond/membership grants are owner-only; staff can read the ledger', testAdminDiamondGrantIsOwnerOnly);
   await runTest('bot result maps GHost++ players to users by WC3 name, then IP; learns wc3_name', testBotResultMapsWc3NamesAndIps);

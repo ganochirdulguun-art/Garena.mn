@@ -5848,6 +5848,19 @@ init();
     renderTarget();
     modal.classList.remove('hidden');
     (target ? el('dia-amount') : el('dia-to-search')).focus();
+    // Өдөр / 7 хоног / сарын шилжүүлгийн хязгаар ба үлдэгдэл (сервер тооцно; эзэнд хамаарахгүй)
+    const lim = el('dia-limits');
+    if (lim) {
+      lim.textContent = '';
+      if (!currentUser?.unlimited_diamonds) {
+        api('get', '/diamonds/me').then((m) => {
+          const t = m?.transfer, u = m?.transfer_usage?.sent;
+          if (!t?.PER_DAY || !u || modal.classList.contains('hidden')) return;
+          const left = (cap, used) => fmtN(Math.max(0, cap - used));
+          lim.textContent = `Шилжүүлгийн хязгаар — өдөрт ${fmtN(t.PER_DAY)} 💎 (үлдсэн ${left(t.PER_DAY, u.day)}) · 7 хоногт ${fmtN(t.PER_WEEK)} 💎 (үлдсэн ${left(t.PER_WEEK, u.week)}) · сард ${fmtN(t.PER_MONTH)} 💎 (үлдсэн ${left(t.PER_MONTH, u.month)}). Хүлээн авагчид мөн адил хязгаартай.`;
+        }).catch(() => {});
+      }
+    }
   }
   function closeTransfer() { modal?.classList.add('hidden'); }
   function renderTarget() {

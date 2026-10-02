@@ -187,3 +187,29 @@ body .gxw-hero h3 { margin: 2px 0 2px !important; font: 900 28px var(--gx-font) 
 .gxw-act { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px; }
 /* Нийтийн Room-д явагдаж буй тоглолт (лобби жагсаалт) */
 .gxcl-live { color: var(--gx-green); font-weight: 800; white-space: nowrap; }
+
+/* ── Room жагсаалтын дэвсгэр зураг (2026-10-03): бараан давхарга + цагаан бичвэр — цайвар/бараан горимд адил ── */
+.gxcl { position: relative; border-color: #3b2f1c; background: linear-gradient(rgba(14,11,6,.58), rgba(14,11,6,.70)), url('covers/bg-rooms.jpg') center 35% / cover no-repeat, #1a140a; }
+.gxcl .gxcl-row { border-top-color: rgba(255,236,190,.10); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.85); }
+.gxcl .gxcl-row:not(.gxcl-th) { background: transparent; }
+.gxcl .gxcl-row:nth-child(odd):not(.gxcl-th) { background: rgba(0,0,0,.16); }
+.gxcl .gxcl-row:hover:not(.gxcl-th) { background: rgba(255,214,120,.16); }
+.gxcl .gxcl-row.mine { background: rgba(46,160,67,.28) !important; box-shadow: inset 3px 0 0 #4ade80; }
+.gxcl .gxcl-th { background: rgba(10,8,4,.72) !important; color: #e9d7a8; text-shadow: none; }
+.gxcl .gxcl-name { font-weight: 800; }
+.gxcl .gxcl-game { color: #eadfc6; }
+.gxcl .gxcl-row.ranked .gxcl-game b { color: #ffc94d; }
+.gxcl .gxcl-num small { color: #d8ccb0; }
+.gxcl .gxcl-num b { color: #ffd76a; background: rgba(0,0,0,.45); }
+.gxcl .gxcl-bar { background: rgba(255,255,255,.20); box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+.gxcl .gxcl-bar i { background: #4ade80; }
+.gxcl .gxcl-row.st-busy .gxcl-bar i { background: #fbbf24; }
+.gxcl .gxcl-row.st-full .gxcl-bar i { background: #f87171; }
+.gxcl .gxcl-st { color: #eadfc6; }
+.gxcl .gxcl-row.st-busy .gxcl-st { color: #fcd34d; }
+.gxcl .gxcl-row.st-full .gxcl-st { color: #fca5a5; }
+.gxcl .gxcl-live { color: #86efac; }
+.gxcl .gxcl-fav { color: #e6dcc3; text-shadow: 0 1px 2px rgba(0,0,0,.85); }
+.gxcl .gxcl-fav:hover { background: rgba(255,255,255,.14); color: #ffd76a; }
+.gxcl .gxcl-fav.on { color: #fbbf24; }
+.gxcl img.gxcl-img { box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 1px 4px rgba(0,0,0,.5); }

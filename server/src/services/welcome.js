@@ -7,10 +7,11 @@ const { addDiamonds, notifyUser, withTx } = require('../routes/membership');
 let db;
 try { db = require('../config/db'); } catch { db = null; }
 
-const AMOUNT = Math.max(0, parseInt(process.env.WELCOME_DIAMONDS || '350', 10) || 0);
+// 2026-10-03 (эзэн): 350 → 50 💎 (олон бүртгэл үүсгэж урамшуулал цуглуулахаас сэргийлнэ; шилжүүлэг мөн хязгаартай).
+const AMOUNT = Math.max(0, parseInt(process.env.WELCOME_DIAMONDS || '50', 10) || 0);
 const REF = 'welcome:v1';
 const MESSAGE = process.env.WELCOME_MESSAGE
-  || 'Garena.mn платформ-д тавтай морил. Танд шинэ хэрэглэгчийн урамшуулал болгож 350 Diamond бэлэг болгон илгээв';
+  || `Garena.mn платформ-д тавтай морил. Танд шинэ хэрэглэгчийн урамшуулал болгож ${AMOUNT} Diamond бэлэг болгон илгээв`;
 const SYSTEM_EMAIL = 'system@garena.mn';
 const SYSTEM_NAME = 'Garena.mn';
 let systemUserId = null;

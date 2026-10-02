@@ -1,5 +1,5 @@
 const express = require('express');
-const welcome = require('../services/welcome');       // шинэ хэрэглэгчийн урамшуулал (+350 💎 + DM)
+const welcome = require('../services/welcome');       // шинэ хэрэглэгчийн урамшуулал (+50 💎 + DM)
 const botNotify = require('../services/botNotify');   // GarenaSystem руу Discord role дохио
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
