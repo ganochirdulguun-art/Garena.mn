@@ -107,7 +107,7 @@ router.post('/game-stats', async (req, res) => {
   if (!game) return res.status(404).json({ error: 'game_token олдсонгүй (өрөө?)' });
   const winnerTeam = [1, 2].includes(Number(b.winner_team)) ? Number(b.winner_team) : null;
   const net = netReportOf(b);
-  console.log(`[Relay] дүн ирлээ token=${token.slice(0, 12)} room=${game.room_id} winner=${winnerTeam} ${b.game_time_sec}с lag=${JSON.stringify(net.lag)}`);
+  console.log(`[Relay] дүн ирлээ token=${token.slice(0, 12)} room=${game.room_id} winner=${winnerTeam}${b.winner_source ? ` (${b.winner_source})` : ''} ${b.game_time_sec}с lag=${JSON.stringify(net.lag)}`);
   let joiners = [];
   let ranked = false;
   if (db) {

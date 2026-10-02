@@ -35,10 +35,23 @@ function buildPayload(file) {
     left_at_sec: p.pid != null && leaveByPid[p.pid] != null ? leaveByPid[p.pid] : null,
   }));
   const gameToken = meta.game || path.basename(file).split('-')[0];
+  // Ялагч (2026-10-02): DotA-гийн W3MMD «Winner» зөвхөн throne унах / -ff үед бичигддэг тул 7 хоногийн 28 тоглолтын
+  // 26-д ялагчгүй (202 no-winner) байв. Хоёрдугаар эх: гарсан дарааллаар — нэг багийн БҮХ тоглогч тоглоом дуусахаас ≥20с өмнө
+  // гарсан, нөгөө багийн ядаж нэг нь төгсгөл хүртэл үлдсэн бол үлдсэн баг ялна (≥10 мин). Хоёулаа үлдсэн/хоёулаа гарсан бол таахгүй.
+  let winner = r.stats.winner || null;
+  let winnerSource = winner ? 'w3mmd' : null;
+  if (!winner && r.gameTimeSec >= 600) {
+    const act = r.stats.players.filter((p) => p.active);
+    const stayed = (t) => act.filter((p) => p.team === t && (leaveByPid[p.pid] == null || leaveByPid[p.pid] >= r.gameTimeSec - 20)).length;
+    const s = stayed('sentinel'), c = stayed('scourge');
+    if (s > 0 && c === 0) winner = 'sentinel'; else if (c > 0 && s === 0) winner = 'scourge';
+    if (winner) winnerSource = 'leave';
+  }
   return {
     game_token: gameToken,
-    winner: r.stats.winner || null,
-    winner_team: r.stats.winner === 'sentinel' ? 1 : r.stats.winner === 'scourge' ? 2 : null,
+    winner,
+    winner_team: winner === 'sentinel' ? 1 : winner === 'scourge' ? 2 : null,
+    winner_source: winnerSource,
     game_time_sec: r.gameTimeSec, dota_clock: { m: r.stats.meta.m ?? null, s: r.stats.meta.s ?? null },
     players,
     names: r.names, own_pid: r.ownPid, joiners: meta.joiners || {}, primary_sid: meta.primarySid ?? null,
@@ -98,7 +111,7 @@ async function post(payload) {
   let payload;
   try { payload = buildPayload(file); } catch (e) { log('задлал алдаа: ' + e.message); process.exit(1); }
   if (!radarOnly) {
-    log(`задлав: ${payload.players.length} тоглогч, winner=${payload.winner}, ${payload.game_time_sec}с, lag=${JSON.stringify(payload.lag)}`);
+    log(`задлав: ${payload.players.length} тоглогч, winner=${payload.winner}${payload.winner_source ? ` (${payload.winner_source})` : ''}, ${payload.game_time_sec}с, lag=${JSON.stringify(payload.lag)}`);
     if (dry || !URL_BASE) { console.log(JSON.stringify(payload, null, 2)); }
     else {
       const r = await post(payload);
