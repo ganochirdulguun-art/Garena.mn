@@ -53,7 +53,7 @@
       <section class="rgc-chat" id="rgc-chat"></section>
       <section class="rgc-members">
         <div class="rgc-h"><span>Өрөөнд байгаа</span><b id="rgc-mcount">0</b></div>
-        <div class="rgc-mhead"><span></span><span>Нэр</span><span>Tier</span><span>LV</span></div>
+        <div class="rgc-mhead"><span></span><span>Нэр</span><span>LV</span></div>
         <div id="rgc-mlist" class="rgc-mlist"></div>
       </section>
       <aside class="rgc-games">

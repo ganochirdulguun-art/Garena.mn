@@ -1881,6 +1881,27 @@ function formatChatTime(time) {
   return date.toLocaleTimeString('mn-MN', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
+// Чатын аватар (2026-10-03): мессеж бичсэн хүний профайл зураг (GIF бол хөдөлнө). Зураггүй / алдаа гарвал нэрийн эхний үсэг.
+const _avMissing = new Set();
+function chatAvatarEl(userId, username, isMe) {
+  const id = String(userId ?? '');
+  const initial = () => {
+    const s = document.createElement('span');
+    s.className = 'chat-av chat-av-ini';
+    s.textContent = ([...String(username || '?').trim()][0] || '?').toUpperCase();
+    return s;
+  };
+  const img = document.createElement('img');
+  img.className = 'chat-av'; img.alt = ''; img.loading = 'lazy'; img.draggable = false;
+  if (!id || id === '0') { img.src = 'logo.png'; img.classList.add('chat-av-sys'); return img; }   // системийн мэдэгдэл
+  if (!/^\d+$/.test(id) || _avMissing.has(id)) return initial();
+  img.src = (isMe && currentUser?.avatar_url) ? currentUser.avatar_url
+    : (typeof window.__AV_TEST__ === 'function' ? window.__AV_TEST__(id) : `${SERVER}/profile/avatar/${id}`);
+  img.addEventListener('error', () => { _avMissing.add(id); img.replaceWith(initial()); }, { once: true });
+  if (!isMe) { img.style.cursor = 'pointer'; img.addEventListener('click', () => { try { openUserProfile(id); } catch {} }); }
+  return img;
+}
+
 function appendMessage({ userId, username, text, time, replyTo, quiet }) {
   const box  = document.getElementById('chat-messages');
   const isMe = username === currentUser?.username;
@@ -1898,6 +1919,7 @@ function appendMessage({ userId, username, text, time, replyTo, quiet }) {
     <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
     ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
   `;
+  div.querySelector('.msg-header')?.prepend(chatAvatarEl(userId, username, isMe));
   if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'room', { username, text, time });
   if (!isMe && userId) {
@@ -2239,6 +2261,7 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quie
   const body = parseMentions(escHtml(text), !isMe && !quiet && !toMe);
   if (body.includes('<span class="mention mention-me mention-all">')) div.classList.add('mention-all-row');
   div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
+  div.querySelector('.g-time')?.before(chatAvatarEl(userId, username, isMe));
   if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'lobby', { username, text, time });
   if (!isMe && userId) {
@@ -3403,6 +3426,7 @@ async function openUserProfile(userId) {
   document.getElementById('popup-history-body').innerHTML = '<tr><td colspan="3" class="empty-text">Ачааллаж байна...</td></tr>';
   document.getElementById('popup-friend-btn-wrap').innerHTML = '';
   document.getElementById('popup-stats')?.classList.add('hidden');
+  document.getElementById('popup-tier')?.classList.add('hidden');
 
   const avatarEl = document.getElementById('popup-avatar');
   avatarEl.src = ''; avatarEl.style.display = 'none';
@@ -3414,6 +3438,8 @@ async function openUserProfile(userId) {
     ]);
 
     document.getElementById('popup-username').textContent = withTier(stats.username, stats.tierbot_tier);
+    const tierEl = document.getElementById('popup-tier');
+    if (tierEl) { const tr = String(stats.tierbot_tier || '').trim(); tierEl.textContent = tr ? `Tier ${tr}` : 'Tier —'; tierEl.classList.toggle('none', !tr); tierEl.classList.remove('hidden'); }
     document.getElementById('popup-wins').textContent     = `${stats.wins} хожил`;
     document.getElementById('popup-losses').textContent   = `${stats.losses} хожигдол`;
     document.getElementById('popup-winrate').textContent  = stats.winrate;

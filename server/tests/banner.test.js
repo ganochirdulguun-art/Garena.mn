@@ -10,6 +10,7 @@ function clearSrc() { const p = path.join(serverDir, 'src'); for (const k of Obj
 const tok = (u) => jwt.sign(u, 'test-secret', { expiresIn: '1h' });
 let pass = 0; const ok = (n) => { pass++; console.log('PASS ' + n); };
 const future = new Date(Date.now() + 864e5).toISOString();
+const avatars = {};
 const users = { 1: { id: 1, username: 'bronze', membership: 'bronze' }, 2: { id: 2, username: 'gold', membership: 'gold', membership_until: future } };
 
 async function main() {
@@ -22,6 +23,7 @@ async function main() {
     if (sql.includes('SELECT id, username, membership, membership_until')) return { rows: [users[p[0]]].filter(Boolean) };
     if (sql.includes('UPDATE users SET profile_banner = $1')) { Object.assign(users[p[3]], { profile_banner: p[0], profile_banner_mime: p[1] }); return { rows: [] }; }
     if (sql.includes('SELECT profile_banner, profile_banner_mime')) return { rows: [users[p[0]]].filter(Boolean) };
+    if (sql.includes('SELECT avatar_url FROM users')) return { rows: [avatars[p[0]] !== undefined ? { avatar_url: avatars[p[0]] } : null].filter(Boolean) };
     return { rows: [], rowCount: 0 };
   } } };
   const srv = require(path.join(serverDir, 'src', 'index.js'));
@@ -37,6 +39,22 @@ async function main() {
   assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'image/gif'); assert.ok(Buffer.from(await r.arrayBuffer()).equals(gif));
   r = await fetch(`http://127.0.0.1:${port}/profile/banner/1`); assert.equal(r.status, 404);
   ok('Нээлттэй GET: байт таарна, баннергүй бол 404');
+  // Чатын аватар: data: → зураг (ETag/304), https → чиглүүлэлт, зураг биш / байхгүй → 404
+  const av = (id, h = {}) => fetch(`http://127.0.0.1:${port}/profile/avatar/${id}`, { headers: h, redirect: 'manual' });
+  avatars[2] = `data:image/gif;base64,${gif.toString('base64')}`;
+  avatars[3] = 'https://cdn.discordapp.com/avatars/1/a.png';
+  avatars[4] = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>').toString('base64')}`;
+  avatars[5] = null;
+  r = await av(2); assert.equal(r.status, 200); assert.equal(r.headers.get('content-type'), 'image/gif'); assert.ok(Buffer.from(await r.arrayBuffer()).equals(gif));
+  const etag = r.headers.get('etag'); assert.ok(etag);
+  r = await av(2, { 'If-None-Match': etag }); assert.equal(r.status, 304);
+  ok('Аватар: data: GIF → зураг, ETag → 304');
+  r = await av(3); assert.equal(r.status, 302); assert.equal(r.headers.get('location'), avatars[3]);
+  r = await av(4); assert.equal(r.status, 404);
+  r = await av(5); assert.equal(r.status, 404);
+  r = await av(999); assert.equal(r.status, 404);
+  r = await av('abc'); assert.equal(r.status, 404);
+  ok('Аватар: https → 302, SVG/хоосон/байхгүй → 404');
   console.log(`=== banner: ${pass} PASS ===`);
   process.exit(0);
 }

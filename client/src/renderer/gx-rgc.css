@@ -226,7 +226,7 @@ body.rgc-wc3 .rgc-banner { background-position: center, center 42% !important; b
 /* ── Чатын дэвсгэр зураг (2026-10-03): зураг гүйхгүй, бараан давхарга дээр цайвар бичвэр + сүүдэр ── */
 body.rgc #rgc .rgc-chat .gxr-chat { background: #14170f !important; border-color: #4a4a38 !important; }
 body.rgc #rgc .rgc-chat .gxr-chat-body { background: none !important; }
-body.rgc #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(10,13,8,.76), rgba(10,13,8,.83)), url('covers/bg-chat.jpg') center 30% / cover no-repeat, #14170f !important; color: #f2f3ee !important; text-shadow: 0 1px 2px rgba(0,0,0,.9); }
+body.rgc #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(10,13,8,.80), rgba(10,13,8,.86)), url('covers/bg-chat.jpg') center 30% / cover no-repeat, #14170f !important; color: #f2f3ee !important; text-shadow: 0 1px 2px rgba(0,0,0,.9); }
 #rgc .rgc-chat #chat-messages .msg:hover { background: rgba(255,255,255,.07) !important; }
 #rgc .rgc-chat #chat-messages .msg .msg-time { color: #b9c0ad !important; }
 #rgc .rgc-chat #chat-messages .msg .msg-author { color: #ffd98a !important; }
@@ -243,7 +243,34 @@ html body.gx #rgc .rgc-chat #chat-messages .name-fx-toon { color: #fff !importan
 body.gx #rgc .rgc-chat #chat-messages .mention:not(.mention-all) { color: #9ccdff !important; }
 body.gx #rgc .rgc-chat #chat-messages .mention-me:not(.mention-all) { color: #ffc2b8 !important; background: rgba(225,29,46,.38) !important; }
 /* Чатын дэвсгэр тоглоом бүрээр (WC3 = bg-chat.jpg дээр) */
-body.rgc.rgc-cs16 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(6,10,22,.78), rgba(6,10,22,.85)), url('covers/bg-rooms-cs16.jpg') right center / cover no-repeat, #0b1326 !important; }
-body.rgc.rgc-q3 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(12,13,15,.78), rgba(12,13,15,.84)), url('covers/bg-rooms-q3.jpg') center 45% / cover no-repeat, #17181b !important; }
-body.rgc.rgc-ra2 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(20,4,3,.78), rgba(20,4,3,.85)), url('covers/bg-rooms-ra2.jpg') 30% center / cover no-repeat, #1c0705 !important; }
+body.rgc.rgc-cs16 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(6,10,22,.84), rgba(6,10,22,.90)), url('covers/bg-rooms-cs16.jpg') right center / cover no-repeat, #0b1326 !important; }
+body.rgc.rgc-q3 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(12,13,15,.84), rgba(12,13,15,.90)), url('covers/bg-rooms-q3.jpg') center 45% / cover no-repeat, #17181b !important; }
+body.rgc.rgc-ra2 #rgc .rgc-chat #chat-messages { background: linear-gradient(rgba(20,4,3,.84), rgba(20,4,3,.90)), url('covers/bg-rooms-ra2.jpg') 30% center / cover no-repeat, #1c0705 !important; }
 body.rgc:is(.rgc-cs16, .rgc-q3, .rgc-ra2) #rgc .rgc-chat .gxr-chat { background: #101114 !important; border-color: #3a3d44 !important; }
+
+/* ── Чатын аватар (2026-10-03): [зураг] [цаг] Нэр: текст — GOLD бол алтан цагираг; нэрийн эффект гэрэлтэнэ ── */
+.chat-av { flex: none; width: 22px; height: 22px; border-radius: 50%; object-fit: cover; background: #2a2e34; vertical-align: middle; box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+.chat-av-ini { display: inline-grid; place-items: center; font: 800 11px/1 var(--gx-font, sans-serif); color: #fff; background: linear-gradient(135deg, #5b6472, #353b45); text-shadow: none; }
+.chat-av-sys { object-fit: contain; background: #1a0707; padding: 2px; box-sizing: border-box; }
+.msg-header > .chat-av { margin-right: 6px; }
+.msg.gl > .chat-av { display: inline-block; margin-right: 5px; width: 20px; height: 20px; }
+.msg.gl > .chat-av-ini { display: inline-grid; }
+.msg:has(.clickable-name[data-tier="gold"], [data-fx-user][data-tier="gold"]) .chat-av { box-shadow: 0 0 0 1.5px #f5b301, 0 0 8px rgba(245,179,1,.65); }
+.msg:has(.clickable-name[data-tier="silver"]) .chat-av { box-shadow: 0 0 0 1.5px #b9c6d6; }
+#rgc .rgc-chat #chat-messages .msg { padding: 2px 2px !important; align-items: center; }
+#rgc .rgc-chat #chat-messages .msg .chat-av { order: 0; margin-right: 1px; }
+#rgc .rgc-chat #chat-messages :is(.name-fx-gradient, .name-fx-rainbow) { filter: drop-shadow(0 0 5px rgba(255,150,90,.55)) drop-shadow(0 1px 1px rgba(0,0,0,.9)); }
+
+/* ── Гишүүд: Tier багана хасагдсан (Tier нь нэр дээр дарахад профайлд); нэрийн ард ping үргэлж харагдана ── */
+body.rgc .rgc-mhead { grid-template-columns: 22px minmax(0, 1fr) 30px; }
+#rgc #members-list > li { grid-template-columns: 22px minmax(0, 1fr) auto !important; }
+#rgc #members-list .m-tier { display: none !important; }
+#rgc #members-list .member-info > div { display: flex; align-items: center; gap: 5px; overflow: hidden; }
+#rgc #members-list .member-info > div > :is(.clickable-name, .m-self) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#rgc #members-list .member-info > div > :not(.clickable-name):not(.m-self) { flex: none; margin-left: 0 !important; }
+#rgc #members-list .rp-ping { font-size: 10.5px !important; font-weight: 700; }
+#rgc #members-list > li :is(.kick-btn, .transfer-host-btn) { right: 36px; }
+
+/* Профайлын цонх: Tier */
+.popup-tier { display: inline-block; padding: 1px 8px; border-radius: 5px; background: linear-gradient(#3fae4a, #237a2c); color: #fff; font: 800 12px/1.6 var(--gx-font, sans-serif); text-shadow: 0 1px 1px rgba(0,0,0,.35); }
+.popup-tier.none { background: #6b7280; }

@@ -71,6 +71,30 @@ router.get('/banner/:id', async (req, res) => {
   } catch { return res.status(500).end(); }
 });
 
+// Чатын аватар (2026-10-03): users.avatar_url нь data: (base64) эсвэл https холбоос. <img> токен илгээдэггүй тул нээлттэй;
+// data: бол зураг болгон задалж (magic шалгана — SVG/HTML гарахгүй) кэштэй буцаана, https бол чиглүүлнэ.
+router.get('/avatar/:id', async (req, res) => {
+  if (!/^\d{1,10}$/.test(String(req.params.id))) return res.status(404).end();
+  if (!await dbOk()) return res.status(503).end();
+  try {
+    const r = await db.query('SELECT avatar_url FROM users WHERE id = $1', [req.params.id]);
+    const url = String(r.rows[0]?.avatar_url || '');
+    if (!url) { res.set('Cache-Control', 'public, max-age=120'); return res.status(404).end(); }
+    if (/^https:\/\//i.test(url)) { res.set('Cache-Control', 'public, max-age=300'); return res.redirect(302, url); }
+    const m = /^data:image\/[a-z0-9.+-]+;base64,/i.exec(url);
+    if (!m) return res.status(404).end();
+    const b64 = url.slice(m[0].length);
+    const etag = `"av-${b64.length}-${require('crypto').createHash('sha1').update(b64.slice(0, 256)).update(b64.slice(-256)).digest('hex').slice(0, 16)}"`;
+    res.set({ ETag: etag, 'Cache-Control': 'public, max-age=600', 'X-Content-Type-Options': 'nosniff' });
+    if (req.headers['if-none-match'] === etag) return res.status(304).end();
+    const buf = Buffer.from(b64, 'base64');
+    const mime = sniff(buf);
+    if (!mime) return res.status(404).end();
+    res.set('Content-Type', mime);
+    return res.end(buf);
+  } catch { return res.status(500).end(); }
+});
+
 async function bannerVer(userId) {
   try { const r = await db.query('SELECT profile_banner_ver FROM users WHERE id = $1', [userId]); return r.rows[0]?.profile_banner_ver ? Number(r.rows[0].profile_banner_ver) : null; } catch { return null; }
 }
