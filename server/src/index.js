@@ -191,7 +191,7 @@ async function runStartupMigrations() {
     console.error('[Migration]', e.message);
   }
   // Кланууд / Map-ын сан — дээрх алхам унасан ч заавал үүсгэнэ (idempotent)
-  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); await require('./routes/channels').ensureTables(); await require('./routes/roles').ensureTables(); await require('./routes/roomChat').ensureTables(); }
+  try { await require('./routes/clans').ensureTables(); await require('./routes/maps').ensureTables(); await require('./routes/banner').ensureTables(); await socialRoutes.ensureTables(); await require('./routes/wishes').ensureTables(); await require('./routes/channels').ensureTables(); await require('./routes/roles').ensureTables(); await require('./routes/roomChat').ensureTables(); await require('./services/results').ensureTables(); }
   catch (e) { console.error('[Migration] clans/maps:', e.message); }
 }
 
@@ -199,6 +199,19 @@ async function runStartupMigrations() {
 setIO(io);
 // REST-ээр өрөө устгагдахад socket талын in-memory төлөвийг цэвэрлэх
 roomRoutes.setRoomCleanup((roomId) => cleanupRoomState(roomId));
+// Kick: гаргагдсан хүний бүх socket-ийг өрөөнөөс салгаж, гишүүдийн жагсаалт/LAN тоглоомыг цэвэрлэнэ
+roomRoutes.setKickHook((roomId, userId) => {
+  for (const s of io.sockets.sockets.values()) {
+    if (String(s.user?.id || '') === userId && String(s.data.roomId || '') === roomId) { try { s.leave(roomId); } catch {} s.data.roomId = null; }
+  }
+  if (disconnectTimers[userId] && disconnectTimers[userId].roomId === roomId) { clearTimeout(disconnectTimers[userId].timer); delete disconnectTimers[userId]; }
+  if (roomMembers[roomId]) {
+    for (const [name, id] of [...roomMembers[roomId].entries()]) if (String(id) === userId) roomMembers[roomId].delete(name);
+    io.to(roomId).emit('room:members', membersArray(roomId));
+  }
+  if (roomReady[roomId]) roomReady[roomId].delete(userId);
+  try { lanHostRoutes.removeUserGames(roomId, userId); } catch {}
+});
 // Social router-т io дамжуулах (friend request мэдэгдэлд хэрэг)
 socialRoutes.setIO(io);
 clanRoutes.setIO(io);
@@ -266,7 +279,8 @@ async function refreshChannelIds() {
 async function sweepChannelGhosts() {
   if (!dbForMigration || !channelIds.size) return;
   try {
-    const r = await dbForMigration.query('SELECT room_id, user_id FROM room_players WHERE room_id = ANY($1::int[])', [[...channelIds].map(Number)]);
+    // joined_at < 60с: дөнгөж HTTP-ээр нэгдээд socket room:join хийж амжаагүй хүнийг «сүнс» гэж хасахгүй (аудит 2026-10-02)
+    const r = await dbForMigration.query("SELECT room_id, user_id FROM room_players WHERE room_id = ANY($1::int[]) AND (joined_at IS NULL OR joined_at < NOW() - INTERVAL '60 seconds')", [[...channelIds].map(Number)]);
     // Тоглож буй хүнийг (идэвхтэй LAN тоглоомын хост/joiner) хэзээ ч сүнс гэж хасахгүй — WC3 тоглох үед апп-ын socket
     // тасарч болно; хасвал тоглолтын дүн «player-not-in-room» болж алдагдана (2026-10-02 Room 1)
     const playing = lanHostRoutes.activeHostIds();
@@ -643,6 +657,7 @@ io.on('connection', (socket) => {
         io.to(prevRoom).emit('room:members', membersArray(prevRoom));
       }
       if (!stillInPrev && roomReady[prevRoom]) roomReady[prevRoom].delete(userId);
+      if (!stillInPrev) { try { lanHostRoutes.removeUserGames(prevRoom, userId); } catch {} }   // «сүнс» OPEN GAME үлдээхгүй
     }
 
     socket.join(roomId);
@@ -912,15 +927,17 @@ io.on('connection', (socket) => {
   });
 
   // Typing indicator (DM)
-  socket.on('typing:start', async ({ toUserId }) => {
-    if (checkRateLimit(socket)) return;
+  // typing нь тусдаа, хөнгөн хязгаартай (1с-д 1) — чатын limiter-ийг хөндөхгүй (аудит 2026-10-02)
+  const typingLimited = () => { const n = Date.now(); if (socket.data.lastTypingAt && n - socket.data.lastTypingAt < 1000) return true; socket.data.lastTypingAt = n; return false; };
+  socket.on('typing:start', async ({ toUserId } = {}) => {
+    if (!toUserId || typingLimited()) return;
     // Хаасан хэрэглэгч рүү typing дохио явуулахгүй (private:message-тэй ижил бодлого)
     try { if (await socialRoutes.isUserBlocked(String(toUserId), String(socket.user.id))) return; } catch {}
     io.to(`user:${String(toUserId)}`).emit('typing:start', { fromUserId: String(socket.user.id), fromUsername: socket.user.username });
   });
 
-  socket.on('typing:stop', ({ toUserId }) => {
-    if (checkRateLimit(socket)) return;
+  socket.on('typing:stop', ({ toUserId } = {}) => {
+    if (!toUserId) return;
     io.to(`user:${String(toUserId)}`).emit('typing:stop', { fromUserId: String(socket.user.id) });
   });
 

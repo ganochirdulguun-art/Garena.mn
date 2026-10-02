@@ -49,6 +49,7 @@ async function query(sql, p = []) {
   if (s.includes('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean).map((u) => ({ ...u, banned: false })) };
   if (s.includes('SELECT id, username, discord_id FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean) };
   if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : String(p[0]) === '941' ? [{ kind: 'channel', game_type: 'Counter-Strike 1.6' }] : [{ kind: 'room' }] };
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id = $1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : [{ kind: 'room' }] };
   if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
   if (s.includes('FROM room_players rp JOIN rooms r') || s.includes('isUserInRoom')) return { rows: [{}] };
   if (s.startsWith('UPDATE rooms SET pinned_notice')) { notice = p[1]; return { rows: [{ id: 901 }] }; }
@@ -74,6 +75,8 @@ async function main() {
   // Moderator: LAN нээх эрх, хүсэлт → батлах
   r = await call(2, 'POST', '/rooms/901/lan-host/begin'); j = await r.json();
   assert.equal(r.status, 403); assert.equal(j.code, 'MODERATOR_REQUIRED'); ok('Moderator-гүй хүн нийтийн Room-д LAN нээж чадахгүй');
+  r = await call(2, 'POST', '/rooms/901/lan-host/announce', { game_token: 'selfmadetoken1234', gameinfo_b64: 'AAAA' }); j = await r.json();
+  assert.equal(r.status, 403); assert.equal(j.code, 'MODERATOR_REQUIRED'); ok('/announce-аар Moderator эрхийг тойрч чадахгүй');
   r = await call(2, 'POST', '/roles/request', { note: 'идэвхтэй тоглогч' }); assert.equal(r.status, 200); ok('Moderator хүсэлт илгээнэ');
   r = await call(2, 'POST', '/roles/request', { note: 'дахин' }); assert.equal(r.status, 409); ok('Давхар хүсэлт хориглоно');
   r = await call(2, 'GET', '/roles/requests'); assert.equal(r.status, 403); ok('Энгийн хэрэглэгч хүсэлтүүдийг харахгүй');
@@ -81,6 +84,14 @@ async function main() {
   r = await call(1, 'POST', '/roles/requests/1/approve'); assert.equal(r.status, 200); assert.equal(roles.get(2), 'moderator'); ok('Эзэн батална → Moderator');
   r = await call(2, 'GET', '/roles/me'); j = await r.json(); assert.equal(j.can_host_channel, true); ok('/roles/me: can_host_channel');
   r = await call(2, 'POST', '/rooms/901/lan-host/begin'); assert.notEqual(r.status, 403); ok('Moderator нийтийн Room-д LAN нээнэ');
+  if (r.status === 200) {
+    const bj = await r.json();
+    r = await call(1, 'POST', '/rooms/901/lan-host/announce', { game_token: bj.game_token, gameinfo_b64: 'AAAA' }); j = await r.json();
+    assert.equal(r.status, 403); assert.equal(j.code, 'TOKEN_NOT_ISSUED'); ok('Бусдын /begin токеныг өөр хүн зарлаж чадахгүй');
+    r = await call(2, 'POST', '/rooms/901/lan-host/announce', { game_token: bj.game_token, gameinfo_b64: 'AAAA', host_wc3_name: 'HostName' }); assert.equal(r.status, 200); ok('Эзэн нь токеноо зарлана');
+    r = await call(3, 'POST', `/rooms/901/lan-host/${bj.game_token}/join`, { wc3_name: 'hostname' }); assert.equal(r.status, 409); ok('Joiner хостын WC3 нэрийг авч чадахгүй');
+    r = await call(3, 'POST', '/rooms/901/lan-host/unknowntoken/join', { wc3_name: 'x' }); assert.equal(r.status, 404); ok('Үл мэдэгдэх токенд join бүртгэхгүй');
+  }
   r = await call(1, 'POST', '/rooms/941/lan-host/begin'); j = await r.json(); assert.equal(j.code, 'GAME_NOT_READY'); ok('CS 1.6 Room-д WC3 LAN relay нээгдэхгүй');
 
   // Зарлал

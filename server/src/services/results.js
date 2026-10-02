@@ -22,6 +22,7 @@ async function recordGameResult({
   fogclick = [],
   // Алхам 3: ranked өрөө (💎 зөвхөн энд), relay-ийн хүчинтэй байдлын дүгнэлт, сүлжээний тайлан
   ranked = false, rankedValid = true, rankedReason = null, netReport = null,
+  gameToken = null,   // relay-ийн тоглолтын токен — нэг токен = нэг дүн (idempotent)
 }) {
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
@@ -41,7 +42,11 @@ async function recordGameResult({
     const jr = await db.query('SELECT user_id, wc3_name, ip FROM bot_job_players WHERE job_id = $1', [botJobId]).catch(() => ({ rows: [] }));
     joins = (jr.rows || []).filter((j) => members.some((m) => String(m.id) === String(j.user_id)));
   }
-  const used = new Set();
+  // user_id-ээр шууд танигдсан хүмүүсийг нэрийн нөхөн тааруулалтад ДАХИН оноохгүй (давхар хожил/XP-ээс хамгаална)
+  const used = new Set(players.map((p) => p.user_id).filter((id) => id !== undefined && id !== null && id !== '').map(String));
+  // Хэсэгчилсэн (includes) нэрийн тааруулалт зөвхөн жижиг хувийн өрөөнд (бот/replay эх) — нийтийн Room-ын 300 гишүүнд
+  // богино нэр санамсаргүй таарч тоглоогүй хүнд хожил/XP бичдэг байсан (аудит 2026-10-02)
+  const allowPartial = source !== 'relay' && members.length <= 12;
   const take = (id) => { if (id == null || used.has(String(id))) return null; used.add(String(id)); return id; };
 
   // Relay-ийн user_id хост/lan_game_players-аас ирдэг (найдвартай). Урт тоглолтын дараа тоглогч өрөөнөөс гарсан эсвэл
@@ -77,7 +82,7 @@ async function recordGameResult({
       // 4) платформын нэр (яг / хэсэгчилсэн)
       if (!userId && n) {
         userId = take(members.find((x) => norm(x.username) === n && !used.has(String(x.id)))?.id)
-          || take(members.find((x) => norm(x.username) && !used.has(String(x.id)) && (n.includes(norm(x.username)) || norm(x.username).includes(n)))?.id)
+          || (allowPartial ? take(members.find((x) => norm(x.username).length >= 4 && n.length >= 4 && !used.has(String(x.id)) && (n.includes(norm(x.username)) || norm(x.username).includes(n)))?.id) : null)
           || null;
       }
     }
@@ -105,12 +110,19 @@ async function recordGameResult({
     // Өрөө бүрт транзакцын хугацаанд advisory lock — бот хостын дүн ба хостын replay
     // нэг тоглолтод бараг зэрэг ирдэг тул давхар бүртгэлийг (XP/💎/wins давхардал) атомоор хаана.
     const lockKey = Number.parseInt(roomId, 10);
-    if (Number.isFinite(lockKey)) await client.query('SELECT pg_advisory_xact_lock($1)', [lockKey]);
+    const tokenKey = gameToken ? String(gameToken).slice(0, 64) : null;
+    if (tokenKey) {
+      // Relay эх: давхардлыг ТОКЕНООР л шийднэ. Өмнө нь room+12 цагийн цонхоор таамагладаг байсан тул нийтийн Room-д
+      // (trigger-ээр үргэлж 'waiting') эхний тоглолтоос хойш 12 цагийн бүх дүн «давхардал» болж хаягддаг байв (аудит 2026-10-02).
+      await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [tokenKey]);
+      const dup = await client.query('SELECT id, played_at, source FROM game_results WHERE game_token = $1 LIMIT 1', [tokenKey]);
+      if (dup.rows[0]) { await client.query('COMMIT'); return { duplicate: true, result: dup.rows[0] }; }
+    } else if (Number.isFinite(lockKey)) await client.query('SELECT pg_advisory_xact_lock($1)', [lockKey]);
     // Lock авсны дараа транзакц дотор давхар шалгалт: (а) өрөө 'playing' биш (replay хожуу),
     // (б) сүүлийн 10 мин дотор энэ өрөөнд дүн бүртгэгдсэн бол → давхардал гэж үзнэ.
     const existing = await client.query('SELECT id, played_at, source FROM game_results WHERE room_id = $1 AND played_at > NOW() - INTERVAL \'12 hours\' ORDER BY id DESC LIMIT 1', [roomId]);
     const roomStatus = await client.query('SELECT status FROM rooms WHERE id = $1', [roomId]);
-    if (existing.rows[0]) {
+    if (!tokenKey && existing.rows[0]) {   // токенгүй эх (replay/бот) л room+цагийн цонхоор шалгана
       const ageMs = Date.now() - new Date(existing.rows[0].played_at).getTime();
       if (roomStatus.rows[0]?.status !== 'playing' || ageMs < 10 * 60 * 1000) {
         await client.query('COMMIT');
@@ -127,9 +139,9 @@ async function recordGameResult({
       if ((same.rows[0]?.n || 0) >= RANKED_MAX_SAME_LINEUP_PER_DAY) { rankedOk = false; reason = 'same-lineup'; }
     }
     const rr = await client.query(
-      `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path, source, bot_job_id, map_name, game_name, ranked, ranked_valid, lineup_hash, net_report)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [roomId, winnerTeam, toInt(durationMinutes), replayPath, source, botJobId, mapName, gameName, !!ranked, rankedOk, lineupHash, netReport ? JSON.stringify(netReport) : null]
+      `INSERT INTO game_results (room_id, winner_team, duration_minutes, replay_path, source, bot_job_id, map_name, game_name, ranked, ranked_valid, lineup_hash, net_report, game_token)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`,
+      [roomId, winnerTeam, toInt(durationMinutes), replayPath, source, botJobId, mapName, gameName, !!ranked, rankedOk, lineupHash, netReport ? JSON.stringify(netReport) : null, tokenKey]
     );
     const result = rr.rows[0];
     const awards = [];
@@ -192,4 +204,13 @@ async function recordGameResult({
   }
 }
 
-module.exports = { recordGameResult };
+// game_results.game_token — relay тоглолтын токеноор idempotent бүртгэл (нэг токен = нэг дүн)
+async function ensureTables() {
+  if (!db) return;
+  try {
+    await db.query('ALTER TABLE game_results ADD COLUMN IF NOT EXISTS game_token VARCHAR(64)');
+    await db.query('CREATE UNIQUE INDEX IF NOT EXISTS game_results_token_uniq ON game_results (game_token) WHERE game_token IS NOT NULL');
+  } catch (e) { console.error('[Migration] game_results.game_token:', e.message); }
+}
+
+module.exports = { recordGameResult, ensureTables };

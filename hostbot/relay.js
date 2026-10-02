@@ -153,8 +153,11 @@ function hostCapFinalize(game) {
 }
 function handleHostCapture(sock, msg, leftover) {
   const game = String(msg.game || '');
-  if (!HC_KEY || !game || typeof msg.key !== 'string' || msg.key.length !== 32 ||
-      !crypto.timingSafeEqual(Buffer.from(msg.key), Buffer.from(hostCapKey(game)))) { log('capture: буруу key'); sock.destroy(); return; }
+  // БАЙТ уртаар харьцуулна: 32 тэмдэгт боловч олон-байтын (64 байт) key-д timingSafeEqual RangeError шидэж
+  // relay процесс бүхэлдээ унадаг байв (бүх тоглолт тасарна) — аудит 2026-10-02
+  const hcGot = Buffer.from(typeof msg.key === 'string' ? msg.key : '');
+  const hcWant = Buffer.from(HC_KEY && game ? hostCapKey(game) : '');
+  if (!HC_KEY || !game || !hcGot.length || hcGot.length !== hcWant.length || !crypto.timingSafeEqual(hcGot, hcWant)) { log('capture: буруу key'); sock.destroy(); return; }
   let hc = hostCaps.get(game);
   if (!hc) {
     try { fs.mkdirSync(CAP_DIR, { recursive: true }); } catch {}
@@ -300,3 +303,6 @@ server.listen(CFG.PORT, () => log('relay сонсож байна PORT=' + CFG.PO
 setInterval(() => { if (hosts.size) log('идэвхтэй: ' + hosts.size + ' host, нийт ' + joinerCount + ' joiner'); }, 60000);
 
 process.on('SIGTERM', () => { try { server.close(); } catch {} process.exit(0); });
+// Нэг холболтын алдаа бүх тоглолтыг унагаахгүй — логлоод үргэлжилнэ (аудит 2026-10-02)
+process.on('uncaughtException', (e) => { try { log('uncaughtException: ' + ((e && e.stack) || e)); } catch {} });
+process.on('unhandledRejection', (e) => { try { log('unhandledRejection: ' + ((e && e.message) || e)); } catch {} });

@@ -214,7 +214,7 @@ router.post('/', strictAuth, async (req, res) => {
 
       emitRoomsUpdated();
       return res.status(201).json({
-        ...room,
+        ...safeRoom(room),
         host_name: hostName,
         members: [{ id: String(userId), name: hostName }],
         player_count: 1,
@@ -250,6 +250,15 @@ router.post('/', strictAuth, async (req, res) => {
   return res.status(201).json(roomToPublic(room));
 });
 
+// Нийтийн Room-оос гаргагдсан хүн KICK_BAN_MS хугацаанд тэр Room-д буцаж орохгүй (санах ой; restart-аар арилна)
+const KICK_BAN_MS = 10 * 60 * 1000;
+const kickBans = new Map();   // `${roomId}:${userId}` -> until (ms)
+let _kickHook = null;
+function setKickHook(fn) { _kickHook = fn; }
+
+// rooms мөрийг клиент рүү буцаахдаа password_hash-ийг хасна (аудит 2026-10-02: join/PATCH хариу, room:updated задруулдаг байв)
+function safeRoom(room) { if (!room || typeof room !== 'object') return room; const { password_hash, ...rest } = room; return rest; }
+
 router.post('/:id/join', strictAuth, async (req, res) => {
   const { id } = req.params;
   const { password } = req.body;
@@ -280,9 +289,14 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         [userId]
       );
 
+      const kb = kickBans.get(`${id}:${userId}`);
+      if (kb) {
+        if (kb > Date.now()) return res.status(403).json({ error: `Та энэ Room-оос гаргагдсан — ${Math.ceil((kb - Date.now()) / 60000)} минутын дараа дахин орно уу, эсвэл өөр Room сонгоно уу.`, code: 'KICKED' });
+        kickBans.delete(`${id}:${userId}`);
+      }
       // Энэ өрөөнд аль хэдийн гишүүн бол (тоглолт эхэлсэн ч) зөвшөөрнө
       if (already.rows[0] && String(already.rows[0].id) === String(id)) {
-        return res.json({ message: 'Joined room', room });
+        return res.json({ message: 'Joined room', room: safeRoom(room) });
       }
       // Тоглолт эхэлсэн (LAN тоглоом нээгдсэн) өрөөнд ГАДНЫН/шинэ хүн нэгдэхийг хориглоно —
       // хуучин өрөөг хөндөхөөс ӨМНӨ татгалзана.
@@ -290,21 +304,7 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         return res.status(409).json({ error: 'Тоглолт эхэлсэн тул энэ өрөөнд нэгдэх боломжгүй', code: 'GAME_STARTED' });
       }
 
-      // Өөр өрөөнд байсан бол тэндээс гаргана
-      if (already.rows[0]) {
-        const oldId = already.rows[0].id;
-        await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [oldId, userId]);
-        const oldRoom = await db.query('SELECT host_id FROM rooms WHERE id = $1', [oldId]);
-        if (String(oldRoom.rows[0]?.host_id) === String(userId)) {
-          // Идэвхтэй бот-жобыг цуцална — эс бөгөөс room устахад FK SET NULL-аар өнчирч GHost "сүнс" lobby үлддэг
-          await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [oldId]).catch(() => {});
-          await db.query('DELETE FROM rooms WHERE id = $1', [oldId]);
-          if (_io) _io.to(String(oldId)).emit('room:closed', { reason: 'Host left the room' });
-          cleanupRoom(oldId);
-        }
-        emitRoomsUpdated();
-      }
-
+      // Нууц үг + багтаамжийг хуучин өрөөг хөндөхөөс ӨМНӨ шалгана (буруу нууц үгээр өрөөгөө алддаг байсан — аудит 2026-10-02)
       if (room.has_password) {
         if (!password) return res.status(403).json({ error: 'Password required', need_password: true });
         const ok = await bcrypt.compare(password, room.password_hash);
@@ -323,9 +323,26 @@ router.post('/:id/join', strictAuth, async (req, res) => {
         }
       }
 
+      // Өөр өрөөнд байсан бол тэндээс гаргана
+      if (already.rows[0]) {
+        const oldId = already.rows[0].id;
+        await db.query('DELETE FROM room_players WHERE room_id = $1 AND user_id = $2', [oldId, userId]);
+        // Хуучин өрөөнд нээсэн LAN тоглоомуудыг цэвэрлэнэ — эс бөгөөс нийтийн Room-д «сүнс» OPEN GAME үүрд үлдэнэ (аудит 2026-10-02)
+        try { require('./lanhost').removeUserGames(String(oldId), userId); } catch {}
+        const oldRoom = await db.query('SELECT host_id FROM rooms WHERE id = $1', [oldId]);
+        if (String(oldRoom.rows[0]?.host_id) === String(userId)) {
+          // Идэвхтэй бот-жобыг цуцална — эс бөгөөс room устахад FK SET NULL-аар өнчирч GHost "сүнс" lobby үлддэг
+          await db.query("UPDATE bot_jobs SET status='cancelled', updated_at=NOW() WHERE room_id=$1 AND status IN ('queued','hosting','lobby')", [oldId]).catch(() => {});
+          await db.query('DELETE FROM rooms WHERE id = $1', [oldId]);
+          if (_io) _io.to(String(oldId)).emit('room:closed', { reason: 'Host left the room' });
+          cleanupRoom(oldId);
+        }
+        emitRoomsUpdated();
+      }
+
       await db.query('INSERT INTO room_players (room_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [id, userId]);
       emitRoomsUpdated();
-      return res.json({ message: 'Joined room', room });
+      return res.json({ message: 'Joined room', room: safeRoom(room) });
     } catch (e) {
       console.error('[Join]', e);
       return res.status(500).json({ error: 'Server error' });
@@ -479,6 +496,11 @@ router.post('/:id/kick/:targetId', strictAuth, async (req, res) => {
       if (String(targetId) === String(userId)) {
         return res.status(400).json({ error: 'Cannot kick yourself' });
       }
+      // Эзнийг (owner) зөвхөн эзэн өөрөө л гаргаж болно — ADMIN эзнийг kick хийдэг байв (аудит 2026-10-02)
+      const adminMw = require('../middleware/admin');
+      if (adminMw.isOwnerUser({ id: targetId }) && !adminMw.isOwnerUser(req.user)) {
+        return res.status(403).json({ error: 'Эзнийг гаргах боломжгүй' });
+      }
       // Нийтийн Room-оос гаргахад шалтгаан ЗААВАЛ (хувийн сэтгэл хөдлөлөөр kick хийхийг хянах) — kick_log-д бүртгэнэ
       const reason = String(req.body?.reason || '').replace(/\s+/g, ' ').trim().slice(0, 300);
       if (result.rows[0].kind === 'channel' && reason.length < 3) {
@@ -490,6 +512,10 @@ router.post('/:id/kick/:targetId', strictAuth, async (req, res) => {
         await db.query('INSERT INTO kick_log (room_id, target_id, by_id, reason) VALUES ($1, $2, $3, $4)', [id, targetId, userId, reason]).catch((e) => console.error('[kick_log]', e.message));
       }
       if (_io) _io.to(id).emit('room:kicked', { userId: String(targetId), reason: reason || undefined });
+      // Серверийн тал: гаргагдсан хүний socket өрөөндөө үлдэж чат/LAN токен авсаар, тоглоом нь жагсаалтад үлддэг байв (аудит 2026-10-02)
+      if (result.rows[0].kind === 'channel') kickBans.set(`${id}:${targetId}`, Date.now() + KICK_BAN_MS);
+      try { if (_kickHook) _kickHook(String(id), String(targetId)); } catch {}
+      emitRoomsUpdated();
       return res.json({ message: 'Player kicked' });
     } catch (e) {
       console.error(e);
@@ -629,8 +655,8 @@ router.patch('/:id', strictAuth, async (req, res) => {
       }
 
       const updated = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
-      if (_io) _io.to(id).emit('room:updated', updated.rows[0]);
-      return res.json({ ok: true, room: updated.rows[0] });
+      if (_io) _io.to(id).emit('room:updated', safeRoom(updated.rows[0]));
+      return res.json({ ok: true, room: safeRoom(updated.rows[0]) });
     } catch (e) {
       console.error(e);
       return res.status(500).json({ error: 'Server error' });
@@ -684,17 +710,23 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
       if (existing.rows[0]) {
         return res.status(409).json({ error: 'Leave your current room first' });
       }
+      // Бандуулсан хэрэглэгч quickmatch-аар ч орохгүй (өмнө нь зөвхөн /join шалгадаг байв — аудит 2026-10-02)
+      const banQ = await db.query('SELECT COALESCE(banned,FALSE) AS banned, ban_reason FROM users WHERE id = $1', [userId]);
+      if (banQ.rows[0]?.banned) return res.status(403).json({ error: 'banned', reason: banQ.rows[0].ban_reason || 'MapHack' });
+      // Клиентийн тоглоомын нэр ("Frozen Throne" г.м.) нийтийн Room-ын game_type-тай яг таардаггүй → WC3 төрлийг нэг гэж үзнэ
+      const isWc3 = /war3|warcraft|frozen throne|wc3|dota|lod|imba/i.test(String(game_type));
 
       const available = await db.query(`
         SELECT r.id, COUNT(rp.user_id) AS player_count
         FROM rooms r
         LEFT JOIN room_players rp ON r.id = rp.room_id
-        WHERE r.status='waiting' AND r.has_password=FALSE AND r.clan_id IS NULL AND r.game_type=$1
+        WHERE r.status='waiting' AND r.has_password=FALSE AND r.clan_id IS NULL
+          AND (r.game_type=$1 OR ($3::boolean AND COALESCE(r.kind,'room') = 'channel' AND r.game_type ILIKE '%warcraft%'))
         GROUP BY r.id
         HAVING COUNT(rp.user_id) < CASE WHEN COALESCE(r.kind,'room') = 'channel' AND NOT $2::boolean THEN COALESCE(r.visible_cap, r.max_players) ELSE r.max_players END
         ORDER BY (COALESCE(r.kind,'room') = 'channel') DESC, player_count DESC
         LIMIT 1
-      `, [game_type, await require('./channels').hasPremiumSlot(req.user)]);   // Нийтийн Room 1–20 эхэлж
+      `, [game_type, await require('./channels').hasPremiumSlot(req.user), isWc3]);   // Нийтийн Room 1–20 эхэлж
 
       if (available.rows[0]) {
         const roomId = available.rows[0].id;
@@ -702,9 +734,10 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
         const roomResult = await db.query(`
           SELECT r.id, r.name, r.host_id, u.username AS host_name,
             r.max_players, r.game_type, r.status, r.has_password, r.zerotier_network_id,
+            COALESCE(r.kind, 'room') AS kind, r.channel_no, r.visible_cap, r.ranked,
             COUNT(rp.user_id) AS player_count,
             JSON_AGG(JSON_BUILD_OBJECT('id', u2.id::text, 'name', u2.username, 'tier', u2.tierbot_tier)
-              ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL) AS members
+              ORDER BY rp.joined_at) FILTER (WHERE u2.username IS NOT NULL AND COALESCE(r.kind, 'room') <> 'channel') AS members
           FROM rooms r
           LEFT JOIN users u ON r.host_id=u.id
           LEFT JOIN room_players rp ON r.id=rp.room_id
@@ -716,6 +749,11 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
         return res.json({ joined: true, room: { ...roomResult.rows[0], members: roomResult.rows[0].members || [] } });
       }
 
+      // Хувийн өрөө үүсгэх нь GOLD/ажилтны эрх (POST /rooms-тэй ижил) — quickmatch-аар тойрдог байв (аудит 2026-10-02)
+      let mayCreate = false;
+      try { mayCreate = await require('../middleware/admin').isAdminUser(req.user); } catch {}
+      if (!mayCreate) { try { mayCreate = (await require('./membership').tierOf(userId)) === 'gold'; } catch {} }
+      if (!mayCreate) return res.status(403).json({ error: 'Сул нийтийн Room олдсонгүй. Хувийн өрөө үүсгэх нь GOLD гишүүнчлэлийн эрх.', code: 'TIER_REQUIRED', need_tier: 'gold' });
       const qname = `Quick Match #${Math.floor(Math.random() * 9000) + 1000}`;
       const result = await db.query(
         'INSERT INTO rooms (name, host_id, max_players, game_type, has_password) VALUES ($1, $2, 10, $3, FALSE) RETURNING *',
@@ -726,7 +764,7 @@ router.post('/quickmatch', strictAuth, async (req, res) => {
       emitRoomsUpdated();
       return res.status(201).json({
         joined: false,
-        room: { ...room, host_name: hostName, members: [{ id: String(userId), name: hostName }], player_count: 1 },
+        room: { ...safeRoom(room), host_name: hostName, members: [{ id: String(userId), name: hostName }], player_count: 1 },
       });
     } catch (e) {
       console.error(e);
@@ -801,5 +839,6 @@ async function isUserInRoom(userId, roomId) {
 module.exports = router;
 module.exports.setIO = setIO;
 module.exports.setRoomCleanup = setRoomCleanup;
+module.exports.setKickHook = setKickHook;
 module.exports.memRooms = memRooms;
 module.exports.isUserInRoom = isUserInRoom;

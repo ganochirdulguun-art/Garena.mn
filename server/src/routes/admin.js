@@ -156,6 +156,7 @@ router.patch('/api/users/:id', adminMW, async (req, res) => {
 
 // Хэрэглэгчийг устгах (өрөө/тоглолт/мессеж зэрэг нь ON DELETE CASCADE-аар цуг арилна).
 router.delete('/api/users/:id', adminMW, async (req, res) => {
+  if (!req.isOwner) return res.status(403).json({ error: 'Зөвхөн эзэн энэ үйлдлийг хийнэ' });   // аудит 2026-10-02: ADMIN цол өөрийгөө whitelist-д нэмэх/эзнийг устгах боломжтой байв
   const id = parseInt(req.params.id, 10);
   if (!Number.isInteger(id))
     return res.status(400).json({ error: 'Invalid id' });
@@ -320,6 +321,7 @@ router.get('/api/admins', adminMW, async (req, res) => {
 
 // Discord ID-аар шинэ админ нэмэх.
 router.post('/api/admins', adminMW, async (req, res) => {
+  if (!req.isOwner) return res.status(403).json({ error: 'Зөвхөн эзэн энэ үйлдлийг хийнэ' });   // аудит 2026-10-02: ADMIN цол өөрийгөө whitelist-д нэмэх/эзнийг устгах боломжтой байв
   const discordId = String(req.body?.discord_id || '').trim();
   const note = String(req.body?.note || '').trim().slice(0, 200);
 
@@ -349,6 +351,7 @@ router.post('/api/admins', adminMW, async (req, res) => {
 
 // Динамик админыг хасах (env үндсэн админыг хасах боломжгүй).
 router.delete('/api/admins/:discordId', adminMW, async (req, res) => {
+  if (!req.isOwner) return res.status(403).json({ error: 'Зөвхөн эзэн энэ үйлдлийг хийнэ' });   // аудит 2026-10-02: ADMIN цол өөрийгөө whitelist-д нэмэх/эзнийг устгах боломжтой байв
   const discordId = String(req.params.discordId || '').trim();
 
   if (isEnvAdmin(discordId)) {

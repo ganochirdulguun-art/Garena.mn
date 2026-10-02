@@ -86,11 +86,12 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   }
   if (ranked && blockGames >= RULES.BLOCK_SIZE) {
     if (blockWins >= RULES.BLOCK_MIN_WINS) {
+      // Зөвхөн бонусыг (30) нэмнэ — өмнө нь diamondsEarned (2+30) нэмж ranked хожлын 2💎 давхар ордог байв (аудит 2026-10-02)
       diamondsEarned += RULES.BLOCK_BONUS_DIAMONDS;
-      await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [diamondsEarned, userId]);
+      await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [RULES.BLOCK_BONUS_DIAMONDS, userId]);
       await client.query(
         `INSERT INTO diamond_transactions (user_id, amount, type, ref, note) VALUES ($1, $2, 'block_bonus', $3, $4)`,
-        [userId, diamondsEarned, ref, `${RULES.BLOCK_SIZE} тоглолтоос ${blockWins} хожил — бонус`]
+        [userId, RULES.BLOCK_BONUS_DIAMONDS, ref, `${RULES.BLOCK_SIZE} тоглолтоос ${blockWins} хожил — бонус`]
       );
     }
     await client.query('UPDATE users SET block_games = 0, block_wins = 0 WHERE id = $1', [userId]);

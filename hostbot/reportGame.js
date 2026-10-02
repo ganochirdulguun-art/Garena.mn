@@ -23,7 +23,9 @@ function buildPayload(file) {
   const r = summarizeCapture(buf);
   const primaryName = (meta.joiners && meta.primarySid != null) ? meta.joiners[String(meta.primarySid)] || null : null;
   const leaveByPid = {};
-  for (const l of r.leaves || []) if (leaveByPid[l.pid] == null) leaveByPid[l.pid] = Math.round((l.atMs || 0) / 1000);
+  // Лоббид (тоглоом эхлэхээс өмнө, atMs=0) гарсан хүний PID-г дараагийн тоглогч дахин авдаг → тэр leave-ийг ТООЦОХГҮЙ
+  // (өмнө нь тэр тоглогч left_at=0 болж худал leaver, буруу ялагч гардаг байв). Тоглоомын доторх СҮҮЛИЙН leave-ийг авна.
+  for (const l of r.leaves || []) if ((l.atMs || 0) > 0) leaveByPid[l.pid] = Math.round(l.atMs / 1000);
   const players = r.stats.players.filter((p) => p.active).map((p) => ({
     colour: p.colour, dotaId: p.dotaId, pid: p.pid, isJoiner: !!p.isJoiner,
     // capture-д joiner-ийн өөрийн нэр байдаггүй → meta (REQJOIN) нэрээр нөхнө
@@ -44,7 +46,9 @@ function buildPayload(file) {
     const act = r.stats.players.filter((p) => p.active);
     const stayed = (t) => act.filter((p) => p.team === t && (leaveByPid[p.pid] == null || leaveByPid[p.pid] >= r.gameTimeSec - 20)).length;
     const s = stayed('sentinel'), c = stayed('scourge');
-    if (s > 0 && c === 0) winner = 'sentinel'; else if (c > 0 && s === 0) winner = 'scourge';
+    // Хоёр багт хоёуланд нь тоглогч байсан үед л (эсрэг талгүй ганцаараа суугаад «хожих» боломжгүй)
+    const both = act.some((p) => p.team === 'sentinel') && act.some((p) => p.team === 'scourge');
+    if (both && s > 0 && c === 0) winner = 'sentinel'; else if (both && c > 0 && s === 0) winner = 'scourge';
     if (winner) winnerSource = 'leave';
   }
   return {

@@ -41,9 +41,11 @@ function heroInfo(code) {
 const enrichPlayers = (players) => (Array.isArray(players) ? players : []).map((p) => ({ ...p, ...heroInfo(p.hero) }));
 
 function keyOk(req) {
-  const k = String(req.headers['x-relay-key'] || '');
-  if (!REPORT_KEY || !k || k.length !== REPORT_KEY.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(k), Buffer.from(REPORT_KEY));
+  // БАЙТ уртаар харьцуулна — олон-байтын тэмдэгттэй үед timingSafeEqual throw хийдэг (аудит 2026-10-02)
+  const k = Buffer.from(String(req.headers['x-relay-key'] || ''));
+  const want = Buffer.from(REPORT_KEY);
+  if (!REPORT_KEY || !k.length || k.length !== want.length) return false;
+  return crypto.timingSafeEqual(k, want);
 }
 
 // Ирсэн payload-ыг цэвэрлэж (хэмжээ, төрөл), DB-д бичих хэлбэрт оруулна — цэвэр функц (tests/radar.test.js)

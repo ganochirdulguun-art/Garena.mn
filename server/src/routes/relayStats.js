@@ -21,9 +21,11 @@ const RANKED = {
 };
 
 function keyOk(req) {
-  const k = String(req.headers['x-relay-key'] || '');
-  if (!REPORT_KEY || !k || k.length !== REPORT_KEY.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(k), Buffer.from(REPORT_KEY));
+  // БАЙТ уртаар харьцуулна — олон-байтын тэмдэгттэй үед timingSafeEqual throw хийдэг (аудит 2026-10-02)
+  const k = Buffer.from(String(req.headers['x-relay-key'] || ''));
+  const want = Buffer.from(REPORT_KEY);
+  if (!REPORT_KEY || !k.length || k.length !== want.length) return false;
+  return crypto.timingSafeEqual(k, want);
 }
 
 const norm = (s) => String(s || '').trim().toLowerCase();
@@ -133,7 +135,7 @@ router.post('/game-stats', async (req, res) => {
   try {
     const saved = await recordGameResult({
       roomId: game.room_id, winnerTeam, durationMinutes: Math.round(Number(b.game_time_sec || 0) / 60),
-      players, source: 'relay', ranked, rankedValid: validity.valid, rankedReason: validity.reason, netReport: net,
+      players, source: 'relay', ranked, rankedValid: validity.valid, rankedReason: validity.reason, netReport: net, gameToken: token,
     });
     console.log(`[Relay] ${saved.duplicate ? 'давхардал' : 'бүртгэв'} room=${game.room_id} ranked=${ranked} valid=${saved.ranked_valid} ${saved.reason || ''}`);
     return res.json({

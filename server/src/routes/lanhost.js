@@ -94,9 +94,23 @@ function isMeshIp(ip) { const p = String(ip || '').split('.').map(Number); retur
 
 // /begin-д хостод өгсөн relay-г токеноор санана → /announce joiner-уудад ЯГ ТЭР relay-г өгнө (failover дундуур зөрөхгүй)
 const beginRelay = new Map();   // token -> { ip, port, at }
-function rememberBegin(token, r) {
-  beginRelay.set(token, { ip: r.ip, port: r.port, at: Date.now() });
+function rememberBegin(token, r, userId = null, roomId = null) {
+  beginRelay.set(token, { ip: r.ip, port: r.port, at: Date.now(), user_id: userId, room_id: roomId == null ? null : String(roomId) });
   if (beginRelay.size > 5000) { const cut = Date.now() - 6 * 3600 * 1000; for (const [k, v] of beginRelay) if (v.at < cut) beginRelay.delete(k); }
+}
+
+// Өрөөний төрөл (kind/game_type) — хэзээ ч өөрчлөгддөггүй тул санах ойд кэшлэнэ (announce бүрт DB асуухгүй)
+const _roomMeta = new Map();
+async function roomMeta(roomId) {
+  const k = String(roomId);
+  if (_roomMeta.has(k)) return _roomMeta.get(k);
+  if (!db) return null;
+  try {
+    const r = await db.query("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id = $1", [k]);
+    const v = r.rows[0] || null;
+    if (v) { _roomMeta.set(k, v); if (_roomMeta.size > 2000) _roomMeta.delete(_roomMeta.keys().next().value); }
+    return v;
+  } catch { return null; }
 }
 
 // Санах ой дахь идэвхтэй тоглоомууд: roomId -> Map<token, game>
@@ -155,7 +169,7 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
   }
   const token = crypto.randomBytes(18).toString('hex');   // санамсаргүй, таамаглах боломжгүй → зөвхөн өрөөнд тарна
   const r = shardFor(currentRelay(), token);
-  rememberBegin(token, r);
+  rememberBegin(token, r, req.user.id, roomId);
   return res.json({ game_token: token, relay_ip: r.ip, relay_port: r.port, relay_key: RELAY_KEY, capture: captureFor(token) });
 });
 
@@ -167,10 +181,37 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
   if (!game_token || !gameinfo_b64) return res.status(400).json({ error: 'game_token/gameinfo_b64 дутуу' });
   if (String(gameinfo_b64).length > 4096) return res.status(400).json({ error: 'gameinfo хэт урт' });
+  if (String(game_token).length > 64) return res.status(400).json({ error: 'game_token хэт урт' });
+  // ── Токены эзэмшил (аудит 2026-10-02): /announce нь /begin-ийн эрхийн шалгалтыг тойрч, мөн өөр өрөөнөөс бусдын токеныг
+  //    зарлаж хостын дүнг булаах боломжтой байв. Одоо: (1) токен өөр өрөөнд/өөр хостод идэвхтэй бол татгалзана,
+  //    (2) /begin-ээр олгогдсон бол яг тэр хэрэглэгч+өрөө байх ёстой, (3) сервер restart-ын дараа DB мөрөөр баталгаажуулна,
+  //    (4) нийтийн Room-д announce бүрт Moderator эрх + WC3 эсэхийг дахин шалгана.
+  const tok = String(game_token);
+  for (const [rid, mm] of roomGames.entries()) {
+    const og = mm.get(tok);
+    if (og && (String(rid) !== roomId || String(og.host_user_id) !== String(req.user.id))) return res.status(409).json({ error: 'Токен өөр хэрэглэгч/өрөөнийх' });
+  }
+  const bg = beginRelay.get(tok);
+  if (bg && bg.user_id != null && (String(bg.user_id) !== String(req.user.id) || (bg.room_id != null && bg.room_id !== roomId))) {
+    return res.status(403).json({ error: 'Токен өөр хэрэглэгч/өрөөнд олгогдсон', code: 'TOKEN_NOT_ISSUED' });
+  }
+  if (!bg && db) {
+    try {
+      const row = (await db.query('SELECT host_user_id, room_id FROM lan_games WHERE token = $1', [tok])).rows[0];
+      if (row && ((row.host_user_id != null && String(row.host_user_id) !== String(req.user.id)) || (row.room_id != null && String(row.room_id) !== roomId))) {
+        return res.status(409).json({ error: 'Токен өөр хэрэглэгч/өрөөнийх' });
+      }
+    } catch { /* DB түр алдаа — доорх эрхийн шалгалт үлдэнэ */ }
+  }
+  const meta = await roomMeta(roomId);
+  if (meta && meta.kind === 'channel') {
+    if (meta.game_type && !/warcraft|frozen throne/i.test(meta.game_type)) return res.status(400).json({ error: 'Энэ тоглоомын онлайн холболт удахгүй нээгдэнэ.', code: 'GAME_NOT_READY' });
+    if (!await require('./roles').canHostInChannel(req.user)) return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д.', code: 'MODERATOR_REQUIRED' });
+  }
   const m = gamesOf(roomId);
-  const existing = m.get(String(game_token));
+  const existing = m.get(tok);
   if (existing && String(existing.host_user_id) !== String(req.user.id)) return res.status(409).json({ error: 'Токен өөр хэрэглэгчийнх' });
-  const br = beginRelay.get(String(game_token)) || shardFor(currentRelay(), String(game_token));
+  const br = bg || shardFor(currentRelay(), tok);
   const g = existing || { token: String(game_token), host_user_id: req.user.id, relay_ip: br.ip, relay_port: br.port, created_at: Date.now() };
   g.gameinfo_b64 = String(gameinfo_b64);
   delete g.started_at;   // GAMEINFO дахин ирсэн = лобби нээлттэй (OPEN GAMES)
@@ -186,7 +227,8 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   if (db) {
     db.query(
       `INSERT INTO lan_games (token, room_id, host_user_id, host_wc3_name) VALUES ($1,$2,$3,$4)
-       ON CONFLICT (token) DO UPDATE SET host_wc3_name = EXCLUDED.host_wc3_name, host_user_id = EXCLUDED.host_user_id`,
+       ON CONFLICT (token) DO UPDATE SET host_wc3_name = EXCLUDED.host_wc3_name, host_user_id = COALESCE(lan_games.host_user_id, EXCLUDED.host_user_id)
+         WHERE lan_games.host_user_id IS NULL OR lan_games.host_user_id = EXCLUDED.host_user_id`,
       [g.token, Number(roomId), req.user.id, g.host_wc3_name]
     ).catch((e) => console.warn('[LAN] lan_games save:', e.message));
   }
@@ -227,8 +269,24 @@ router.post('/:id/lan-host/:token/join', authMW, async (req, res) => {
   if (!token) return res.status(400).json({ error: 'token дутуу' });
   if (!await inRoom(req.user.id, roomId)) return res.status(403).json({ error: 'Та энэ өрөөнд байхгүй байна' });
   const wc3 = sanitizeWc3Name((req.body || {}).wc3_name);
+  // Токен ЭНЭ өрөөний тоглоом байх ёстой; бусдын (хост эсвэл түрүүлж бүртгүүлсэн тоглогчийн) WC3 нэрийг авч дүн/💎-г нь
+  // булаахаас хамгаална — «анх бүртгүүлсэн нь ялна» (аудит 2026-10-02)
+  const lc = (v) => String(v || '').trim().toLowerCase();
+  const g = (roomGames.get(roomId) && roomGames.get(roomId).get(token)) || null;
+  if (!g) {
+    let known = false;
+    if (db) { try { const r0 = await db.query('SELECT room_id FROM lan_games WHERE token = $1', [token]); known = !!r0.rows[0] && String(r0.rows[0].room_id) === roomId; } catch {} }
+    if (!known) return res.status(404).json({ error: 'Тоглоом олдсонгүй' });
+  }
+  if (wc3 && g && g.host_wc3_name && lc(g.host_wc3_name) === lc(wc3) && String(g.host_user_id) !== String(req.user.id)) {
+    return res.status(409).json({ error: 'Энэ WC3 нэр хостынх', code: 'NAME_TAKEN' });
+  }
   if (db) {
     try {
+      if (wc3) {
+        const taken = await db.query('SELECT 1 FROM lan_game_players WHERE token = $1 AND LOWER(wc3_name) = LOWER($2) AND user_id <> $3 LIMIT 1', [token, wc3, req.user.id]);
+        if (taken.rows[0]) return res.status(409).json({ error: 'Энэ WC3 нэр өөр тоглогчид бүртгэлтэй', code: 'NAME_TAKEN' });
+      }
       await db.query('INSERT INTO lan_games (token, room_id) VALUES ($1,$2) ON CONFLICT (token) DO NOTHING', [token, Number(roomId)]);
       await db.query(
         `INSERT INTO lan_game_players (token, user_id, wc3_name) VALUES ($1,$2,$3)
