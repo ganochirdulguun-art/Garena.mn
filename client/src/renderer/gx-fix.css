@@ -177,26 +177,3 @@ body.gx .ymdm-input:focus, body.gx .dm-popup-input:focus { border-color: rgba(25
 #portable-bar { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 9500; display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 8px 10px 8px 14px; border-radius: 10px; background: #b91c1c; color: #fff; font: 600 13px var(--gx-font, sans-serif); box-shadow: 0 6px 20px rgba(0,0,0,.3); }
 #portable-bar b { font-weight: 800; }
 #portable-bar button { flex: none; height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: #fff; color: #b91c1c; font: 800 12.5px var(--gx-font, sans-serif); cursor: pointer; }
-
-/* ── Цайвар горимын дэвсгэр (2026-10-03, эзэн): цагаан талбай нүд гялбуулдаг байсан → чулуун сийлбэртэй саарал дэвсгэр
-   (covers/bg-light.jpg: хээгүй чулуун гадаргуу; үүсгэгч client/dev/bg-draft-gen.py → bg-texture.svg). Бараан горимд хамаарахгүй.
-   Картууд бага зэрэг тунгалаг (зөвхөн #gx-content дотор — цонх/цэс/popup цул хэвээр). ── */
-html:not([data-gx-theme="dark"]) body.gx .gx-main { background: #bec2c8 url('covers/bg-light.jpg') center / cover no-repeat; }   /* хээгүй жигд чулуун гадаргуу (2026-10-03: эзэн зураг/хээг хасуулсан) */
-html:not([data-gx-theme="dark"]) body.gx #gx-content { background: transparent !important; }
-html:not([data-gx-theme="dark"]) body.gx .gx-top { background: rgba(236,238,241,.92); }
-html:not([data-gx-theme="dark"]) body.gx #gx-content {
-  --gx-bg: #bec2c8; --gx-surface: rgba(248,248,246,.86); --gx-surface-2: rgba(238,240,243,.80); --gx-surface-3: rgba(222,226,232,.85);
-  --gx-text-2: #2b3140; --gx-text-3: #454c5c;
-}
-/* агуулга доторх дэлгэгддэг жагсаалт/цэс тунгалаг биш */
-html:not([data-gx-theme="dark"]) body.gx #gx-content :is(.mention-dropdown, .invite-friends-dropdown, .dia-search-results, [class*="dropdown"], [class*="-menu"], [class*="popover"], .gx-ctx) {
-  --gx-surface: #f8f8f6; --gx-surface-2: #eef0f3; --gx-surface-3: #dee2e8;
-}
-/* дэвсгэр дээр шууд суух бичвэр (гарчиг, тайлбар, таб) тод уншигдана */
-html:not([data-gx-theme="dark"]) body.gx #gx-content :is(h1, h2, h3, .gx-sub, .gx-subtabs button, .gxch-head, .gxch-total, .gx-page-head p) { text-shadow: 0 1px 0 rgba(255,255,255,.75), 0 0 10px rgba(236,238,242,.9); }
-html:not([data-gx-theme="dark"]) body.gx #gx-content :is(.gx-sub, .gx-page-head p) { color: #2b3140 !important; font-weight: 500; }
-html:not([data-gx-theme="dark"]) body.gx #gx-content .gx-subtabs button:not(.on):not(.active) { color: #2b3140 !important; }
-/* бараан дэвсгэртэй хэсгүүд доторх гарчгуудад гэрэлтэлт хэрэггүй */
-html:not([data-gx-theme="dark"]) body.gx #gx-content :is(.gxcl, .rk-guide, .gxw-hero, .gx-banner, [class*="hero"]) :is(h1, h2, h3) { text-shadow: none; }
-/* баруун талын нарийн самбар ч цагаан биш — дээд мөртэй ижил зөөлөн саарал */
-html:not([data-gx-theme="dark"]) body.gx .gx-rail { background: #e3e6ea; }
