@@ -126,7 +126,7 @@
       const lh = $('btn-lan-host');
       return lh && !lh.classList.contains('hidden') ? [lh, 'Тоглоом эхлүүлэх'] : [null, 'Тоглоом нээлттэй'];
     }
-    const j = document.querySelector('#lan-games-list [data-join]:not(.joined)');
+    const j = document.querySelector('#lan-games-list [data-join]:not(.joined):not([data-started])');   // эхэлсэн тоглоомд START нэгдүүлэхгүй
     if (j) return [j, 'Нэгдэх'];
     if (document.querySelector('#lan-games-list .joined')) return [null, 'WC3-д нээгдсэн'];
     // Нийтийн Room: тоглоом алга, эрхгүй бол «Moderator авах» (зарлалын самбарын товч)

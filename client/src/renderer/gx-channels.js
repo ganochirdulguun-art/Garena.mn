@@ -114,6 +114,7 @@
     { id: 'q3', title: 'Quake III Arena', short: 'Quake III', ico: 'Q3', emoji: '⚡', net: 'Сервер' },
     { id: 'ra2', title: 'Red Alert 2', short: 'Red Alert 2', ico: 'RA', emoji: '🪖', net: 'LAN' },
   ];
+  const myRoomId = () => String(window.gxRoom?.roomId || (typeof currentRoom !== 'undefined' && currentRoom?.id) || '');
   function chFavs() { try { return new Set(JSON.parse(localStorage.getItem('gx_ch_favs') || '[]')); } catch { return new Set(); } }
   function mainMode() {
     document.addEventListener('click', (e) => {
@@ -134,7 +135,7 @@
       },
       gameSectionHTML(g, channels) {
         if (!channels.length) return '';
-        const mine = String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '');
+        const mine = myRoomId();
         const favs = chFavs();
         const total = channels.reduce((a, c) => a + Number(c.player_count || 0), 0);
         const rankedN = channels.filter((c) => c.ranked).length;
@@ -162,7 +163,7 @@
       const b = e.target.closest('[data-ch-join]'); if (!b) return;
       e.stopPropagation();
       const r = (roomsCache || {})[b.dataset.chJoin]; if (!r) return;
-      if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(r.id)) { enterRoom(String(r.id), r.name, r.game_type, false, ''); return; }
+      if (myRoomId() === String(r.id)) { showTab('roomview'); return; }
       channelJoin(r);
     });
     // 🏆 Ranked товч (Ranked таб): Ranked Room 1–5-аас багтаамжтай, хамгийн олон хүнтэйг сонгоно
@@ -173,10 +174,18 @@
       const cap = (r) => Number(r.visible_cap || 200);
       const free = list.filter((r) => Number(r.player_count || 0) < cap(r));
       const pick = (free.length ? free : list).sort((a, b) => Number(b.player_count || 0) - Number(a.player_count || 0) || Number(a.channel_no) - Number(b.channel_no))[0];
-      if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(pick.id)) { enterRoom(String(pick.id), pick.name, pick.game_type, false, ''); return; }
+      if (myRoomId() === String(pick.id)) { showTab('roomview'); return; }
       channelJoin(pick);
     };
+    // Өрөө солихын өмнө: LAN тоглолт/relay идэвхтэй бол анхааруулна — нэг товшилтоор явагдаж буй тоглолт тасардаг байв (аудит 2026-10-02)
+    async function switchGuard(targetId) {
+      const cur = myRoomId(); if (!cur || cur === String(targetId)) return true;
+      let busy = false; try { busy = !!(await window.api.isRelayRunning?.()); } catch {}
+      if (!busy) return true;
+      return !!(await showConfirm('⚠ Тоглолт явагдаж байна', 'Өөр Room руу шилжвэл одоогийн LAN тоглолтын холболт ТАСАРНА (хост бол бүх тоглогч сална).\n\nҮргэлжлүүлэх үү?'));
+    }
     async function channelJoin(r) {
+      if (!await switchGuard(r.id)) return;
       try { await window.api.joinRoom(String(r.id), null); enterRoom(String(r.id), r.name, r.game_type, false, ''); }
       catch (err) {
         const m = errMsg(err);
@@ -185,6 +194,8 @@
       }
     }
 
+    // «⚡ Хурдан» = хамгийн идэвхтэй нийтийн WC3 Room руу (өмнө нь GOLD-гүй хүнд хувийн «Quick Match» өрөө үүсгэдэг байв)
+    $('btn-quickmatch')?.addEventListener('click', (e) => { e.stopImmediatePropagation(); e.preventDefault(); window.gxJoinPublic('wc3'); }, true);
     // Өөрийн өрөө үүсгэх — зөвхөн GOLD (эзэн/админ чөлөөтэй)
     const createBtn = $('btn-create-room');
     createBtn?.addEventListener('click', async (e) => {
@@ -201,7 +212,7 @@
       if (!list.length) { showTab('lobby'); return; }
       const free = list.filter((r) => Number(r.player_count || 0) < Number(r.visible_cap || 200));
       const r = (free.length ? free : list).sort((a, b) => Number(b.player_count || 0) - Number(a.player_count || 0) || Number(a.channel_no) - Number(b.channel_no))[0];
-      if (String((typeof currentRoom !== 'undefined' && currentRoom?.id) || '') === String(r.id)) { enterRoom(String(r.id), r.name, r.game_type, false, ''); return; }
+      if (myRoomId() === String(r.id)) { showTab('roomview'); return; }
       channelJoin(r);
     };
 
@@ -341,7 +352,7 @@
       } else if (curTab === 'mods') {
         const r = await api('get', '/roles/moderators');
         body.innerHTML = r.moderators.length ? `<div class="gxo-table gxo-mods"><div class="gxo-tr gxo-th"><span>Moderator</span><span>Олгосон</span><span>Хэзээ</span><span></span></div>
-          ${r.moderators.map((m) => `<div class="gxo-tr"><span><b>${esc(m.username)}</b> ${m.tier ? `<span class="gxo-tier">${esc(m.tier)}</span>` : ''}</span><span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span><button type="button" class="btn btn-sm" data-gxo-act="revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Эрх хасах</button></span></div>`).join('')}</div>`
+          ${r.moderators.map((m) => `<div class="gxo-tr"><span><b>${esc(m.username)}</b> ${m.role === 'admin' ? '<span class="mod-badge admin">ADMIN</span>' : ''} ${m.tier ? `<span class="gxo-tier">${esc(m.tier)}</span>` : ''}</span><span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span>${m.role === 'admin' ? '<small class="gxo-muted">нэр дээр баруун товч</small>' : `<button type="button" class="btn btn-sm" data-gxo-act="revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Эрх хасах</button>`}</span></div>`).join('')}</div>`
           : '<div class="gx-empty"><b>Moderator алга</b><span>«Гишүүдийн идэвх»-ээс хамгийн идэвхтэй тоглогчдод олгоно уу.</span></div>';
       } else if (curTab === 'kicks') {
         const r = await api('get', '/roles/kicks');

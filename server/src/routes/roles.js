@@ -59,6 +59,11 @@ async function sweepAutoApprove() {
   return r.rows.length;
 }
 
+// Цол хураасныг role_requests-д 'revoked' мөрөөр тэмдэглэнэ (автомат батлалт тойрохоос хамгаална)
+async function markRevoked(userId, byId) {
+  try { await db.query("INSERT INTO role_requests (user_id, role, note, status, decided_by, decided_at) VALUES ($1, 'moderator', '', 'revoked', $2, NOW())", [userId, byId]); } catch (e) { console.error('[roles] markRevoked', e.message); }
+}
+
 async function ensureTables() {
   if (!await dbOk()) return;
   try {
@@ -179,7 +184,9 @@ router.post('/request', auth, async (req, res) => {
       `INSERT INTO role_requests (user_id, role, note) VALUES ($1, 'moderator', $2)
        ON CONFLICT (user_id, role) WHERE status = 'pending' DO NOTHING RETURNING id, created_at`, [req.user.id, note]);
     if (!r.rows[0]) return res.status(409).json({ error: 'Таны хүсэлт аль хэдийн хүлээгдэж байна' });
-    if (await autoActive()) {
+    // Сүүлийн 30 хоногт татгалзсан/хураагдсан хүнийг автоматаар батлахгүй — эзэн/админ гараар шийднэ (аудит 2026-10-02)
+    const prior = await db.query("SELECT 1 FROM role_requests WHERE user_id = $1 AND status IN ('rejected','revoked') AND COALESCE(decided_at, created_at) > NOW() - INTERVAL '30 days' LIMIT 1", [req.user.id]);
+    if (!prior.rows[0] && await autoActive()) {
       await approveRequest({ id: r.rows[0].id, user_id: req.user.id, role: 'moderator' }, null, AUTO_NOTE);
       notifyStaff({ type: 'role_auto', id: r.rows[0].id, username: req.user.username, note, pending_count: await pendingCount() });
       return res.json({ ok: true, id: r.rows[0].id, auto: true, approved: true });
@@ -210,6 +217,10 @@ async function decide(req, res, approve) {
     const r = await db.query("SELECT id, user_id, role FROM role_requests WHERE id = $1 AND status = 'pending'", [req.params.id]);
     const rq = r.rows[0]; if (!rq) return res.status(404).json({ error: 'Хүсэлт олдсонгүй эсвэл аль хэдийн шийдэгдсэн' });
     const note = String(req.body?.note || '').trim().slice(0, NOTE_MAX);
+    if (approve) {
+      const bq = await db.query('SELECT COALESCE(banned,FALSE) AS banned FROM users WHERE id = $1', [rq.user_id]);
+      if (bq.rows[0]?.banned) return res.status(400).json({ error: 'Бандуулсан хэрэглэгчийг батлах боломжгүй' });
+    }
     await db.query(`UPDATE role_requests SET status = $2, decided_by = $3, decided_at = NOW(), decision_note = $4 WHERE id = $1`,
       [rq.id, approve ? 'approved' : 'rejected', req.user.id, note]);
     if (approve) {
@@ -298,6 +309,8 @@ router.post('/grant/:userId', auth, staffOnly, async (req, res) => {
     if (!u.rows[0]) return res.status(404).json({ error: 'Хэрэглэгч олдсонгүй' });
     if (u.rows[0].banned) return res.status(400).json({ error: 'Бандуулсан хэрэглэгч' });
     if (adminMW.isOwnerUser(u.rows[0]) || ((await roleOf(uid)) === 'admin' && !adminMW.isOwnerUser(req.user))) return res.status(403).json({ error: 'ADMIN/эзний цолд зөвхөн эзэн хүрнэ' });
+    // ADMIN цолтой хүнд «Moderator өгөх» дарахад чимээгүй буурдаг байв (аудит 2026-10-02) — цолыг нэр дээр баруун товчоор өөрчилнө
+    if ((await roleOf(uid)) === 'admin') return res.status(409).json({ error: 'Энэ хэрэглэгч ADMIN цолтой (Moderator эрхийг багтаасан). Цолыг өөрчлөх бол нэр дээр баруун товч дарна уу.' });
     await db.query(`INSERT INTO platform_roles (user_id, role, granted_by) VALUES ($1, 'moderator', $2)
       ON CONFLICT (user_id) DO UPDATE SET role = 'moderator', granted_by = EXCLUDED.granted_by, granted_at = NOW()`, [uid, req.user.id]);
     await db.query(`UPDATE role_requests SET status = 'approved', decided_by = $2, decided_at = NOW() WHERE user_id = $1 AND status = 'pending'`, [uid, req.user.id]);
@@ -371,6 +384,7 @@ router.delete('/moderators/:userId', auth, staffOnly, async (req, res) => {
     const r = await db.query('DELETE FROM platform_roles WHERE user_id = $1 RETURNING role', [req.params.userId]);
     if (!r.rows[0]) return res.status(404).json({ error: 'Олдсонгүй' });
     cacheRole(req.params.userId, null);
+    await markRevoked(req.params.userId, req.user.id);
     if (_io) _io.to(`user:${req.params.userId}`).emit('role:decided', { role: r.rows[0].role, approved: false, revoked: true });
     return res.json({ ok: true });
   } catch (e) { console.error('[roles] revoke', e.message); return res.status(500).json({ error: 'Server error' }); }

@@ -187,6 +187,19 @@ async function connectSocket() {
     auth: { token, portable: window._gxPortable === true },   // portable бол сервер «Setup суулга» мэдэгдэнэ
   });
 
+  // Өрөөний гишүүнчлэл серверт алдагдсан (сүнс цэвэрлэгээ/grace дууссан) үед чат чимээгүй хаягддаг «үхсэн өрөө» болдог байв
+  // (аудит 2026-10-02) → HTTP-ээр дахин нэгдээд socket-оо сэргээнэ; болохгүй бол хэрэглэгчид хэлнэ.
+  let _roomErrRetry = 0;
+  socket.on('room:error', async ({ roomId } = {}) => {
+    if (!currentRoom || String(roomId) !== String(currentRoom.id)) return;
+    if (_roomErrRetry++ < 2) {
+      try { await window.api.joinRoom(String(currentRoom.id), null); socket.emit('room:join', { roomId: currentRoom.id }); appendSysMsg('🔄 Өрөөний холболт сэргээгдлээ.'); return; } catch {}
+    }
+    appendSysMsg('⚠ Өрөөний гишүүнчлэл дууссан байна — өрөөнөөс гараад дахин орно уу.');
+    try { showToast('Өрөөний холболт тасарсан — гараад дахин орно уу', 'warning', 8000); } catch {}
+  });
+  try { window.api.onGameLaunchError?.(({ message } = {}) => { showToast(message || 'Тоглоом нээгдсэнгүй', 'error', 8000); }); } catch {}
+
   socket.on('connect', () => {
     console.log('Socket холбогдлоо');
     updateConnectionStatus('online');
@@ -482,6 +495,7 @@ async function connectSocket() {
       // PLAYER: host хаасан үед killGame() → game:exited гарна, давхардуулахгүй
       if (_hostKilledGame) { _hostKilledGame = false; return; }
       if (socket) socket.emit('room:game_ended_player', { roomId: currentRoom.id });
+      if (currentRoom.kind === 'channel') { appendSysMsg('⏹ WC3 хаагдлаа. Дахин тоглох бол OPEN GAMES-ээс тоглоом сонгож «Нэгдэх» дарна уу.'); return; }
       appendSysMsg('⚠ WC3 хаагдлаа. Дахин нэвтрэхийн тулд доорх товчийг дарна уу.');
       setLaunchBtnRejoin();
       showToast('WC3 хаагдлаа — "↩ Дахин нэвтрэх" дарж буцаж орно уу', 'warning', 8000);
@@ -1009,8 +1023,8 @@ document.getElementById('btn-open-friends-window')?.addEventListener('click', ()
 async function loadRooms() {
   const waiting = document.getElementById('rooms-waiting');
   const playing = document.getElementById('rooms-playing');
-  waiting.innerHTML = renderRoomsSkeleton();
-  playing.innerHTML = '';
+  // Skeleton зөвхөн анхны ачаалалд — rooms:updated бүрт жагсаалт арчигдаж анивчдаг, scroll дээш үсэрдэг байв (аудит 2026-10-02)
+  if (!Object.keys(roomsCache || {}).length) { waiting.innerHTML = renderRoomsSkeleton(); playing.innerHTML = ''; }
   try {
     const rooms = await window.api.getRooms();
     roomsCache = {};
@@ -1019,7 +1033,7 @@ async function loadRooms() {
     renderFilteredRooms();
     _roomsRetry = 0;
   } catch {
-    waiting.innerHTML = '<p class="empty-text">Серверт холбогдож чадсангүй — автоматаар дахин оролдож байна…</p>';
+    if (!Object.keys(roomsCache || {}).length) waiting.innerHTML = '<p class="empty-text">Серверт холбогдож чадсангүй — автоматаар дахин оролдож байна…</p>';
     // Сервер түр унасан бол 10, 20, … 60с-ийн дараа өөрөө дахин ачаална (апп дахин асаах шаардлагагүй)
     clearTimeout(_roomsRetryTimer);
     _roomsRetryTimer = setTimeout(() => { if (currentUser) loadRooms(); }, Math.min(++_roomsRetry, 6) * 10000);
@@ -1880,8 +1894,9 @@ function appendMessage({ userId, username, text, time, replyTo, quiet }) {
       });
     });
   }
+  const stick = isMe || quiet || chatStick(box);
   box.appendChild(div);
-  box.scrollTop = box.scrollHeight;
+  if (stick) box.scrollTop = box.scrollHeight;
 }
 
 function appendSysMsg(text) {
@@ -1893,6 +1908,9 @@ function appendSysMsg(text) {
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
 }
+
+// Чатын автомат гүйлгэлт: хэрэглэгч дээш гүйлгэж түүх уншиж байвал шинэ мессеж хүчээр доош татахгүй (аудит 2026-10-02)
+function chatStick(box) { return !box || (box.scrollHeight - box.scrollTop - box.clientHeight) < 140; }
 
 // ── Өрөөний чатын байнгын түүх (2026-10-02) ──
 // Сервер DB-ээс сүүлийн 200-г өгнө. Дахин холбогдоход давхардуулахгүй; «таныг байхгүй үед» хуваагч;
@@ -3536,7 +3554,7 @@ async function loadGameHistory(userId, page) {
       return `<tr>
         <td>${date}</td>
         <td>${g.game_type || '—'}</td>
-        <td>${g.room_name || '—'}</td>
+        <td>${escHtml(g.room_name || '—')}</td>
         <td>${g.team}</td>
         <td>${result}</td>
         <td>${duration}</td>
@@ -3767,7 +3785,7 @@ document.getElementById('btn-setup-firewall')?.addEventListener('click', async (
   if (statusEl) statusEl.textContent = 'Windows UAC зөвшөөрөл асууж байна...';
   try {
     const result = await window.api.setupFirewall();
-    if (result.firewall && result.metric) {
+    if (result && result.firewall) {
       showToast('Firewall + сүлжээ амжилттай тохируулагдлаа!', 'success', 5000);
       localStorage.setItem('firewall_configured', '1');
       if (statusEl) statusEl.textContent = 'Амжилттай тохируулагдлаа';
@@ -3897,7 +3915,7 @@ function showGameResult(data) {
     const race = raceEmoji[p.race] || '';
     const matched = p.user_id ? '✓' : '';
     return `<div class="result-player ${isWinner ? 'winner' : 'loser'}">
-      <span class="result-player-name">${race} ${p.name} ${matched}</span>
+      <span class="result-player-name">${race} ${escHtml(p.name)} ${matched}</span>
       ${p.apm ? `<span class="result-player-apm">${p.apm} APM</span>` : ''}
     </div>`;
   }).join('');
@@ -5667,7 +5685,7 @@ init();
     box.innerHTML = list.map((g) => `
       <div class="lan-game-row" data-token="${g.game_token}">
         <span class="lan-game-info">🎮 <b>${esc(g.host_wc3_name || g.host_username || 'Тоглогч')}</b>-ийн тоглоом</span>
-        <button class="lan-join-btn ${joinedToken === g.game_token ? 'joined' : ''}" data-join="${g.game_token}">${joinedToken === g.game_token ? '✓ WC3-д нээгдсэн' : 'Нэгдэх'}</button>
+        <button class="lan-join-btn ${joinedToken === g.game_token ? 'joined' : ''}" data-join="${g.game_token}"${g.started_at ? ' data-started="1"' : ''}>${joinedToken === g.game_token ? '✓ WC3-д нээгдсэн' : 'Нэгдэх'}</button>
       </div>`).join('');
     box.querySelectorAll('[data-join]').forEach((b) => b.addEventListener('click', () => joinGame(b.getAttribute('data-join'))));
   }
@@ -5699,6 +5717,13 @@ init();
   // GAMEINFO баригдмагц серверт зарлана (announce) → room:lan_lobby зөвхөн өрөөнд
   window.api.onLanGameInfo?.(async ({ gameinfo_b64 } = {}) => {
     if (!hosting?.token || !gameinfo_b64) return;
+    // Тоглолт 5+ мин явсны дараа ШИНЭ лобби (WC3 хаалгүй дахин Create Game) → шинэ токен: тоглолт бүр тусдаа дүн/capture.
+    // (5 мин босго: лоббийн богино завсарлагыг «эхэлсэн» гэж андуурсан тохиолдолд joiner-уудыг салгахгүй.)
+    if (hosting.startedAt && Date.now() - hosting.startedAt > 5 * 60 * 1000 && !hosting.rotating) {
+      hosting.rotating = true;
+      try { await stopHosting(); await startHosting(); } catch {}
+      return;
+    }
     try {
       const wc3Name = await getWc3Name();
       await api('post', `/rooms/${currentRoom.id}/lan-host/announce`, { game_token: hosting.token, gameinfo_b64, host_wc3_name: wc3Name || undefined, direct: hosting.direct || undefined });
@@ -5714,6 +5739,7 @@ init();
       await window.api.launchGame(currentRoom?.gameType || '');
       await window.api.startLanJoin({ relayIp: g.relay_ip, relayPort: g.relay_port, game: g.game_token, gameInfoB64: g.gameinfo_b64, endpoints: g.endpoints || null });
       joinedToken = token; renderGames();
+      try { if (typeof socket !== 'undefined' && socket) socket.emit('room:game_started'); } catch {}   // AFK жагсаалтад «🎮 тоглож буй»
       // Алхам 3: WC3 нэрээ серверт бүртгүүлнэ → relay-ийн дүн (K/D/A, 💎) нэрээр ЯГ таарна
       try { const wc3Name = await getWc3Name(); await api('post', `/rooms/${currentRoom.id}/lan-host/${token}/join`, { wc3_name: wc3Name || '' }); } catch {}
       appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}»-ийн тоглоомд нэгдэж байна — WC3 → Local Area Network → тоглоомоо сонгож ор.`);
@@ -5769,7 +5795,18 @@ init();
   }
 
   // Хостын WC3 лобби хаагдсан (тоглоом эхэлсэн) → серверт мэдэгдэж STARTED GAMES руу шилжүүлнэ
-  window.api.onLanStarted?.(() => { const t = hosting?.token; if (t && currentRoom?.id) api('post', `/rooms/${currentRoom.id}/lan-host/${t}/started`).catch(() => {}); });
+  window.api.onLanStarted?.(() => {
+    const t = hosting?.token; if (!t || !currentRoom?.id) return;
+    hosting.startedAt = Date.now();
+    api('post', `/rooms/${currentRoom.id}/lan-host/${t}/started`).catch(() => {});
+    try { if (typeof socket !== 'undefined' && socket) socket.emit('room:game_started'); } catch {}   // AFK жагсаалтад «🎮 тоглож буй»
+  });
+  // ТОГЛОЛТ ДУУССАН (WC3 хаагдсан) — аудит 2026-10-02: нийтийн Room-д hosting зогсдоггүй байсан тул дүн/XP/💎 хост Room-оос гарах
+  // хүртэл илгээгддэггүй, STARTED GAMES-д дууссан тоглоом үлддэг, дараагийн тоглолт нэг токен/capture-д нийлдэг байв.
+  window.api.onGameExited?.(() => {
+    if (hosting) { stopHosting(); appendSysMsg('⏹ Тоглолт дууслаа — дүн бүртгэгдэж байна. Дахин тоглох бол «LAN нээх» дарна уу.'); }
+    else if (joinedToken) { joinedToken = null; window.api.stopLanJoin?.().catch(() => {}); renderGames(); }
+  });
   // gx-rgc.js (RGC маягийн өрөө) уншина: бүх тоглоом, нэгдэх, төлөв
   window.gxLan = { games, join: (t) => joinGame(t), get hosting() { return hosting; }, get joined() { return joinedToken; } };
   el('btn-lan-host')?.addEventListener('click', startHosting);

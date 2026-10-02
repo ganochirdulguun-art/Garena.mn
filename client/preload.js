@@ -64,6 +64,8 @@ contextBridge.exposeInMainWorld('api', {
   startHostRelay:  (playerIps) => ipcRenderer.invoke('relay:startHost', playerIps),
   startGameFinder: (hostIp)    => ipcRenderer.invoke('relay:startFinder', hostIp),
   stopRelay:       ()          => ipcRenderer.invoke('relay:stop'),
+  isRelayRunning:  ()          => ipcRenderer.invoke('relay:running'),
+  onGameLaunchError: (cb)      => ipcRenderer.on('game:launch_error', (_, d) => cb(d)),
   addRelayPlayer:  (ip)        => ipcRenderer.invoke('relay:addHostPlayer', ip),
   startBotBridge:  (opts)      => ipcRenderer.invoke('relay:startBotBridge', opts),
   stopBotBridge:   ()          => ipcRenderer.invoke('relay:stopBotBridge'),

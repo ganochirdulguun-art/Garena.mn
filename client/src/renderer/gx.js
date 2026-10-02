@@ -210,12 +210,14 @@
   function syncCurrentRoom() {
     const card = $('gx-cur-room'); if (!card || !currentUser) return;
     const myId = String(currentUser.id);
-    const r = Object.values(roomsCache || {}).find((x) => String(x.host_id) === myId || (x.members || []).some((m) => String(m.id) === myId));
+    // Нийтийн Room-д members агрегатлагддаггүй, host_id NULL → шигтгэсэн өрөөний id-аар эхэлж хайна (ногоон «одоогийн өрөө» карт)
+    const r = (roomsCache || {})[String(window.gxRoom?.roomId || '')]
+      || Object.values(roomsCache || {}).find((x) => String(x.host_id) === myId || (x.members || []).some((m) => String(m.id) === myId));
     card.classList.toggle('hidden', !r);
     if (!r) return;
     $('gx-cur-room-name').textContent = r.name || 'Өрөө';
-    $('gx-cur-room-meta').textContent = `${r.player_count || 0}/${r.max_players || 10} тоглогч${r.status === 'playing' ? ' · тоглож буй' : ''}`;
-    card.onclick = () => enterRoom(r.id, r.name, r.game_type, String(r.host_id) === myId, r.host_id, r.status);
+    $('gx-cur-room-meta').textContent = `${r.player_count || 0}/${(r.kind === 'channel' ? r.visible_cap : r.max_players) || 10} тоглогч${r.status === 'playing' ? ' · тоглож буй' : ''}`;
+    card.onclick = () => { if (String(window.gxRoom?.roomId || '') === String(r.id)) showTab('roomview'); else enterRoom(r.id, r.name, r.game_type, String(r.host_id) === myId, r.host_id, r.status); };
   }
 
   // ── 9. Тоглоомууд таб ──

@@ -101,7 +101,12 @@
     else if (a === 'ladder') post('tab', { tab: 'ranking' });
     else if (a === 'shop') post('tab', { tab: 'premium' });
     else if (a === 'start') {
-      if (isWc3) $('gxr-start')?.click();
+      // START: сонгосон НЭЭЛТТЭЙ тоглоом байвал түүнд нэгдэнэ (жагсаалтын эхний/эхэлсэн тоглоом биш) — аудит 2026-10-02
+      const lan = window.gxLan; const sg = selected && lan?.games.get(selected);
+      const myId = String((typeof currentUser !== 'undefined' && currentUser?.id) || '');
+      if (isWc3 && sg && sg.started_at && String(sg.host_user_id) !== myId) { try { showToast('Энэ тоглоом аль хэдийн эхэлсэн — OPEN GAMES-ээс нээлттэй тоглоом сонгоно уу', 'info', 4000); } catch {} }
+      else if (isWc3 && sg && !sg.started_at && String(sg.host_user_id) !== myId && lan.joined !== selected) lan.join(selected);
+      else if (isWc3) $('gxr-start')?.click();
       else { try { showToast(`⏳ ${gameLabel}-ын онлайн холболт удахгүй нээгдэнэ`, 'info', 4000); } catch {} }
     }
   });
@@ -181,7 +186,8 @@
   function onGameClick(e, join) {
     const r = e.target.closest('.rgc-g[data-tok]'); if (!r) return;
     selected = r.dataset.tok; renderGames();
-    if (join) signAction();
+    // 2 товшилт = ЗӨВХӨН нэгдэх (өөрийн тоглоомоо зогсоох / LAN нээх гэх мэт бусад үйлдэл санамсаргүй ажилладаг байв)
+    if (join && signState()[0] === 'join') signAction();
   }
   ['rgc-open', 'rgc-started'].forEach((id) => {
     $(id).addEventListener('click', (e) => onGameClick(e, false));

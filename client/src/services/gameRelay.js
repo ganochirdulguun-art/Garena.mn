@@ -62,6 +62,16 @@ function _localBindIp() {
   return c.length ? c[0].address : null;
 }
 // LAN IP + түүний дэд сүлжээний broadcast хаяг (жинхэнэ LAN хост шиг GAMEINFO цацахад)
+// Холбогдсон тал нь ЭНЭ машин мөн эсэх: loopback эсвэл өөрийн аль нэг интерфэйсийн IPv4 (WC3 нь GAMEINFO-ийн эх IP = LAN IP руу холбогддог)
+function _isLocalPeer(addr) {
+  const a = String(addr || '').replace(/^::ffff:/, '');
+  if (!a || a === '::1' || a.startsWith('127.')) return true;
+  try {
+    for (const list of Object.values(os.networkInterfaces())) for (const i of list || []) if (i && i.address === a) return true;
+  } catch { return true; }   // интерфэйс уншиж чадахгүй бол хуучин зан (хаахгүй)
+  return false;
+}
+
 function _localBindInfo() {
   const c = _candidateIps();
   if (!c.length) return null;
@@ -530,6 +540,10 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoi
 
   // TCP proxy: WC3 бүрийн холболтыг relay руу (joiner handshake урдаа) дамжуулна.
   state.server = net.createServer((client) => {
+    // ӨРӨӨ ХООРОНДЫН ТУСГААРЛАЛТ (аудит 2026-10-02): GAMEINFO-г LAN broadcast-аар цацдаг тул нэг кафе/LAN дотор өөр PC-ийн
+    // WC3-д энэ тоглоом харагдаж, тэр хүн манай proxy-оор (өөр өрөөний тоглоомд) нэгдэх боломжтой байв. Proxy нь зөвхөн
+    // ЭНЭ машины WC3-ийн холболтыг (loopback эсвэл өөрийн интерфэйсийн IP) хүлээн авна — гаднын PC-г татгалзана.
+    if (!_isLocalPeer(client.remoteAddress)) { bblog(`LAN join: гаднын PC-ийн холболтыг татгалзав (${client.remoteAddress})`); try { client.destroy(); } catch {} return; }
     state.conns.add(client);
     client.setNoDelay(true);
     client.pause();   // handshake илгээх хүртэл WC3-ийн байтыг түр саатуулна

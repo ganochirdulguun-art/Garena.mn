@@ -644,6 +644,12 @@ io.on('connection', (socket) => {
     const username = socket.user.username;
     const userId   = String(socket.user.id);
     if (!await ensureRoomMembership(socket, roomId)) return;
+    // Ижил socket ижил өрөөнд ДАХИН room:join илгээвэл (клиент анх ороход 2 удаа илгээдэг) «X нэгдлээ» + дуу давхар
+    // гардаг байв (аудит 2026-10-02) → зөвхөн гишүүдийн жагсаалтыг дахин өгөөд буцна
+    if (String(socket.data.roomId || '') === String(roomId) && roomMembers[roomId]?.has(username)) {
+      socket.emit('room:members', membersArray(roomId));
+      return;
+    }
 
     // ── Хуучин өрөөнөөс бүрэн гарах (room isolation) ──
     const prevRoom = socket.data.roomId;

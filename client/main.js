@@ -571,7 +571,7 @@ ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, pas
 ipcMain.handle('rooms:join', async (event, roomId, password) => {
   try {
     const result = await apiService.joinRoom(roomId, password);
-    try { replayService.startWatcher(roomId); } catch {}
+    try { if ((result?.room?.kind || 'room') !== 'channel') replayService.startWatcher(roomId); else replayService.stopWatcher(); } catch {}
     return result;
   } catch (err) { throw apiError(err); }
 });
@@ -1200,6 +1200,8 @@ ipcMain.handle('relay:stop', () => {
   gameRelayService.stopAll();
   return true;
 });
+// Идэвхтэй LAN relay (хост/joiner) байгаа эсэх — өрөө солихын өмнө анхааруулахад
+ipcMain.handle('relay:running', () => { try { return !!gameRelayService.isRunning(); } catch { return false; } });
 ipcMain.handle('relay:startBotBridge', (_, opts) => gameRelayService.startBotBridge(opts || {}));
 ipcMain.handle('relay:stopBotBridge', () => { gameRelayService.stopBotBridge(); return true; });
 ipcMain.handle('relay:updateBotBridge', (_, opts) => gameRelayService.updateBotBridge(opts || {}));
@@ -1346,7 +1348,19 @@ ipcMain.handle('game:launch', async (_, gameType) => {
 
   ensureAutosaveReplay();   // тоглолт бүрийн replay хадгалагдахыг баталгаажуулна
 
-  const game = games.find(g => g.name === gameType) || games[0];
+  // Нэр яг таарахгүй бол тоглоомын ТӨРЛӨӨР (wc3/cs16/q3/ra2) олно — өмнө нь games[0]-ийг ажиллуулдаг байсан тул 2+ тоглоом
+  // бүртгэсэн хүнд WC3 Room-д өөр exe нээгддэг байв (аудит 2026-10-02)
+  const kindOfGame = (v) => { const h = String(v || '').toLowerCase();
+    if (/war3|warcraft|frozen throne|wc3|dota|imba/.test(h)) return 'wc3';
+    if (/cstrike|counter[-\s]?strike|hl\.exe/.test(h)) return 'cs16';
+    if (/quake|ioquake3|quake3/.test(h)) return 'q3';
+    if (/red alert|ra2|gamemd|yuri/.test(h)) return 'ra2';
+    return null; };
+  const wantKind = kindOfGame(gameType);
+  const game = games.find(g => g.name === gameType)
+    || (wantKind && games.find(g => kindOfGame(`${g.name} ${g.path}`) === wantKind))
+    || (wantKind ? null : games[0]);
+  if (!game) throw new Error('Энэ өрөөний тоглоом тохируулагдаагүй байна — Тохиргоо → Тоглоом хэсэгт exe-ээ нэмнэ үү');
   if (!fs.existsSync(game.path)) {
     throw new Error(`"${game.name}" файл олдсонгүй: ${game.path}`);
   }
@@ -1356,6 +1370,16 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
   _gameProc = proc;
+  // «Run as administrator» тохиргоотой exe → spawn EACCES 'error' (exit ирэхгүй). Listener-гүй бол main процесст
+  // uncaught exception цонх гардаг байв (аудит 2026-10-02) → ShellExecute (UAC)-ээр нээж, war3.exe-ийн гаралтыг хянана.
+  proc.once('error', (e) => {
+    console.error('[Game] spawn алдаа:', e.message);
+    if (_gameProc === proc) _gameProc = null;
+    shell.openPath(game.path).then((err) => {
+      if (err) broadcastToWindows('game:launch_error', { message: `Тоглоом нээгдсэнгүй: ${err}` });
+      else { try { watchWar3Exit(); } catch {} }
+    }).catch(() => {});
+  });
   const launchedAt = Date.now();
   startMaphackWatch();   // тоглолтын дундуур maphack асаасныг барих
 
