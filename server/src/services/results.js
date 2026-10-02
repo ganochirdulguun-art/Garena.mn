@@ -44,10 +44,20 @@ async function recordGameResult({
   const used = new Set();
   const take = (id) => { if (id == null || used.has(String(id))) return null; used.add(String(id)); return id; };
 
+  // Relay-ийн user_id хост/lan_game_players-аас ирдэг (найдвартай). Урт тоглолтын дараа тоглогч өрөөнөөс гарсан эсвэл
+  // нийтийн Room-ын сүнс-цэвэрлэгээнд хасагдсан байж болно (2026-10-02 Room 1: 3ц40м тоглолтын дүн 3 удаа «player-not-in-room»
+  // гэж хаягдсан) → relay эхээс ирсэн бол users-ээс баталгаажуулж тоолно; бусад эх (гар/бот) хуучнаараа чанга.
+  const extraIds = source === 'relay'
+    ? players.map((p) => p.user_id).filter((id) => id !== undefined && id !== null && id !== '' && !members.some((x) => String(x.id) === String(id)))
+    : [];
+  const extraUsers = extraIds.length
+    ? (await db.query('SELECT id, username, discord_id, wc3_name FROM users WHERE id = ANY($1::int[])', [extraIds.map(Number).filter(Number.isInteger)])).rows
+    : [];
+
   const resolved = players.map((p) => {
     let userId = null;
     if (p.user_id !== undefined && p.user_id !== null && p.user_id !== '') {
-      const m = members.find((x) => String(x.id) === String(p.user_id));
+      const m = members.find((x) => String(x.id) === String(p.user_id)) || extraUsers.find((x) => String(x.id) === String(p.user_id));
       if (!m) throw new Error(`player-not-in-room:${p.user_id}`);
       userId = m.id;
     } else if (p.discord_id) {

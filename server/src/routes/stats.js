@@ -215,6 +215,7 @@ router.get('/player/:discord_id', async (req, res) => {
 // Тоглогчийн статистик — user_id-гаар
 router.get('/player/id/:userId', async (req, res) => {
   const { userId } = req.params;
+  if (!/^\d+$/.test(String(userId))) return res.status(400).json({ error: 'Буруу хэрэглэгчийн ID' });   // хуучин клиент "null" илгээдэг (2026-10-02)
   if (await dbAvailable()) {
     try {
       const result = await db.query(
@@ -248,6 +249,7 @@ router.get('/player/id/:userId', async (req, res) => {
 // Тоглоомын түүх
 router.get('/history/:userId', async (req, res) => {
   const { userId } = req.params;
+  if (!/^\d+$/.test(String(userId))) return res.status(400).json({ error: 'Буруу хэрэглэгчийн ID' });
   const page  = Math.max(1, parseInt(req.query.page) || 1);
   const limit = 20;
   const offset = (page - 1) * limit;

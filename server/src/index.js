@@ -267,7 +267,15 @@ async function sweepChannelGhosts() {
   if (!dbForMigration || !channelIds.size) return;
   try {
     const r = await dbForMigration.query('SELECT room_id, user_id FROM room_players WHERE room_id = ANY($1::int[])', [[...channelIds].map(Number)]);
+    // Тоглож буй хүнийг (идэвхтэй LAN тоглоомын хост/joiner) хэзээ ч сүнс гэж хасахгүй — WC3 тоглох үед апп-ын socket
+    // тасарч болно; хасвал тоглолтын дүн «player-not-in-room» болж алдагдана (2026-10-02 Room 1)
+    const playing = lanHostRoutes.activeHostIds();
+    const toks = lanHostRoutes.activeTokens();
+    if (toks.length) {
+      try { (await dbForMigration.query('SELECT DISTINCT user_id FROM lan_game_players WHERE token = ANY($1::text[])', [toks])).rows.forEach((x) => playing.add(String(x.user_id))); } catch {}
+    }
     const ghosts = r.rows.filter((x) => {
+      if (playing.has(String(x.user_id))) return false;   // тоглолтод байна
       const t = disconnectTimers[String(x.user_id)];
       if (t && String(t.roomId) === String(x.room_id)) return false;   // grace хүлээлтэд байна
       return !userHasLiveSocketInRoom(x.user_id, x.room_id);

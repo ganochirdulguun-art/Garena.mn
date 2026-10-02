@@ -262,6 +262,10 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
   return res.json({ relay_configured: relayConfigured(), games: m ? [...m.values()].map(gamePublic) : [] });
 });
 
+// Идэвхтэй тоглоомын токенууд / хостууд — нийтийн Room-ын сүнс-цэвэрлэгээ тоглож буй хүнийг хасахгүйн тулд (2026-10-02)
+function activeTokens() { const out = []; for (const m of roomGames.values()) for (const t of m.keys()) out.push(t); return out; }
+function activeHostIds() { const out = new Set(); for (const m of roomGames.values()) for (const g of m.values()) out.add(String(g.host_user_id)); return out; }
+
 // Өрөөний идэвхтэй LAN тоглоомын тоо — лоббийн жагсаалтын «🎮 N тоглолт» (санах ой, DB асуулгагүй)
 function gameCounts(roomId) {
   const m = roomGames.get(String(roomId)); if (!m || !m.size) return null;
@@ -269,4 +273,4 @@ function gameCounts(roomId) {
   return { open, started };
 }
 
-module.exports = { router, setIO, gameCounts, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
+module.exports = { router, setIO, gameCounts, activeTokens, activeHostIds, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
