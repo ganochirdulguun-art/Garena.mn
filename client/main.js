@@ -556,7 +556,14 @@ ipcMain.handle('api:request', async (_event, { method, path: urlPath, body } = {
   if (!allowed.includes(String(method || '').toLowerCase()) || badPath) {
     throw new Error('Буруу хүсэлт');
   }
-  try { return await apiService.request(method, urlPath, body); } catch (err) { throw apiError(err); }
+  try {
+    const data = await apiService.request(method, urlPath, body);
+    // Нэр солиход сервер шинэ JWT буцаана — хадгалахгүй бол хуучин нэртэй токеноор үргэлжилнэ
+    if (urlPath === '/auth/username' && data && data.token) {
+      try { authService.saveToken(data.token, { ...(authService.getUser() || {}), username: data.username, custom_username: !!data.custom_username }); } catch {}
+    }
+    return data;
+  } catch (err) { throw apiError(err); }
 });
 
 ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, password, description, game_mode, background_url, ranked, clan_id }) => {

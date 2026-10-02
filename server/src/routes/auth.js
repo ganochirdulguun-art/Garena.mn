@@ -13,6 +13,19 @@ try { db = require('../config/db'); } catch { db = null; }
 const allowInMemoryFallback = process.env.NODE_ENV !== 'production';
 const router = express.Router();
 
+// Эзэн өөрийн нэрийг чөлөөтэй солино (2026-10-03): users.custom_username = TRUE бол Discord нэвтрэлт / Tier sync нэрийг
+// буцааж дарахгүй. Tier, Discord role нь discord_id-аар таардаг тул нэр солигдсон ч хэвээр танигдана.
+let _customNameCol = null;
+function ensureCustomNameColumn() {
+  if (!db) return Promise.reject(new Error('no-db'));
+  if (!_customNameCol) {
+    _customNameCol = db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_username BOOLEAN DEFAULT FALSE')
+      .catch((e) => { _customNameCol = null; throw e; });
+  }
+  return _customNameCol;
+}
+const OWNER_NAME_MAX = 32;
+
 async function dbOk() {
   if (!db) return false;
   try {
@@ -273,10 +286,12 @@ router.get('/discord/callback', async (req, res) => {
           const result = await db.query('SELECT * FROM users WHERE id = $1', [linkUserId]);
           userRow = result.rows[0];
         } else {
+          // custom_username (эзний өөрөө сольсон нэр) бол Discord нэрээр дарж бичихгүй
+          const keepCustom = await ensureCustomNameColumn().then(() => true, () => false);
           const result = await db.query(
             `INSERT INTO users (discord_id, username, discord_username, avatar_url)
              VALUES ($1, $2, $2, $3)
-             ON CONFLICT (discord_id) DO UPDATE SET username = $2, discord_username = $2, avatar_url = $3
+             ON CONFLICT (discord_id) DO UPDATE SET username = ${keepCustom ? 'CASE WHEN COALESCE(users.custom_username, FALSE) THEN users.username ELSE $2 END' : '$2'}, discord_username = $2, avatar_url = $3
              RETURNING *, (xmax = 0) AS is_new`,
             [discordId, discordName, avatarUrl]
           );
@@ -495,19 +510,28 @@ router.post('/reset-password', async (req, res) => {
 });
 
 router.put('/username', authMW, async (req, res) => {
-  const { username } = req.body;
-  if (!username || username.trim().length < 2 || username.trim().length > 20) {
-    return res.status(400).json({ error: 'Username must be 2-20 characters' });
+  const isOwner = require('../middleware/admin').isOwnerUser(req.user);
+  const max = isOwner ? OWNER_NAME_MAX : 20;
+  // хяналтын тэмдэгт арилгаж, олон зайг нэг болгоно
+  const clean = String(req.body?.username || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, '').replace(/\s+/g, ' ').trim();
+  if (clean.length < 2 || clean.length > max) {
+    return res.status(400).json({ error: isOwner ? `Нэр 2–${max} тэмдэгт байна` : 'Username must be 2-20 characters' });
   }
 
-  const clean = username.trim();
   if (await dbOk()) {
     try {
       const current = await db.query('SELECT discord_id FROM users WHERE id = $1', [req.user.id]);
-      if (current.rows[0]?.discord_id) {
+      if (current.rows[0]?.discord_id && !isOwner) {
         return res.status(400).json({ error: 'Discord nickname-ийг апп дотор засах боломжгүй' });
       }
 
+      if (isOwner) {
+        // Эзэн: Discord холбоотой ч сольж болно; дараагийн Discord нэвтрэлт / Tier sync нэрийг буцааж дарахгүй
+        await ensureCustomNameColumn();
+        await db.query('UPDATE users SET username = $1, custom_username = TRUE WHERE id = $2', [clean, req.user.id]);
+        console.log(`[Auth] эзэн нэрээ солив: #${req.user.id} «${req.user.username}» → «${clean}»`);
+        return res.json({ ok: true, token: makeJWT({ ...req.user, username: clean }), username: clean, custom_username: true });
+      }
       await db.query('UPDATE users SET username = $1 WHERE id = $2', [clean, req.user.id]);
       return res.json({ ok: true, token: makeJWT({ ...req.user, username: clean }), username: clean });
     } catch (e) {
@@ -517,7 +541,7 @@ router.put('/username', authMW, async (req, res) => {
 
   if (!allowInMemoryFallback) return requireOperationalDb(res);
   const user = memFindById(req.user.id);
-  if (user?.discord_id) {
+  if (user?.discord_id && !isOwner) {
     return res.status(400).json({ error: 'Discord nickname-ийг апп дотор засах боломжгүй' });
   }
   if (user) user.username = clean;
@@ -561,6 +585,8 @@ router.get('/me', authMW, async (req, res) => {
           block_games: row.block_games || 0, block_wins: row.block_wins || 0,
           play_seconds_total: row.play_seconds_total || 0, play_next_diamond_sec: require('../services/playtime').secToNextDiamond(row.play_seconds_total || 0),
           is_owner: isOwner, is_admin: isAdmin, unlimited_diamonds: isOwner,
+          // эзэн нэрээ өөрөө сольсон эсэх — клиент Discord нэрийн оронд username-ийг харуулна
+          custom_username: isOwner ? await db.query('SELECT COALESCE(custom_username, FALSE) AS c FROM users WHERE id = $1', [req.user.id]).then((r) => !!r.rows[0]?.c, () => false) : false,
           banner_ver: await require('./banner').bannerVer(req.user.id),
         });
       }

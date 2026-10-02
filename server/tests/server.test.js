@@ -219,6 +219,44 @@ async function testDiscordLinkedUsernameIsReadOnly() {
   }
 }
 
+// Эзэн Discord холбоотой ч нэрээ чөлөөтэй солино: custom_username = TRUE, шинэ JWT-д шинэ нэр, discord_id хэвээр (Tier таних түлхүүр)
+async function testOwnerCanRenameDespiteDiscord() {
+  const sqls = [];
+  const mockDb = {
+    query: async (sql, params = []) => {
+      const s = sql.replace(/\s+/g, ' ').trim();
+      sqls.push([s, params]);
+      if (s === 'SELECT 1') return { rows: [{ '?column?': 1 }] };
+      if (s.startsWith('SELECT discord_id FROM users WHERE id')) return { rows: [{ discord_id: '999' }] };
+      return { rows: [], rowCount: 0 };
+    },
+  };
+  const server = await startServer({ ADMIN_DISCORD_IDS: '999' }, { mockDb });
+  try {
+    const token = makeAuthToken({ id: 1, username: 'OldOwner', discord_id: '999' });
+    const put = (username) => fetch(`${server.baseUrl}/auth/username`, {
+      method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ username }),
+    });
+    let res = await put('  Вито   Андолини Корлеон  ');
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.username, 'Вито Андолини Корлеон');   // 21 тэмдэгт — эзэнд 32 хүртэл
+    assert.equal(body.custom_username, true);
+    const payload = JSON.parse(Buffer.from(body.token.split('.')[1], 'base64').toString());
+    assert.equal(payload.username, 'Вито Андолини Корлеон');
+    assert.equal(payload.discord_id, '999');
+    const upd = sqls.find(([q]) => q.startsWith('UPDATE users SET username = $1, custom_username = TRUE'));
+    assert.ok(upd, 'custom_username = TRUE тавигдана');
+    assert.deepEqual(upd[1], ['Вито Андолини Корлеон', 1]);
+    res = await put('x'.repeat(33));
+    assert.equal(res.status, 400);
+    res = await put(' ');
+    assert.equal(res.status, 400);
+  } finally {
+    await server.stop();
+  }
+}
+
 async function testAuthMeReturnsDiscordUsername() {
   const mockDb = {
     query: async (sql) => {
@@ -1242,6 +1280,7 @@ async function testBotAdminOverview() {
 (async () => {
   await runTest('server smoke flow supports register/login/me and guarded auth endpoints', testSmokeFlow);
   await runTest('Discord-linked usernames are read-only in-app', testDiscordLinkedUsernameIsReadOnly);
+  await runTest('owner can rename freely even when Discord-linked (custom_username)', testOwnerCanRenameDespiteDiscord);
   await runTest('auth/me returns the stored Discord nickname', testAuthMeReturnsDiscordUsername);
   await runTest('admin can edit and delete platform users', testAdminUserEditDelete);
   await runTest('warkey users can be banned, listed, blocked, and restored', testWarkeyBanRestore);

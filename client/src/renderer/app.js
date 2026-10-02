@@ -811,6 +811,7 @@ function setUpdateMsg(msg, type) {
 
 function userDisplayName(user) {
   const base = String(
+    (user?.custom_username && user?.username) ||   // эзэн нэрээ өөрөө сольсон бол Discord нэрээс түрүүлнэ
     user?.discord_username ||
     user?.discord_display_name ||
     user?.discord_global_name ||
@@ -3493,6 +3494,30 @@ function getRank(wins) {
   return              { name: 'Bronze',   css: 'rank-bronze' };
 }
 
+// Эзэн нэрээ солих (профайл дээрх ✎) — Tier/Discord холбоо discord_id-аар тул нэр солигдсон ч хэвээр
+document.getElementById('btn-edit-username')?.addEventListener('click', async () => {
+  if (!currentUser?.is_owner || typeof window.gxPrompt !== 'function') return;
+  const cur = (currentUser.custom_username && currentUser.username) || currentUser.discord_username || currentUser.username || '';
+  const name = await window.gxPrompt('✎ Нэрээ солих', 'Шинэ нэр (2–32 тэмдэгт). Tier болон Discord холбоо хэвээр үлдэнэ.', cur, { okText: 'Хадгалах' });
+  if (name == null) return;
+  const clean = String(name).replace(/\s+/g, ' ').trim();
+  if (clean.length < 2 || clean.length > 32) { showToast('Нэр 2–32 тэмдэгт байна', 'warning'); return; }
+  if (clean === cur) return;
+  try {
+    const r = await window.api.request('put', '/auth/username', { username: clean });
+    currentUser = { ...currentUser, username: r.username || clean, custom_username: true };
+    setUserUI(currentUser);
+    document.getElementById('profile-name').textContent = userDisplayName(currentUser);
+    document.getElementById('profile-name-source')?.classList.add('hidden');
+    // Чат/онлайн жагсаалтад шинэ нэрээр гарахын тулд socket-ийг шинэ токеноор дахин холбоно
+    try {
+      const tok = await window.api.getToken();
+      if (socket && tok) { socket.auth = { ...(socket.auth || {}), token: tok }; socket.disconnect().connect(); }
+    } catch {}
+    showToast(`✓ Нэр «${clean}» боллоо. Өрөөнд байгаа бол гараад дахин орход шинэ нэрээр харагдана.`, 'success', 7000);
+  } catch (e) { showToast(`Нэр солиход алдаа: ${ipcErr(e)}`, 'error', 6000); }
+});
+
 async function loadProfile() {
   try {
     await window.api.refreshUser?.();
@@ -3507,7 +3532,8 @@ async function loadProfile() {
     const nameSourceEl = document.getElementById('profile-name-source');
     const nameNoteEl   = document.getElementById('profile-name-note');
     const hasDiscord   = Boolean(user.discord_id);
-    nameSourceEl?.classList.toggle('hidden', !hasDiscord);
+    nameSourceEl?.classList.toggle('hidden', !hasDiscord || !!user.custom_username);
+    document.getElementById('btn-edit-username')?.classList.toggle('hidden', !user.is_owner);
     nameNoteEl?.classList.add('hidden');
     const avatarEl = document.getElementById('profile-avatar');
     if (user.avatar_url) {

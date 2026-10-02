@@ -44,7 +44,8 @@ async function ensureTierBotColumns() {
       ADD COLUMN IF NOT EXISTS tierbot_rank INTEGER,
       ADD COLUMN IF NOT EXISTS tierbot_synced_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS platform_wins INTEGER DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS platform_losses INTEGER DEFAULT 0;
+      ADD COLUMN IF NOT EXISTS platform_losses INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS custom_username BOOLEAN DEFAULT FALSE;
 
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_id ON users(tierbot_id);
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_rating ON users(tierbot_rating DESC);
@@ -169,7 +170,7 @@ async function upsertTierBotPlayer(player, opts = {}) {
   if (existing) {
     await db.query(
       `UPDATE users
-       SET username = $1,
+       SET username = CASE WHEN COALESCE(custom_username, FALSE) THEN username ELSE $1 END,
            discord_id = COALESCE($2, discord_id),
            wins = $3,
            losses = $4,
