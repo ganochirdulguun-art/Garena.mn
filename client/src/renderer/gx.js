@@ -214,10 +214,14 @@
     const r = (roomsCache || {})[String(window.gxRoom?.roomId || '')]
       || Object.values(roomsCache || {}).find((x) => String(x.host_id) === myId || (x.members || []).some((m) => String(m.id) === myId));
     card.classList.toggle('hidden', !r);
+    const navBtn = $('gx-nav-myroom');   // зүүн цэсний «Миний өрөө» (2026-10-03, эзэн: өрөө рүүгээ буцах цэс)
+    navBtn?.classList.toggle('hidden', !r);
     if (!r) return;
     $('gx-cur-room-name').textContent = r.name || 'Өрөө';
-    $('gx-cur-room-meta').textContent = `${r.player_count || 0}/${(r.kind === 'channel' ? r.visible_cap : r.max_players) || 10} тоглогч${r.status === 'playing' ? ' · тоглож буй' : ''}`;
-    card.onclick = () => { if (String(window.gxRoom?.roomId || '') === String(r.id)) showTab('roomview'); else enterRoom(r.id, r.name, r.game_type, String(r.host_id) === myId, r.host_id, r.status); };
+    $('gx-cur-room-meta').textContent = `${r.player_count || 0}/${(r.kind === 'channel' ? r.visible_cap : r.max_players) || 10} тоглогч${r.status === 'playing' ? ' · тоглож буй' : ''} · дарж буцна`;
+    const back = () => { if (String(window.gxRoom?.roomId || '') === String(r.id)) showTab('roomview'); else enterRoom(r.id, r.name, r.game_type, String(r.host_id) === myId, r.host_id, r.status); };
+    card.onclick = back;
+    if (navBtn) { navBtn.title = `${r.name || 'Өрөө'} рүү буцах`; navBtn.onclick = (e) => { e.stopImmediatePropagation(); e.preventDefault(); back(); }; }
   }
 
   // ── 9. Тоглоомууд таб ──
