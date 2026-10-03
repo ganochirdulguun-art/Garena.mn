@@ -321,6 +321,7 @@ router.get('/:id/lan-host', authMW, async (req, res) => {
 });
 
 // Идэвхтэй тоглоомын токенууд / хостууд — нийтийн Room-ын сүнс-цэвэрлэгээ тоглож буй хүнийг хасахгүйн тулд (2026-10-02)
+function gamesIn(roomId) { const m = roomGames.get(String(roomId)); return m ? [...m.values()] : []; }
 function activeTokens() { const out = []; for (const m of roomGames.values()) for (const t of m.keys()) out.push(t); return out; }
 function activeHostIds() { const out = new Set(); for (const m of roomGames.values()) for (const g of m.values()) out.add(String(g.host_user_id)); return out; }
 
@@ -331,4 +332,4 @@ function gameCounts(roomId) {
   return { open, started };
 }
 
-module.exports = { router, setIO, gameCounts, activeTokens, activeHostIds, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
+module.exports = { router, setIO, gameCounts, gamesIn, activeTokens, activeHostIds, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };

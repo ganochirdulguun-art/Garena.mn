@@ -393,6 +393,16 @@ async function resolveReply(reply, roomId) {
   } catch { return null; }
 }
 
+// Өрөөний бүх хүнд системийн мессеж (!rank/!ping хариу г.м.) — түүхэнд ч хадгална
+function postRoomSystem(roomId, text) {
+  const msg = { userId: 0, username: 'Garena.mn', text: String(text).slice(0, 500), time: new Date().toISOString(), system: true };
+  if (!roomMessages[roomId]) roomMessages[roomId] = [];
+  roomMessages[roomId].push(msg);
+  if (roomMessages[roomId].length > 100) roomMessages[roomId].shift();
+  io.to(String(roomId)).emit('chat:message', msg);
+  try { require('./routes/roomChat').save(roomId, msg); } catch {}
+}
+
 // ── Socket.io — Чат & өрөөний event ─────────────────────
 // roomId → Map<username, userId>
 const roomMembers = {};
@@ -802,6 +812,22 @@ io.on('connection', (socket) => {
     if (roomMessages[roomId].length > 100) roomMessages[roomId].shift();
     io.to(String(roomId)).emit('chat:message', msg);
     require('./routes/roomChat').save(roomId, msg);   // байнгын түүх (await хийхгүй — чат саатахгүй)
+    // !rank / !ping (2026-10-03): хариу бүх хүнд системийн мессежээр
+    if (text.trim().startsWith('!')) {
+      const rttOf = (uid) => {
+        let best = null;
+        for (const s of io.sockets.sockets.values()) {
+          if (String(s.user?.id) !== String(uid) || String(s.data.roomId || '') !== String(roomId)) continue;
+          const d = s.data;
+          if (d.relayRttAt && Date.now() - d.relayRttAt < 60000) return d.relayRtt;
+          if (d.probeRttAt && Date.now() - d.probeRttAt < 60000 && best == null) best = d.probeRtt;
+        }
+        return best;
+      };
+      require('./routes/chatCommands').handle({ userId: socket.user.id, text, db: dbForMigration, games: lanHostRoutes.gamesIn(roomId), rttOf })
+        .then((reply) => { if (reply) postRoomSystem(roomId, reply); })
+        .catch((e) => console.warn('[chat cmd]', e.message));
+    }
   });
 
   // Өмнөх чатыг дээш гүйлгэхэд ачаална (зөвхөн тухайн өрөөний гишүүн)
@@ -893,7 +919,8 @@ io.on('connection', (socket) => {
   });
   socket.on('net:report', ({ rtt, avg, loss } = {}) => {
     const roomId = socket.data.roomId;
-    if (!roomId || evThrottled(socket, 'net', 4000)) return;   // клиент 8с тутам илгээдэг — io.emit үерлүүлэхээс хамгаална
+    if (!roomId || evThrottled(socket, 'net', 4000)) return;
+    if (rtt != null && Number.isFinite(Number(rtt))) { socket.data.probeRtt = Math.round(Number(rtt)); socket.data.probeRttAt = Date.now(); }   // !ping (relay RTT байхгүй үед)   // клиент 8с тутам илгээдэг — io.emit үерлүүлэхээс хамгаална
     // 2026-09-06: relay-ийн kernel RTT (POST /relay/rtt) сүүлийн 30 с-д ирсэн бол клиентийн probe-ийг ҮЛ ТООНО —
     // probe нь PC ачаалал/стрим орж 120–160 мс харагдаж "гацаж байна" гэсэн буруу сэтгэгдэл төрүүлдэг байсан.
     if (socket.data.relayRttAt && Date.now() - socket.data.relayRttAt < 30000) return;
