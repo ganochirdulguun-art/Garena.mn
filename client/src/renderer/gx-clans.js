@@ -293,7 +293,9 @@
         try {
           const n = window.gxNotif; const cn = d?.clan_name ? `«${d.clan_name}»` : 'Клан';
           if (n && d) {
-            if (d.request) n.push({ type: 'clan', icon: '🛡', clanId: d.clan_id, text: `${d.from_username || 'Хэн нэгэн'} ${cn} кланд элсэх хүсэлт илгээлээ`, sub: d.message || '', btn: 'Харах' });
+            if (d.invite) { n.refreshInvites?.(); toast(`🛡 ${d.by_username || 'Хэн нэгэн'} таныг ${cn} кланд урилаа — 🔔 мэдэгдлээс хариулна`, 'info', 6000); }
+            else if (d.invite_answer) n.push({ type: d.invite_answer === 'accepted' ? 'clan' : 'info', icon: d.invite_answer === 'accepted' ? '🤝' : '✖', clanId: d.clan_id, text: `${d.from_username || 'Хэрэглэгч'} ${cn} кланы урилгыг ${d.invite_answer === 'accepted' ? 'хүлээн авлаа' : 'татгалзлаа'}`, btn: 'Нээх' });
+            else if (d.request) n.push({ type: 'clan', icon: '🛡', clanId: d.clan_id, text: `${d.from_username || 'Хэн нэгэн'} ${cn} кланд элсэх хүсэлт илгээлээ`, sub: d.message || '', btn: 'Харах' });
             else if (d.accepted) n.push({ type: 'clan', icon: '🎉', clanId: d.clan_id, text: `${cn} кланд элсэх хүсэлт тань батлагдлаа`, sub: d.by_username ? `Баталсан: ${d.by_username}` : '', btn: 'Нээх' });
             else if (d.declined) { n.push({ type: 'info', icon: '✖', text: `${cn} кланд элсэх хүсэлт тань татгалзагдлаа` }); toast(`${cn} кланд элсэх хүсэлт тань татгалзагдлаа`, 'warning'); }
             else if (d.added) { n.push({ type: 'clan', icon: '🛡', clanId: d.clan_id, text: `Таныг ${cn} кланд нэмлээ`, sub: d.by_username ? `Нэмсэн: ${d.by_username}` : '', btn: 'Нээх' }); toast(`Таныг ${cn} кланд нэмлээ`, 'success'); }

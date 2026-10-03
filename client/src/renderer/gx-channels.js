@@ -65,23 +65,39 @@
     document.addEventListener('click', (e) => { if (box && !e.target.closest('#gxu-ctx')) hide(); });
     window.addEventListener('blur', hide);
     document.addEventListener('scroll', hide, true);
+    // Миний удирддаг кланууд (Lord/админ) — «Кланд урих» (2026-10-03, эзэн); 60с кэш
+    let myClans = null, myClansAt = 0;
+    async function managedClans() {
+      if (myClans && Date.now() - myClansAt < 60000) return myClans;
+      try { const r = await api('get', '/clans/mine'); myClans = (r?.clans || []).filter((c) => c.role === 'lord' || c.role === 'admin'); }
+      catch { myClans = myClans || []; }
+      myClansAt = Date.now(); return myClans;
+    }
+    setTimeout(() => { managedClans().catch(() => {}); }, 2500);
     document.addEventListener('contextmenu', async (e) => {
       const el = e.target.closest('[data-user-id]');
-      if (!el || !(me?.global_staff ?? me?.staff)) return;   // цол өгөх цэс — зөвхөн эзэн/глобал админ (Room-ын ADMIN биш)
+      if (!el) return;
       const uid = String(el.dataset.userId || '');
       if (!uid || uid === String((typeof currentUser !== 'undefined' && currentUser?.id) || '')) return;
+      const staff = !!(me?.global_staff ?? me?.staff);   // цол өгөх хэсэг — зөвхөн эзэн/глобал админ (Room-ын ADMIN биш)
+      const clans = myClans || [];
+      if (!staff && !clans.length) { managedClans().catch(() => {}); return; }   // энгийн хэрэглэгч → браузерийн цэс хэвээр
       e.preventDefault(); e.stopPropagation();
       if (!box) { box = document.createElement('div'); box.id = 'gxu-ctx'; box.className = 'gx-ctx hidden'; document.body.appendChild(box); box.addEventListener('click', onPick); }
       box.innerHTML = '<div class="gxu-h">Ачааллаж байна…</div>';
       place(e);
-      let u; try { u = await api('get', `/roles/user/${uid}`); } catch (err) { box.innerHTML = `<div class="gxu-h">${esc(errMsg(err))}</div>`; return; }
-      const roleLbl = { owner: '👑 Эзэн', admin: `🛡 ADMIN${u.room_name ? ' · ' + esc(u.room_name) : u.room_id ? ' · Room #' + u.room_id : ' · бүх Room'}`, moderator: '⭐ Moderator' }[u.role] || 'Энгийн гишүүн';
-      const item = (act, label, cls = '') => `<button type="button" class="gx-ctx-i ${cls}" data-gxu="${act}" data-uid="${u.id}" data-name="${esc(u.username)}">${label}</button>`;
+      const nameGuess = (el.textContent || '').trim().replace(/\s*\(Та\)$/, '').slice(0, 40);
+      let u = { id: uid, username: nameGuess || `#${uid}` };
+      if (staff) { try { u = await api('get', `/roles/user/${uid}`); } catch (err) { box.innerHTML = `<div class="gxu-h">${esc(errMsg(err))}</div>`; return; } }
+      const roleLbl = staff ? ({ owner: '👑 Эзэн', admin: `🛡 ADMIN${u.room_name ? ' · ' + esc(u.room_name) : u.room_id ? ' · Room #' + u.room_id : ' · бүх Room'}`, moderator: '⭐ Moderator' }[u.role] || 'Энгийн гишүүн') : '';
+      const item = (act, label, cls = '', extra = '') => `<button type="button" class="gx-ctx-i ${cls}" data-gxu="${act}" data-uid="${u.id}" data-name="${esc(u.username)}" ${extra}>${label}</button>`;
+      const clanItems = (await managedClans()).map((c) => item('clan-invite', `🛡 ${c.tag ? `[${esc(c.tag)}] ` : ''}${esc(c.name)} кланд урих`, '', `data-clan="${esc(c.id)}" data-clan-name="${esc(c.name)}"`));
       box.innerHTML = [
         `<div class="gxu-h"><b>${esc(u.username)}</b><span>${roleLbl}</span></div>`,
-        u.can_set_admin ? (u.role === 'admin' ? item('unset', '🛡 ADMIN цол хураах', 'danger') : item('admin', '🛡 ADMIN цол өгөх', 'accent')) : '',
-        u.can_set_mod && u.role !== 'admin' ? (u.role === 'moderator' ? item('unset', '⭐ Moderator хураах', 'danger') : item('moderator', '⭐ Moderator өгөх', 'accent')) : '',
-        !u.can_set_admin && !u.can_set_mod ? '<div class="gxu-h gxo-muted">Энэ хэрэглэгчийн цолыг өөрчлөх эрхгүй</div>' : '',
+        staff && u.can_set_admin ? (u.role === 'admin' ? item('unset', '🛡 ADMIN цол хураах', 'danger') : item('admin', '🛡 ADMIN цол өгөх', 'accent')) : '',
+        staff && u.can_set_mod && u.role !== 'admin' ? (u.role === 'moderator' ? item('unset', '⭐ Moderator хураах', 'danger') : item('moderator', '⭐ Moderator өгөх', 'accent')) : '',
+        staff && !u.can_set_admin && !u.can_set_mod ? '<div class="gxu-h gxo-muted">Энэ хэрэглэгчийн цолыг өөрчлөх эрхгүй</div>' : '',
+        clanItems.length ? `${staff ? '<hr>' : ''}${clanItems.join('')}` : '',
         '<hr>', item('profile', '👤 Профайл харах'),
       ].join('');
       place(e);
@@ -97,6 +113,11 @@
       hide();
       const act = b.dataset.gxu, uid = b.dataset.uid, name = b.dataset.name;
       if (act === 'profile') { try { openUserProfile(uid); } catch {} return; }
+      if (act === 'clan-invite') {
+        try { const r = await api('post', `/clans/${b.dataset.clan}/invite`, { user_id: uid }); toast(`🛡 ${r.username || name}-г «${r.clan_name || b.dataset.clanName}» кланд урилаа`, 'success'); }
+        catch (err) { toast(errMsg(err), 'error'); }
+        return;
+      }
       const role = act === 'unset' ? null : act;
       // ADMIN цол зөвхөн нэг Room-д: өрөөн дотроос бол энэ Room-д; лоббиос бол эзний самбар «ADMIN-ууд»-аас Room сонгож олгоно
       let roomId = null, roomName = '';

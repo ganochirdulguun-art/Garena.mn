@@ -44,9 +44,15 @@
     return nameCache.get(uid) || '';
   }
   function requests() { try { return (pendingRequests || []).slice(); } catch { return []; } }
+  // Кланы урилга — серверт хадгалагдана (офлайн байхад ирсэн ч харагдана)
+  let clanInvites = [];
+  async function refreshInvites() {
+    try { const r = await window.api.request('get', '/clans/invites'); if (Array.isArray(r?.invites)) clanInvites = r.invites; } catch { /* хуучин сервер / сүлжээ — өмнөх жагсаалт хэвээр */ }
+    badge(); if (open) render();
+  }
   function total() {
     let dm = 0; try { dm = Object.values(dmConversations || {}).reduce((s, c) => s + Number(c?.unread || 0), 0); } catch {}
-    return dm + requests().length + events.filter((e) => !e.seen).length;
+    return dm + requests().length + clanInvites.length + events.filter((e) => !e.seen).length;
   }
   function badge() {
     const n = total(); const b = $('gx-rail-notif'); if (!b) return;
@@ -82,11 +88,12 @@
 
   function render() {
     const p = $('gx-notif-panel'); if (!p) return;
-    const dms = dmItems(), reqs = requests(), evs = events.slice().reverse();
+    const dms = dmItems(), reqs = requests(), evs = events.slice().reverse(), invs = clanInvites.slice();
     const sec = (title, html, extra = '') => `<div class="gx-notif-sec"><div class="gx-notif-h"><b>${title}</b>${extra}</div>${html}</div>`;
     let html = '';
     if (dms.length) html += sec(`💬 Мессеж <i>${dms.reduce((s, d) => s + d.unread, 0)}</i>`, dms.map((d) => `<button type="button" class="gx-notif-i" data-dm="${esc(d.uid)}" data-name="${esc(d.name)}"><span class="gx-notif-av">${esc((d.name || '?').slice(0, 1).toUpperCase())}</span><span class="gx-notif-t"><b>${esc(d.name || `#${d.uid}`)}</b><small>${esc(d.preview || 'Шинэ мессеж')}</small></span><em>${d.unread}</em></button>`).join(''));
     if (reqs.length) html += sec(`👋 Найзын хүсэлт <i>${reqs.length}</i>`, reqs.map((r) => `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(String(r.username || '?').slice(0, 1).toUpperCase())}</span><span class="gx-notif-t"><b>${esc(r.username)}</b><small>найз болохыг хүсэж байна</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-acc="${esc(r.id)}" data-name="${esc(r.username)}">Зөвшөөрөх</button><button type="button" class="btn btn-sm" data-dec="${esc(r.id)}">✕</button></span></div>`).join(''));
+    if (invs.length) html += sec(`🛡 Кланы урилга <i>${invs.length}</i>`, invs.map((v) => `<div class="gx-notif-i static"><span class="gx-notif-av">🛡</span><span class="gx-notif-t"><b>${v.clan_tag ? `[${esc(v.clan_tag)}] ` : ''}${esc(v.clan_name)}</b><small>${esc(v.by_username || '')} таныг урьсан · ${ago(Date.parse(v.created_at))}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-inv-acc="${esc(v.id)}">Нэгдэх</button><button type="button" class="btn btn-sm" data-inv-dec="${esc(v.id)}">✕</button></span></div>`).join(''));
     if (evs.length) html += sec('🔔 Мэдэгдэл', evs.map((e) => e.type === 'clan'
       ? `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(e.icon || '🛡')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${e.sub ? `${esc(e.sub)} · ` : ''}${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-clan="${esc(e.clanId)}">${esc(e.btn || 'Нээх')}</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
       : e.type === 'invite'
@@ -109,6 +116,16 @@
       catch (err) { showToast(`Нэгдэхэд алдаа: ${err.message}`, 'error'); }
       return;
     }
+    const ia = e.target.closest('[data-inv-acc], [data-inv-dec]');
+    if (ia) {
+      ia.disabled = true; const acc = ia.hasAttribute('data-inv-acc'); const id = acc ? ia.dataset.invAcc : ia.dataset.invDec;
+      try {
+        const r = await window.api.request('post', `/clans/invites/${id}/${acc ? 'accept' : 'decline'}`);
+        showToast(acc ? `🎉 «${r.clan_name || 'Клан'}» кланд нэгдлээ` : 'Урилгыг татгалзлаа', acc ? 'success' : 'info');
+        if (acc) { try { window.gxClans?.loadMine?.(); } catch {} }
+      } catch (err) { showToast(err?.message || 'Алдаа гарлаа', 'error'); }
+      await refreshInvites(); return;
+    }
     const cl = e.target.closest('[data-clan]');
     if (cl) { try { $('gx-drawer-close')?.click(); showTab('clans'); setTimeout(() => window.gxClans?.openClan?.(cl.dataset.clan), 150); } catch {} return; }
     const rm = e.target.closest('[data-rm]'); if (rm) { remove(rm.dataset.rm); return; }
@@ -125,6 +142,8 @@
   }
 
   setInterval(() => { ensureBell(); badge(); if (open) render(); }, 1500);
+  setInterval(refreshInvites, 5 * 60 * 1000);
+  setTimeout(refreshInvites, 3000);
   ensureBell();
-  window.gxNotif = { push, toggle, total, _events: events };
+  window.gxNotif = { push, toggle, total, refreshInvites, _events: events, _setInvites: (a) => { clanInvites = a; badge(); if (open) render(); } };
 })();

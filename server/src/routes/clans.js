@@ -66,6 +66,17 @@ async function ensureTables() {
         decided_at TIMESTAMP
       );
       CREATE UNIQUE INDEX IF NOT EXISTS clan_requests_pending ON clan_requests(clan_id, user_id) WHERE status = 'pending';
+      -- Кланы урилга (2026-10-03, эзэн): Lord/админ хүний нэр дээр баруун товч → «Кланд урих»; хүлээн авагч 🔔-оос Нэгдэх/татгалзах
+      CREATE TABLE IF NOT EXISTS clan_invites (
+        id         SERIAL PRIMARY KEY,
+        clan_id    INTEGER NOT NULL REFERENCES clans(id) ON DELETE CASCADE,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        invited_by INTEGER,
+        status     VARCHAR(10) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW(),
+        decided_at TIMESTAMP
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS clan_invites_pending ON clan_invites(clan_id, user_id) WHERE status = 'pending';
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clan_id INTEGER REFERENCES clans(id) ON DELETE SET NULL;
       ALTER TABLE clans ADD COLUMN IF NOT EXISTS icon_data BYTEA;
       ALTER TABLE clans ADD COLUMN IF NOT EXISTS icon_mime VARCHAR(20);
@@ -159,6 +170,18 @@ router.get('/mine', auth, async (req, res) => {
 });
 
 // ── Нэг клан: мэдээлэл + гишүүд (+ хүсэлтүүд — зөвхөн lord/admin) ──
+// Миний хүлээгдэж буй урилгууд (🔔 цэс асах үед ачаална — офлайн байхад ирсэн урилга ч харагдана)
+router.get('/invites', auth, async (req, res) => {
+  if (!await dbOk()) return res.json({ invites: [] });
+  try {
+    const r = await db.query(`
+      SELECT i.id, i.clan_id, c.name AS clan_name, c.tag AS clan_tag, u.username AS by_username, i.created_at
+      FROM clan_invites i JOIN clans c ON c.id = i.clan_id LEFT JOIN users u ON u.id = i.invited_by
+      WHERE i.user_id = $1 AND i.status = 'pending' ORDER BY i.created_at DESC LIMIT 20`, [req.user.id]);
+    return res.json({ invites: r.rows });
+  } catch (e) { console.error('[clans] invites', e.message); return res.json({ invites: [] }); }
+});
+// ↑ '/:id'-ээс ӨМНӨ байх ёстой (эс бөгөөс 'invites'-ийг кланы id гэж барина)
 router.get('/:id', auth, async (req, res) => {
   if (!await dbOk()) return bad(res, 503, 'Service temporarily unavailable');
   try {
@@ -300,6 +323,44 @@ router.post('/:id/join', auth, async (req, res) => {
     notify(await clanManagers(clan.id), { clan_id: clan.id, request: true, clan_name: clan.name, from_user_id: req.user.id, from_username: req.user.username, message: msg });
     return res.json({ ok: true, status: 'pending' });
   } catch (e) { console.error('[clans] join', e.message); return bad(res, 500, 'Server error'); }
+});
+
+// ── Кланы урилга (2026-10-03): Lord/админ → хэрэглэгч ──
+router.post('/:id/invite', auth, async (req, res) => {
+  if (!await dbOk()) return bad(res, 503, 'Service temporarily unavailable');
+  try {
+    const role = await roleOf(req.params.id, req.user.id);
+    if (role !== 'lord' && role !== 'admin') return bad(res, 403, 'Зөвхөн Clan Lord эсвэл админ урина');
+    const uid = Number.parseInt(req.body?.user_id, 10);
+    if (!Number.isInteger(uid)) return bad(res, 400, 'Хэрэглэгч заана уу');
+    if (String(uid) === String(req.user.id)) return bad(res, 400, 'Өөрийгөө урих боломжгүй');
+    const u = await db.query('SELECT id, username FROM users WHERE id = $1', [uid]);
+    if (!u.rows[0]) return bad(res, 404, 'Хэрэглэгч олдсонгүй');
+    if (await roleOf(req.params.id, uid)) return bad(res, 409, `${u.rows[0].username} аль хэдийн энэ кланд байна`);
+    const name = await clanName(req.params.id);
+    const ins = await db.query(
+      `INSERT INTO clan_invites (clan_id, user_id, invited_by) VALUES ($1, $2, $3)
+       ON CONFLICT (clan_id, user_id) WHERE status = 'pending' DO UPDATE SET invited_by = EXCLUDED.invited_by, created_at = NOW()
+       RETURNING id`, [req.params.id, uid, req.user.id]);
+    notify(uid, { clan_id: Number(req.params.id), invite: true, invite_id: ins.rows[0]?.id, clan_name: name, by_username: req.user.username });
+    return res.json({ ok: true, invite_id: ins.rows[0]?.id, username: u.rows[0].username, clan_name: name });
+  } catch (e) { console.error('[clans] invite', e.message); return bad(res, 500, 'Server error'); }
+});
+router.post('/invites/:iid/:action(accept|decline)', auth, async (req, res) => {
+  if (!await dbOk()) return bad(res, 503, 'Service temporarily unavailable');
+  try {
+    const r = await db.query("SELECT * FROM clan_invites WHERE id = $1 AND user_id = $2 AND status = 'pending'", [req.params.iid, req.user.id]);
+    const inv = r.rows[0]; if (!inv) return bad(res, 404, 'Урилга олдсонгүй (хугацаа дууссан эсвэл цуцлагдсан)');
+    const accept = req.params.action === 'accept';
+    await db.query('UPDATE clan_invites SET status = $1, decided_at = NOW() WHERE id = $2', [accept ? 'accepted' : 'declined', inv.id]);
+    if (accept) {
+      await db.query("INSERT INTO clan_members (clan_id, user_id, role) VALUES ($1,$2,'member') ON CONFLICT DO NOTHING", [inv.clan_id, req.user.id]);
+      await db.query("UPDATE clan_requests SET status = 'accepted', decided_at = NOW() WHERE clan_id = $1 AND user_id = $2 AND status = 'pending'", [inv.clan_id, req.user.id]);
+    }
+    const name = await clanName(inv.clan_id);
+    notify(await clanManagers(inv.clan_id), { clan_id: Number(inv.clan_id), invite_answer: accept ? 'accepted' : 'declined', clan_name: name, from_username: req.user.username });
+    return res.json({ ok: true, accepted: accept, clan_id: Number(inv.clan_id), clan_name: name });
+  } catch (e) { console.error('[clans] invite answer', e.message); return bad(res, 500, 'Server error'); }
 });
 
 // ── Хүсэлтээ цуцлах ──
