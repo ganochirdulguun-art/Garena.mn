@@ -140,6 +140,28 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// /download — хамгийн сүүлийн Garena.mn Setup exe руу шууд (Facebook-д тараах богино холбоос, 2026-10-03).
+// GitHub API-г 10 мин кэшилнэ (rate limit); алдаа гарвал releases/latest хуудас руу.
+let _dlCache = { at: 0, url: null, ver: null };
+async function latestSetupUrl() {
+  if (_dlCache.url && Date.now() - _dlCache.at < 10 * 60 * 1000) return _dlCache;
+  const r = await fetch('https://api.github.com/repos/ganochirdulguun-art/Garena.mn-releases/releases/latest', { headers: { 'User-Agent': 'garena-mn-server', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(6000) });
+  if (!r.ok) throw new Error(`github ${r.status}`);
+  const rel = await r.json();
+  const a = (rel.assets || []).find((x) => /^Garena\.mn-Setup-.*\.exe$/i.test(x.name)) || (rel.assets || []).find((x) => /\.exe$/i.test(x.name) && /setup/i.test(x.name));
+  if (!a) throw new Error('setup asset алга');
+  _dlCache = { at: Date.now(), url: a.browser_download_url, ver: rel.tag_name || null };
+  return _dlCache;
+}
+app.get('/download', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try { const d = await latestSetupUrl(); return res.redirect(302, d.url); }
+  catch (e) { console.warn('[download]', e.message); return res.redirect(302, 'https://github.com/ganochirdulguun-art/Garena.mn-releases/releases/latest'); }
+});
+app.get('/download/version', async (req, res) => {
+  try { const d = await latestSetupUrl(); return res.json({ version: d.ver, url: d.url }); } catch { return res.json({ version: null }); }
+});
+
 // Health check (өмнө нь / байсан) — deploy/monitoring-д хэрэглэнэ.
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', message: 'Garena.mn Server ажиллаж байна' });

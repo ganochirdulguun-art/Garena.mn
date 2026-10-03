@@ -64,6 +64,15 @@
   .step span { font-size: 22px; color: var(--muted); line-height: 1.38; }
   .step span strong { color: #fff; font-weight: 800; }
   .kbd { display: inline-block; padding: 0 8px; border-radius: 6px; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2); color: #fff; font-weight: 700; font-size: 19px; }
+
+  /* ── 1200×630 холбоосын preview (og:image) ── */
+  #og { width: 1200px; height: 630px; padding: 44px 52px; display: grid; grid-template-columns: 1fr 520px; gap: 34px; align-items: center; }
+  #og h1 { font-size: 60px; line-height: 1.02; }
+  #og .sub { font-size: 23px; }
+  #og .chips .chip { font-size: 18px; padding: 8px 12px; }
+  #og .chips .chip i { font-size: 20px; }
+  #og .live { font-size: 15px; }
+  #og .shot { transform: perspective(1200px) rotateY(-6deg); }
 </style>
 </head>
 <body>
@@ -112,7 +121,7 @@
   <div class="z brand"><img src="logo.png" alt="" style="height:60px"><b style="font-size:38px">Garena<span>.mn</span></b></div>
   <h2 class="z">5 алхмаар <em>тоглож эхэл</em></h2>
   <div class="z steps">
-    <div class="step"><span class="n">1</span><div><b>Татах</b><span>Постын доорх холбоосоор орж <strong>Garena.mn-Setup.exe</strong> файлыг татна.</span></div></div>
+    <div class="step"><span class="n">1</span><div><b>Татах</b><span>Доорх сайт руу орж <strong>«Үнэгүй татах»</strong> дарна — <strong>Garena.mn-Setup.exe</strong> татагдана.</span></div></div>
     <div class="step"><span class="n">2</span><div><b>Суулгах</b><span>Файлыг ажиллуулна. Windows анхааруулга гарвал <span class="kbd">Дэлгэрэнгүй</span> → <span class="kbd">Ямар ч байсан ажиллуулах</span>.</span></div></div>
     <div class="step"><span class="n">3</span><div><b>Бүртгүүлэх</b><span><strong>Discord</strong> эсвэл <strong>имэйлээр</strong> нэвтэрнэ. Шинэ хэрэглэгчид <strong>+50 💎</strong> бэлэг.</span></div></div>
     <div class="step"><span class="n">4</span><div><b>Тоглоомоо холбох</b><span><span class="kbd">Тохиргоо</span> → <span class="kbd">Тоглоом нэмэх</span> дарж <strong>Warcraft III: The Frozen Throne</strong>-ийн exe файлыг сонгоно.</span></div></div>
@@ -121,11 +130,27 @@
   <div class="z shot" style="border-radius:14px"><img src="shot-lobby-crop.png" alt=""></div>
   <div class="z foot" style="margin-top:-12px;text-align:center">▲ «Өрөөнүүд» цэс — WC3 Room-оо сонгоод орно</div>
   <div class="z" style="display:flex;flex-direction:column;gap:8px">
-    <span class="url">⬇ Татах: <b>github.com/ganochirdulguun-art/Garena.mn-releases</b></span>
+    <span class="url">⬇ Татах: <b>garenamn-production.up.railway.app</b></span>
     <span class="foot">Шинэ хувилбар гарахад апп өөрөө шинэчлэгдэнэ · Асуулт байвал энэ пост дээр коммент үлдээгээрэй</span>
   </div>
 </section>
 
+
+<!-- ═════════ 4. ХОЛБООСЫН PREVIEW 1200×630 ═════════ -->
+<section class="poster" id="og">
+  <div class="bg"></div>
+  <div class="z" style="display:flex;flex-direction:column;gap:18px">
+    <div class="brand"><img src="logo.png" alt="" style="height:54px"><b style="font-size:38px">Garena<span>.mn</span></b></div>
+    <h1>DotA-гаа <em>интернэтээр</em><br>LAN шиг тогло</h1>
+    <p class="sub">Улаанбаатарын сервер · бага ping · үнэгүй.<br>Бүртгүүлээд +50 💎 бэлэг.</p>
+    <div class="chips">
+      <span class="chip"><i>🎮</i>Room 1–20</span>
+      <span class="chip"><i>🏆</i>Ranked +2 💎</span>
+      <span class="chip"><span class="live">LIVE</span></span>
+    </div>
+  </div>
+  <div class="z shot"><img src="shot-room.png" alt=""></div>
+</section>
 <script>const o=new URLSearchParams(location.search).get('only');if(o)document.querySelectorAll('section.poster').forEach(x=>{if(x.id!==o)x.remove()});</script>
 </body>
 </html>
