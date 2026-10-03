@@ -14,7 +14,8 @@ const router = express.Router();
 const WARN_LIMIT = 3;
 // Мэдэгдэж буй maphack хэрэгслүүд. Нэр/цонхны гарчигт агуулагдвал илэрнэ.
 // MAPHACK_BLOCKLIST env-ээр нэмж өргөтгөнө (client дахин билдгүйгээр шинэчилнэ).
-const DEFAULT_BLOCKLIST = ['xenon', 'zodcraft'];
+// 2026-10-04: түгээмэл 1.26a maphack-уудын нэрс нэмэв (процессын нэр / цонхны гарчиг / DLL нэр).
+const DEFAULT_BLOCKLIST = ['xenon', 'zodcraft', 'maphack', 'map hack', 'lazymh', 'lazy mh', 'nemesis', 'mh126', 'mh_126', 'mh 1.26', 'jzmh', 'ttmh', 'dotahack', 'wc3hack', 'war3hack', 'mhloader', 'mh loader', 'vipmh', 'ezmh'];
 
 function blocklist() {
   const extra = String(process.env.MAPHACK_BLOCKLIST || '')
@@ -61,15 +62,9 @@ async function recordMaphackWarning(userId, tool) {
     );
     const row = upd.rows[0] || {};
     const warnings = row.maphack_warnings || 1;
-    let banned = !!row.banned;
-    if (warnings >= WARN_LIMIT && !banned) {
-      await db.query(
-        `UPDATE users SET banned = TRUE, ban_reason = $2, banned_at = NOW() WHERE id = $1`,
-        [userId, `MapHack: ${t}`]
-      );
-      banned = true;
-      try { await require('./roles').revokeOnBan(userId); } catch {}   // бантай хүн Moderator/ADMIN цолтой үлдэхгүй
-    }
+    const banned = !!row.banned;
+    // 2026-10-04 (эзэн): АВТОМАТ БАН ХАСАГДСАН — хэрэг нээгдэж ЭЗЭН/ADMIN-д мэдэгдэнэ; бан зөвхөн эзний шийдвэрээр.
+    try { await require('./acCases').openCase({ userId, kind: /FOGCLICK/i.test(t) ? 'fogclick' : 'process', tool: t, severity: 'high', detail: { warnings } }); } catch {}
     try {
       await db.query('INSERT INTO maphack_events (user_id, tool, warnings, banned) VALUES ($1, $2, $3, $4)', [userId, t, warnings, banned]);
     } catch (e) { console.warn('[AntiCheat] event log:', e.message); }
@@ -83,12 +78,23 @@ async function recordMaphackWarning(userId, tool) {
 }
 
 // MapHack илрэлт мэдэгдэх: сануулга +1, 3 болоход бан, эзэнд DM.
+// kind: 'process' (хориотой програм — клиент WC3-г нээхгүй) | 'module' (WC3-д сэжигтэй DLL) | 'memory' (Game.dll .text өөрчлөгдсөн)
+// module/memory нь сануулга тоолохгүй, зөвхөн хэрэг нээнэ (ЭЗЭН/ADMIN шалгана). Хэрэглэгч бүр цагт ≤20 тайлан.
+const _rate = new Map();
 router.post('/report', authMW, async (req, res) => {
   if (!req.user?.id) return res.status(400).json({ error: 'auth required' });
+  const now = Date.now(); const arr = (_rate.get(String(req.user.id)) || []).filter((t) => now - t < 3600e3);
+  if (arr.length >= 20) return res.status(429).json({ error: 'too many reports' });
+  arr.push(now); _rate.set(String(req.user.id), arr); if (_rate.size > 5000) _rate.delete(_rate.keys().next().value);
   const tool = String(req.body?.tool || 'unknown').slice(0, 64);
+  const kind = String(req.body?.kind || 'process');
+  if (kind === 'module' || kind === 'memory') {
+    const c = await require('./acCases').openCase({ userId: req.user.id, kind, tool, detail: req.body?.detail, severity: req.body?.severity === 'high' ? 'high' : 'review' });
+    return res.json({ ok: !!c, case_id: c?.id || null });
+  }
   const r = await recordMaphackWarning(req.user.id, tool);
   if (!r) return res.status(503).json({ error: 'db unavailable' });
-  return res.json({ warnings: r.warnings, banned: r.banned, max: WARN_LIMIT });
+  return res.json({ warnings: r.warnings, banned: r.banned, max: null, review: true });
 });
 
 // ── GarenaSystem ботын `!maphack` команд (эзэн): жагсаалт + сануулга тэглэх/бан цуцлах ──

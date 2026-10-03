@@ -588,14 +588,14 @@ document.querySelectorAll('.auth-tab').forEach(btn => {
 // MapHack илрэхэд гарах анхааруулга — main процессоос game:maphack event-ээр ирнэ.
 function showMaphackModal(data) {
   const d = data || {};
-  const max = d.max ?? 3;
   document.getElementById('maphack-overlay')?.remove();
   const ov = document.createElement('div');
   ov.id = 'maphack-overlay';
   ov.className = 'maphack-overlay';
+  // 2026-10-04: автомат бан хасагдсан — зөрчил ЭЗЭН/ADMIN-д очиж, бан хийх эсэхийг эзэн шийднэ
   const body = d.banned
-    ? `<p class="mh-ban">🚫 Та MapHack ${max} удаа ашигласан тул платформоос <b>ХОРИГЛОГДЛОО</b>.</p>`
-    : `<p class="mh-warn">Сануулга <b>${d.warnings ?? '?'}/${max}</b> — MapHack-аа <b>унтраагаад</b> дахин оролдоно уу.<br>Нийт <b>${max}</b> удаа бол платформоос <b>бан</b> авна.</p>`;
+    ? `<p class="mh-ban">🚫 Таны account платформоос <b>ХОРИГЛОГДСОН</b> байна.</p>`
+    : `<p class="mh-warn">Энэ зөрчил <b>ЭЗЭН ба ADMIN</b>-д мэдэгдэгдлээ. Тэд шалгаад шийдвэр гаргана — account тань <b>бан</b> авч болно.<br>${d.midgame ? 'Хэрэгслээ <b>одоо хаана уу</b>.' : 'Хэрэгслээ <b>бүрэн хаагаад</b> дахин оролдоно уу — тэр хүртэл WC3 нээгдэхгүй.'}</p>`;
   ov.innerHTML = `
     <div class="maphack-card">
       <div class="mh-icon">🛡️</div>

@@ -1465,10 +1465,56 @@ async function reportMaphack(tool) {
   try { return await apiService.request('post', '/anticheat/report', { tool }); }
   catch { return null; }
 }
+// ── WC3 бүрэн бүтэн байдлын шалгалт (2026-10-04): DLL жагсаалт + Game.dll санах ой ──
+// 45с-ийн дараа эхэлж 3 мин тутам; ижил үр дүнг нэг WC3 сессэд нэг л удаа тайлагнана. Шийтгэл өгөхгүй — серверт
+// «хэрэг» нээгдэж ЭЗЭН/ADMIN шалгана. Тоглоомд хүрэхгүй, main процессыг блоклохгүй (тусдаа 32-бит PowerShell).
+const integrity = require('./src/services/integrity');
+let _icTimer = null, _icFirst = null, _icBusy = false, _icSent = new Set();
+function wc3DirFromSettings() {
+  try { const s = migrateSettings(readSettings()); const g = (s.games || []).find((x) => /war3|warcraft|frozen/i.test(`${x.name} ${x.path}`)); return g ? path.dirname(g.path) : ''; } catch { return ''; }
+}
+async function runIntegrityCheck() {
+  if (_icBusy) return; _icBusy = true;
+  try {
+    const r = await integrity.probe(app.getPath('userData'));
+    if (!r || !r.running) return;
+    const send = async (kind, tool, detail, severity) => {
+      const key = `${kind}|${detail?.sig || tool}`;
+      if (_icSent.has(key)) return null;
+      _icSent.add(key);
+      try { return await apiService.request('post', '/anticheat/report', { kind, tool, detail, severity }); } catch { return null; }
+    };
+    const { blocked, unknown } = integrity.classifyModules(r.modules, _maphackList, wc3DirFromSettings());
+    if (blocked.length) {
+      await send('module', blocked[0], { modules: blocked, sig: blocked.map((x) => x.toLowerCase()).sort().join(',') }, 'high');
+      broadcastToWindows('game:maphack', { tool: blocked[0], review: true, midgame: true });
+    }
+    if (unknown.length) await send('module', `${unknown.length} танигдаагүй DLL`, { modules: unknown, sig: unknown.map((x) => path.win32.basename(x).toLowerCase()).sort().join(',') }, 'review');
+    const g = r.game;
+    if (g && !g.error && g.diff_bytes > 0) {
+      await send('memory', `Game.dll ${g.version || ''} · ${g.diff_bytes} байт өөрчлөгдсөн`.slice(0, 64),
+        { version: g.version, path: g.path, base: g.base, relocated: g.relocated, diff_bytes: g.diff_bytes, regions: g.regions, diffs: (g.diffs || []).slice(0, 30),
+          sig: (g.diffs || []).map((d) => `${d.rva}:${d.mem}`).join('|').slice(0, 1900) }, 'review');
+    } else if (g && g.error) console.warn('[Integrity] Game.dll:', g.error);
+  } catch (e) { console.warn('[Integrity]', e.message); }
+  finally { _icBusy = false; }
+}
+function startIntegrityWatch() {
+  if (_icTimer || _icFirst) return;
+  _icSent = new Set();
+  _icFirst = setTimeout(() => { _icFirst = null; runIntegrityCheck(); _icTimer = setInterval(runIntegrityCheck, 3 * 60 * 1000); _icTimer.unref?.(); }, 45 * 1000);
+  _icFirst.unref?.();
+}
+function stopIntegrityWatch() {
+  if (_icFirst) { clearTimeout(_icFirst); _icFirst = null; }
+  if (_icTimer) { clearInterval(_icTimer); _icTimer = null; }
+}
+
 // WC3 ажиллаж байх хугацаанд үе үе скан (тоглолтын дундуур асаасныг барих)
 let _maphackWatch = null;
 let _maphackReported = null;
 function startMaphackWatch() {
+  startIntegrityWatch();
   if (_maphackWatch) return;
   _maphackReported = null;
   _maphackWatch = setInterval(async () => {
@@ -1483,6 +1529,7 @@ function startMaphackWatch() {
   if (_maphackWatch.unref) _maphackWatch.unref();
 }
 function stopMaphackWatch() {
+  stopIntegrityWatch();
   if (_maphackWatch) { clearInterval(_maphackWatch); _maphackWatch = null; }
   _maphackReported = null;
 }

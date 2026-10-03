@@ -778,3 +778,47 @@ body.gx .rank-badge { background: var(--gx-surface-3) !important; color: var(--g
 .gx-live-chip.full { opacity: .8; }
 .live-picker-f { display: flex; flex-direction: column; gap: 6px; }
 .gx-notif-i.static .gx-notif-t b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; font-size: 12.5px; }
+
+/* ── 🚨 Хакны зөрчил (2026-10-04) ── */
+.ac-help { margin: 4px 0 12px; font-size: 12.5px; color: var(--gx-text-2); line-height: 1.5; }
+.ac-tabs { margin: 0 0 8px; }
+.ac-tabs i { font-style: normal; margin-left: 6px; padding: 1px 7px; border-radius: 6px; background: var(--gx-accent-soft); color: var(--gx-accent); font-size: 11px; }
+.ac-list { display: flex; flex-direction: column; gap: 10px; }
+.ac-case { padding: 12px 14px; border-radius: 12px; border: 1px solid var(--gx-line); background: var(--gx-surface); display: flex; flex-direction: column; gap: 6px; }
+.ac-case.sev-high { border-left: 4px solid #e63946; }
+.ac-case.st-nom { border-color: rgba(245,179,1,.55); background: linear-gradient(90deg, rgba(245,179,1,.10), var(--gx-surface) 40%); }
+.ac-case.st-ban, .ac-case.st-dis { opacity: .75; }
+.ac-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ac-user { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ac-user b { font-size: 14.5px; cursor: pointer; }
+.ac-user small { color: var(--gx-text-3); font-size: 11.5px; }
+.ac-tier { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 5px; background: #2f8f3a; color: #fff; }
+.ac-banned { font-style: normal; font-size: 11px; font-weight: 800; padding: 1px 7px; border-radius: 5px; background: #7a1712; color: #fff; }
+.ac-st { font-size: 11.5px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: var(--gx-surface-2); color: var(--gx-text-2); white-space: nowrap; }
+.ac-st.st-new { background: rgba(230,57,70,.14); color: #e63946; }
+.ac-st.st-nom { background: rgba(245,179,1,.18); color: #b77d00; }
+.ac-st.st-ban { background: #7a1712; color: #fff; }
+.ac-what { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; }
+.ac-kind { font-weight: 800; }
+.ac-tool { color: var(--gx-text-2); font-family: Consolas, monospace; font-size: 12px; }
+.ac-meta { font-size: 11.5px; color: var(--gx-text-3); }
+.ac-note { font-size: 12.5px; padding: 7px 10px; border-radius: 8px; background: rgba(245,179,1,.12); }
+.ac-note.dec { background: var(--gx-surface-2); }
+.ac-more summary { cursor: pointer; font-size: 12px; color: var(--gx-text-2); }
+.ac-det { margin-top: 6px; font-size: 12px; display: flex; flex-direction: column; gap: 4px; }
+.ac-det code { display: block; font-size: 11.5px; word-break: break-all; color: var(--gx-text-2); }
+.ac-det small { color: var(--gx-text-3); }
+.ac-diff { border-collapse: collapse; font-size: 11px; font-family: Consolas, monospace; }
+.ac-diff th, .ac-diff td { padding: 2px 8px; border-bottom: 1px solid var(--gx-line); text-align: left; }
+.ac-diff code { display: inline; }
+.ac-acts { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+.ac-acts .ac-ban { background: linear-gradient(#e2473a, #a3201a); color: #fff; border-color: #7a1712; font-weight: 800; }
+.ac-wait { font-size: 12px; color: #b77d00; font-weight: 700; }
+.ac-modal { position: fixed; inset: 0; z-index: 10002; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; }
+.ac-modal-box { width: min(620px, 94vw); max-height: 88vh; overflow: auto; background: var(--gx-surface, #fff); color: var(--gx-text, #111); border-radius: 14px; padding: 14px 16px 16px; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: flex; flex-direction: column; gap: 10px; }
+.ac-modal-h { display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
+.ac-all { align-self: flex-start; }
+.gx-notif-i.ac { border-color: rgba(230,57,70,.45); }
+.ac-acts .btn-primary { background: linear-gradient(#ff4d5e, #c81d2c) !important; color: #fff !important; border: 1px solid #a3201a !important; font-weight: 800; }
+.ac-acts .btn:not(.btn-primary):not(.ac-ban) { background: var(--gx-surface-2, #f1f2f5); color: var(--gx-text, #111); border: 1px solid var(--gx-line, #ddd); }
+.ac-modal-box .ac-case { background: var(--gx-surface-2, #f7f7f9); }

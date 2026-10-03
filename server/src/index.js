@@ -114,6 +114,7 @@ app.use('/admin/api', membershipRoutes.adminRouter); // админ: 💎 олг�
 app.use('/admin', adminRoutes);
 app.use('/warkey', warkeyRoutes);
 app.use('/anticheat', require('./routes/anticheat'));
+app.use('/anticheat', require('./routes/acCases').router);   // хакны хэрэг: ADMIN санал → ЭЗЭН бан (2026-10-04)
 app.use('/integration', require('./routes/integration')); // GarenaSystem бот: Discord-оор бүртгэлтэй хэрэглэгчид (role sync)
 const meshRoutes = require('./routes/mesh');
 app.use('/mesh', meshRoutes.router);                     // Tailscale/Headscale mesh: preauth түлхүүр + клиентийн mesh IP тайлан (Ш2, 2026-09-27)
@@ -243,7 +244,8 @@ clanRoutes.setIO(io);
 // Эзний самбар: онлайн хэрэглэгчдийн id
 app.set('onlineUserIds', () => new Set([...onlineUsers.values()].map((u) => String(u.userId))));
 require('./routes/roles').setIO(io);
-liveRoutes.setIO(io);   // Room Live мэдэгдэл (live:state / live:ended / live:kick)
+liveRoutes.setIO(io);
+require('./routes/acCases').setIO(io);   // хакны хэргийн мэдэгдэл (staff:notify type 'anticheat')   // Room Live мэдэгдэл (live:state / live:ended / live:kick)
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);

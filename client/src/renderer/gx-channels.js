@@ -98,6 +98,7 @@
         staff && u.can_set_mod && u.role !== 'admin' ? (u.role === 'moderator' ? item('unset', '⭐ Moderator хураах', 'danger') : item('moderator', '⭐ Moderator өгөх', 'accent')) : '',
         staff && !u.can_set_admin && !u.can_set_mod ? '<div class="gxu-h gxo-muted">Энэ хэрэглэгчийн цолыг өөрчлөх эрхгүй</div>' : '',
         clanItems.length ? `${staff ? '<hr>' : ''}${clanItems.join('')}` : '',
+        me?.owner && u.role !== 'owner' ? `<hr>${item('ban-toggle', '<span class="gxu-ban-lbl">⛔ Бан хийх…</span>', 'danger')}` : '',
         '<hr>', item('profile', '👤 Профайл харах'),
       ].join('');
       place(e);
@@ -113,6 +114,7 @@
       hide();
       const act = b.dataset.gxu, uid = b.dataset.uid, name = b.dataset.name;
       if (act === 'profile') { try { openUserProfile(uid); } catch {} return; }
+      if (act === 'ban-toggle') { try { await window.gxAC?.banToggle(uid, name); } catch (err) { toast(errMsg(err), 'error'); } return; }
       if (act === 'clan-invite') {
         try { const r = await api('post', `/clans/${b.dataset.clan}/invite`, { user_id: uid }); toast(`🛡 ${r.username || name}-г «${r.clan_name || b.dataset.clanName}» кланд урилаа`, 'success'); }
         catch (err) { toast(errMsg(err), 'error'); }
@@ -321,6 +323,7 @@
         <button type="button" data-gxo="requests">🛡 Moderator хүсэлт <b class="gxo-badge hidden" id="gxo-badge">0</b></button>
         <button type="button" data-gxo="mods">⭐ Moderator-ууд</button>
         ${me.owner ? '<button type="button" data-gxo="admins">🛡 ADMIN-ууд</button>' : ''}
+        <button type="button" data-gxo="cheats">🚨 Хакны зөрчил <b class="gxo-badge hidden" id="gxo-ac-badge">0</b></button>
         <button type="button" data-gxo="kicks">🚪 Kick бүртгэл</button>
         ${$('btn-admin-dashboard') ? '<button type="button" data-gxo="admin">⚙️ Админ самбар</button>' : ''}`;
       fill.appendChild(menu);
@@ -331,7 +334,7 @@
       const tab = document.createElement('div');
       tab.id = 'tab-owner'; tab.className = 'tab gxo';
       tab.innerHTML = `<div class="gx-page-head"><div><h2>${me.owner ? '👑 Эзний самбар' : '🛡 Админы самбар'}</h2><p class="gx-sub">Гишүүдийн идэвхийг харж, хамгийн идэвхтэй тоглогчдод Moderator олгоно.</p></div></div>
-        <div class="gx-subtabs gxo-tabs"><button type="button" data-gxo-tab="activity" class="on">📊 Гишүүдийн идэвх</button><button type="button" data-gxo-tab="requests">🛡 Хүсэлтүүд <i id="gxo-tab-n">0</i></button><button type="button" data-gxo-tab="mods">⭐ Moderator-ууд</button>${me.owner ? '<button type="button" data-gxo-tab="admins">🛡 ADMIN-ууд</button>' : ''}<button type="button" data-gxo-tab="kicks">🚪 Kick бүртгэл</button></div>
+        <div class="gx-subtabs gxo-tabs"><button type="button" data-gxo-tab="activity" class="on">📊 Гишүүдийн идэвх</button><button type="button" data-gxo-tab="requests">🛡 Хүсэлтүүд <i id="gxo-tab-n">0</i></button><button type="button" data-gxo-tab="mods">⭐ Moderator-ууд</button>${me.owner ? '<button type="button" data-gxo-tab="admins">🛡 ADMIN-ууд</button>' : ''}<button type="button" data-gxo-tab="cheats">🚨 Хакны зөрчил <i id="gxo-ac-tab-n">0</i></button><button type="button" data-gxo-tab="kicks">🚪 Kick бүртгэл</button></div>
         <div id="gxo-body" class="gxo-body"></div>`;
       host.appendChild(tab);
     }
@@ -427,6 +430,9 @@
             <span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span><button type="button" class="btn btn-sm" data-gxo-act="adm-revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Хураах</button></span></div>`).join('')}</div>`
           : '<div class="gx-empty"><b>ADMIN алга</b><span>Дээрх хэсгээс хэрэглэгч ба Room сонгож томилно уу.</span></div>'}`;
         admPrefill = '';
+      } else if (curTab === 'cheats') {
+        if (window.gxAC) await window.gxAC.renderList(body, () => seq !== ownerSeq);
+        else body.innerHTML = '<div class="gx-empty"><b>Ачаалж чадсангүй</b></div>';
       } else if (curTab === 'kicks') {
         const r = await api('get', '/roles/kicks');
         body.innerHTML = r.kicks.length ? `<div class="gxo-table gxo-kicks"><div class="gxo-tr gxo-th"><span>Хэзээ</span><span>Өрөө</span><span>Гаргасан</span><span>Гаргуулсан</span><span>Шалтгаан</span></div>

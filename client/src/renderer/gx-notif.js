@@ -94,7 +94,9 @@
     if (dms.length) html += sec(`💬 Мессеж <i>${dms.reduce((s, d) => s + d.unread, 0)}</i>`, dms.map((d) => `<button type="button" class="gx-notif-i" data-dm="${esc(d.uid)}" data-name="${esc(d.name)}"><span class="gx-notif-av">${esc((d.name || '?').slice(0, 1).toUpperCase())}</span><span class="gx-notif-t"><b>${esc(d.name || `#${d.uid}`)}</b><small>${esc(d.preview || 'Шинэ мессеж')}</small></span><em>${d.unread}</em></button>`).join(''));
     if (reqs.length) html += sec(`👋 Найзын хүсэлт <i>${reqs.length}</i>`, reqs.map((r) => `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(String(r.username || '?').slice(0, 1).toUpperCase())}</span><span class="gx-notif-t"><b>${esc(r.username)}</b><small>найз болохыг хүсэж байна</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-acc="${esc(r.id)}" data-name="${esc(r.username)}">Зөвшөөрөх</button><button type="button" class="btn btn-sm" data-dec="${esc(r.id)}">✕</button></span></div>`).join(''));
     if (invs.length) html += sec(`🛡 Кланы урилга <i>${invs.length}</i>`, invs.map((v) => `<div class="gx-notif-i static"><span class="gx-notif-av">🛡</span><span class="gx-notif-t"><b>${v.clan_tag ? `[${esc(v.clan_tag)}] ` : ''}${esc(v.clan_name)}</b><small>${esc(v.by_username || '')} таныг урьсан · ${ago(Date.parse(v.created_at))}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-inv-acc="${esc(v.id)}">Нэгдэх</button><button type="button" class="btn btn-sm" data-inv-dec="${esc(v.id)}">✕</button></span></div>`).join(''));
-    if (evs.length) html += sec('🔔 Мэдэгдэл', evs.map((e) => e.type === 'clan'
+    if (evs.length) html += sec('🔔 Мэдэгдэл', evs.map((e) => e.type === 'ac'
+      ? `<div class="gx-notif-i static ac"><span class="gx-notif-av">${esc(e.icon || '🚨')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${e.sub ? `${esc(e.sub)} · ` : ''}${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-ac-open="${esc(e.caseId)}" data-ev="${e.id}">${esc(e.btn || 'Шалгах')}</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
+      : e.type === 'clan'
       ? `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(e.icon || '🛡')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${e.sub ? `${esc(e.sub)} · ` : ''}${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-clan="${esc(e.clanId)}">${esc(e.btn || 'Нээх')}</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
       : e.type === 'invite'
       ? `<div class="gx-notif-i static"><span class="gx-notif-av">🎮</span><span class="gx-notif-t"><b>${esc(e.fromUsername)}</b><small>«${esc(e.roomName)}» өрөөнд урив · ${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-join="${esc(e.roomId)}" data-ev="${e.id}">Нэгдэх</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
@@ -126,6 +128,8 @@
       } catch (err) { showToast(err?.message || 'Алдаа гарлаа', 'error'); }
       await refreshInvites(); return;
     }
+    const aco = e.target.closest('[data-ac-open]');
+    if (aco) { remove(aco.dataset.ev); try { $('gx-drawer-close')?.click(); window.gxAC?.openCase(aco.dataset.acOpen); } catch {} return; }
     const cl = e.target.closest('[data-clan]');
     if (cl) { try { $('gx-drawer-close')?.click(); showTab('clans'); setTimeout(() => window.gxClans?.openClan?.(cl.dataset.clan), 150); } catch {} return; }
     const rm = e.target.closest('[data-rm]'); if (rm) { remove(rm.dataset.rm); return; }
