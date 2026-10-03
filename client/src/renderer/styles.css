@@ -2804,9 +2804,11 @@ body.light .settings-menu {
 .friend-tier-5 { background: linear-gradient(135deg,#dc2626,#ef4444); }  /* Tier 5 — улаан */
 /* Профайл цонхны дундаж статистик (K/D/A, creep, denie, neutral, gold) */
 .profile-avg-stats .avg-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 6px; }
-.avg-tile { background: rgba(255,255,255,.04); border: 1px solid rgba(255,90,90,.15); border-radius: 10px; padding: 9px 6px; text-align: center; }
-.avg-val { display: block; font-size: 1.05rem; font-weight: 800; color: var(--text); }
-.avg-lbl { display: block; font-size: 0.68rem; color: var(--text2); margin-top: 2px; letter-spacing: .02em; }
+/* Эзний гомдол (2026-10-03): тоо хэт том, K/D/A 2 мөр болж эмх цэгцгүй байв → жижиг, нэг мөр, тэгш өндөр */
+.avg-tile { background: rgba(255,255,255,.04); border: 1px solid rgba(255,90,90,.15); border-radius: 8px; padding: 6px 4px; text-align: center; min-width: 0; }
+.avg-val { display: block; font-size: 0.86rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; letter-spacing: -.01em; line-height: 1.25; }
+.avg-lbl { display: block; font-size: 0.6rem; color: var(--text2); margin-top: 1px; letter-spacing: .02em; text-transform: uppercase; }
+.profile-avg-stats h4 { font-size: 0.78rem; margin-bottom: 2px; }
 .dm-btn { font-size: 0.68rem; padding: 2px 6px; flex-shrink: 0; }
 .dm-unread {
   background: var(--red); color: white;

@@ -3633,11 +3633,11 @@ async function openUserProfile(userId) {
     if (statsBox) {
       if (st && st.games > 0) {
         statsBox.classList.remove('hidden');
-        document.getElementById('popup-avg-kda').textContent      = `${st.avg_kills ?? 0} / ${st.avg_deaths ?? 0} / ${st.avg_assists ?? 0}`;
+        document.getElementById('popup-avg-kda').textContent      = `${st.avg_kills ?? 0}/${st.avg_deaths ?? 0}/${st.avg_assists ?? 0}`;
         document.getElementById('popup-avg-creeps').textContent   = st.avg_creeps ?? 0;
         document.getElementById('popup-avg-denies').textContent   = st.avg_denies ?? 0;
         document.getElementById('popup-avg-neutrals').textContent = st.avg_neutrals ?? 0;
-        document.getElementById('popup-avg-gold').textContent     = st.avg_gold ?? 0;
+        document.getElementById('popup-avg-gold').textContent     = Number(st.avg_gold ?? 0).toLocaleString('en-US');
         document.getElementById('popup-games').textContent        = st.games;
       } else {
         statsBox.classList.add('hidden');
