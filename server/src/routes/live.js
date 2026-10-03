@@ -34,7 +34,12 @@ function publicState(l) {
 function livesInRoom(roomId) { return [...lives.values()].filter((l) => l.roomId === String(roomId)).map(publicState); }
 function liveOf(userId) { return lives.get(String(userId)) || null; }
 function totalViewers() { let t = 0; for (const l of lives.values()) t += l.viewers.size; return t; }
-function broadcastRoom(roomId) { try { _io?.to(String(roomId)).emit('live:state', { lives: livesInRoom(roomId) }); } catch {} }
+let _lastLobby = '';
+function broadcastRoom(roomId) {
+  try { _io?.to(String(roomId)).emit('live:state', { lives: livesInRoom(roomId) }); } catch {}
+  // Лоббийн жагсаалтын «● LIVE» тэмдэг: Live-тай өрөөний олонлог өөрчлөгдвөл л бүх хүнд rooms:updated (үзэгчийн тоо бүрт биш)
+  try { const key = [...new Set([...lives.values()].map((l) => l.roomId))].sort().join(','); if (key !== _lastLobby) { _lastLobby = key; _io?.emit('rooms:updated'); } } catch {}
+}
 
 async function mintToken({ identity, name, room, publish }) {
   const { AccessToken } = require('livekit-server-sdk');

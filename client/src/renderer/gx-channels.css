@@ -197,3 +197,8 @@ body .gxw-hero h3 { margin: 2px 0 2px !important; font: 900 28px var(--gx-font) 
 .gxo-adm-row select { flex: 1 1 220px; }
 .gxo-adms .gxo-tr { grid-template-columns: 1.4fr 1.6fr 1fr 1fr auto; cursor: default; }
 .gxo-adms select.input { height: 28px; padding: 0 6px; font-size: 12px; max-width: 260px; }
+
+/* Room Live — лоббийн жагсаалтад «● LIVE» (2026-10-03) */
+.gxcl-live { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; font: 800 9.5px var(--gx-font); letter-spacing: .06em; padding: 1px 6px; border-radius: 5px; background: #e63946; color: #fff; vertical-align: 1px; }
+.gxcl-live i { width: 6px; height: 6px; border-radius: 50%; background: #fff; animation: gxcl-live-blink 1.2s infinite; }
+@keyframes gxcl-live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }

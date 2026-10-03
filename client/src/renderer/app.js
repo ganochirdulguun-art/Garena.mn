@@ -1290,7 +1290,7 @@ function roomGridRow(r, inProgress, idx = 0) {
       </div>
       <div class="room-cell room-cell-room" role="cell">
         <div class="room-grid-name-row">
-          <span class="room-name">${escHtml(r.name)}</span>
+          <span class="room-name">${escHtml(r.name)}</span>${r.live ? `<b class="gxcl-live" title="Live: ${escHtml((r.live_names || []).join(', '))}"><i></i>LIVE${r.live > 1 ? ` ×${r.live}` : ''}</b>` : ''}
           ${roomFlags}
         </div>
         <div class="room-grid-subline">${desc ? escHtml(desc) : `${memberCount} тоглогчийн мэдээлэл`}</div>
@@ -5715,7 +5715,7 @@ init();
     el('btn-admin-dashboard')?.classList.toggle('hidden', !(currentUser.is_admin || currentUser.is_owner));
     document.querySelectorAll('.diamond-amount').forEach((n) => n.classList.toggle('unlimited', unlimited));
     const lv = el('user-level');
-    if (lv) { lv.textContent = `LV ${level} · ${levelTitle(level)}`; lv.title = `Level ${level} — ${levelTitle(level)} цол`; lv.classList.remove('hidden'); }
+    if (lv) { lv.textContent = `LV ${level}`; lv.title = `Level ${level} — ${levelTitle(level)} цол`; lv.classList.remove('hidden'); }   // зүүн самбар нарийн: цол tooltip-д (мөр таслахгүй)
     const tierPill = el('user-tier');
     if (tierPill) { const t = myTier(); tierPill.textContent = TIER_NAME[t]; tierPill.classList.toggle('hidden', t === 'bronze'); }
 

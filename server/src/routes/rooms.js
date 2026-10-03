@@ -105,9 +105,11 @@ router.get('/', optAuth, async (req, res) => {
         ORDER BY (COALESCE(r.kind, 'room') = 'channel') DESC, r.channel_no ASC NULLS LAST, r.created_at DESC
       `, [myClans]);
       let lh = null; try { lh = require('./lanhost'); } catch {}
+      let lv = null; try { lv = require('./live'); } catch {}
       return res.json(result.rows.map((row) => {
         const gc = row.kind === 'channel' && lh ? lh.gameCounts(row.id) : null;   // нийтийн Room: «🎮 N тоглолт»
-        return { ...row, members: row.members || [], ...(gc ? { games_open: gc.open, games_started: gc.started } : {}) };
+        const lives = lv ? lv.livesInRoom(row.id) : [];   // Room Live: лоббид «● LIVE» тэмдэг (2026-10-03)
+        return { ...row, members: row.members || [], ...(gc ? { games_open: gc.open, games_started: gc.started } : {}), ...(lives.length ? { live: lives.length, live_names: lives.map((l) => l.username) } : {}) };
       }));
     } catch (e) {
       console.error(e);
