@@ -3473,7 +3473,7 @@ function renderAccountNo(el, accountNo, createdAt) {
   if (!/^\d{11,}$/.test(no)) { el.classList.add('hidden'); el.textContent = ''; return; }
   const date = `${no.slice(0, 4)}-${no.slice(4, 6)}-${no.slice(6, 8)}`;
   const seq = parseInt(no.slice(8), 10);
-  el.innerHTML = `<b>ID ${no}</b> <span>· ${date}-ны ${seq}-р бүртгэл</span>`;
+  el.innerHTML = `<b>ID ${no}</b>`;   // зөвхөн ID (эзэн: тайлбар текстгүй) — тайлбар hover tooltip-д
   el.title = `Бүртгэлийн ID — ${date}-нд ${seq}-р бүртгүүлсэн${createdAt ? ` (${new Date(createdAt).toLocaleString('mn-MN')})` : ''}`;
   el.classList.remove('hidden');
 }
