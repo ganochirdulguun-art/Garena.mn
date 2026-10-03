@@ -397,6 +397,14 @@ async function resolveReply(reply, roomId) {
 }
 
 // Өрөөний бүх хүнд системийн мессеж (!rank/!ping хариу г.м.) — түүхэнд ч хадгална
+// Лоббийн (нийтийн чат) системийн мессеж — бүх онлайн хэрэглэгчид, түүхэнд хадгалагдана
+function postLobbySystem(text) {
+  const msg = { userId: 0, username: 'Garena.mn', text: String(text).slice(0, 500), time: new Date().toISOString(), system: true };
+  lobbyHistory.push(msg);
+  if (lobbyHistory.length > LOBBY_HISTORY_MAX) lobbyHistory.shift();
+  io.emit('lobby:chat', msg);
+  socialRoutes.saveLobbyMessage(0, msg.username, msg.text, msg.time).catch(() => {});
+}
 function postRoomSystem(roomId, text) {
   const msg = { userId: 0, username: 'Garena.mn', text: String(text).slice(0, 500), time: new Date().toISOString(), system: true };
   if (!roomMessages[roomId]) roomMessages[roomId] = [];
@@ -662,6 +670,7 @@ io.on('connection', (socket) => {
     io.emit('lobby:online_users', onlineUsersList());
     // Лобби чатын сүүлийн 50 мессеж илгээх
     socket.emit('lobby:history', lobbyHistory.slice(-50));
+    try { socket.emit('live:public', { lives: liveRoutes.publicLives() }); } catch {}   // лоббийн LIVE мөр
     console.log(`[Socket] ${username} онлайн (нийт: ${onlineUsers.size})${socket.data.appVersion ? ` v${socket.data.appVersion}${socket.data.portable ? ' portable' : ''}` : ''}`);
     setTimeout(() => oldClientNotice(socket), 4000);   // lobby:history-ийн дараа харагдана
   });
@@ -1070,13 +1079,19 @@ io.on('connection', (socket) => {
 
   // Өрөөнөөс гарах
   // ── Room Live (2026-10-03): эхлүүлэх / зогсоох / үзэх / гарах — токеныг сервер олгоно, видео LiveKit SFU-ээр ──
-  socket.on('live:start', async (_p, ack) => {
+  socket.on('live:start', async (p, ack) => {
     const reply = (r) => { if (typeof ack === 'function') ack(r); };
     try {
       const rid = socket.data.roomId;
       if (!rid) return reply({ ok: false, error: 'Эхлээд Room-д орно уу' });
       if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
-      reply(await liveRoutes.start({ userId: socket.user.id, username: socket.user.username, roomId: rid, socketId: socket.id }));
+      const isPublic = !!(p && p.public);
+      let roomName = '';
+      try { const r = await dbForMigration.query('SELECT name FROM rooms WHERE id = $1', [rid]); roomName = r.rows[0]?.name || ''; } catch {}
+      const res = await liveRoutes.start({ userId: socket.user.id, username: socket.user.username, roomId: rid, socketId: socket.id, isPublic, roomName });
+      // Нийтийн чатад зарлах (эзэн 2026-10-03): бүх онлайн хэрэглэгчид системийн мессеж + лоббийн LIVE мөр
+      if (res.ok && isPublic) postLobbySystem(`🔴 ${socket.user.username} «${roomName || `Room ${rid}`}» Room-д LIVE эхлүүллээ — чатын дээрх LIVE мөрөөс үзнэ үү`);
+      reply(res);
     } catch (e) { console.error('[Live] start', e.message); reply({ ok: false, error: 'Server error' }); }
   });
   socket.on('live:stop', (_p, ack) => { try { liveRoutes.stop(socket.user.id, 'stop'); } catch {} if (typeof ack === 'function') ack({ ok: true }); });
@@ -1085,7 +1100,7 @@ io.on('connection', (socket) => {
     try {
       if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
       const rid = socket.data.roomId;
-      reply(await liveRoutes.watch({ viewerId: socket.user.id, viewerName: socket.user.username, viewerRoomId: rid, streamerId, socketId: socket.id, games: rid ? lanHostRoutes.gamesIn(rid) : null }));
+      reply(await liveRoutes.watch({ viewerId: socket.user.id, viewerName: socket.user.username, viewerRoomId: rid, streamerId, socketId: socket.id, games: rid ? lanHostRoutes.gamesIn(rid) : null, gamesOf: (r) => lanHostRoutes.gamesIn(r) }));
     } catch (e) { console.error('[Live] watch', e.message); reply({ ok: false, error: 'Server error' }); }
   });
   socket.on('live:leave', ({ streamerId } = {}) => { try { liveRoutes.leave(socket.user.id, streamerId ?? null); } catch {} });

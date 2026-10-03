@@ -314,3 +314,10 @@ body.rgc .rgc-mhead { grid-template-columns: 22px minmax(0, 1fr) 30px; }
 .live-picker-f input { margin-right: 6px; }
 .rgc-actions .btn-live { color: #fff !important; background: linear-gradient(#2e2e3c, #1d1d26) !important; border-color: rgba(255,255,255,.18) !important; }
 .rgc-actions .btn-live.on { background: linear-gradient(#f0485a, #c92a3b) !important; border-color: #ff6b7a !important; }
+
+/* Live товч доод цэсэнд (эзний хүсэлт, 2026-10-03) */
+.rgc-nav button.btn-live { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-width: 110px; border-color: #7a1712; background: linear-gradient(#3a1714, #241010); color: #ffb3a8; }
+.rgc-nav button.btn-live:hover { background: linear-gradient(#4a1d19, #2c1413); color: #fff; }
+.rgc-nav button.btn-live.on { background: linear-gradient(#f0485a, #c92a3b); border-color: #ff6b7a; color: #fff; }
+.rgc-nav button.btn-live small { font: 700 10px var(--gx-font, sans-serif); letter-spacing: 0; opacity: .95; }
+.rgc-nav button.btn-live .live-dot { width: 8px; height: 8px; }

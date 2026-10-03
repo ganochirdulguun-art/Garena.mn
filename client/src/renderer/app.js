@@ -247,6 +247,7 @@ async function connectSocket() {
       renderFriendsTab();
       playSound('notify');
       showDMNotification(`${byUsername} найз болохыг зөвшөөрлөө`);
+      try { window.gxNotif?.push({ type: 'info', icon: '🤝', text: `${byUsername} найз болохыг зөвшөөрлөө` }); } catch {}
     }
   });
 
@@ -256,6 +257,7 @@ async function connectSocket() {
     playSound('notify');
     showDesktopNotif('🎮 Өрөөний урилга', `${fromUsername} "${roomName}" өрөөнд урив`);
     showRoomInvite(fromUsername, roomId, roomName);
+    try { window.gxNotif?.push({ type: 'invite', fromUsername, fromUserId, roomId, roomName }); } catch {}   // 🔔 мэдэгдлийн цэс
   });
 
   socket.on('disconnect', (reason) => {

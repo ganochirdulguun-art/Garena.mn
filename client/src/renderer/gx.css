@@ -738,3 +738,42 @@ body.gx .rank-badge { background: var(--gx-surface-3) !important; color: var(--g
 .gx-mesh[data-state="off"] { color: #fcd34d; border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.08); }
 .gx-mesh:hover { background: rgba(255,255,255,.06); }
 #page-main.sidebar-collapsed .gx-mesh span { display: none; }
+
+/* ── 🔔 Мэдэгдлийн цэс (2026-10-03) ── */
+.gx-rail-bell.has { color: var(--gx-accent); }
+.gx-rail-i .gx-badge { position: absolute; top: 2px; right: 2px; min-width: 16px; height: 16px; font-size: 9.5px; line-height: 16px; padding: 0 4px; }
+.gx-notif { display: flex; flex-direction: column; gap: 14px; padding: 12px 14px; }
+.gx-notif-sec { display: flex; flex-direction: column; gap: 6px; }
+.gx-notif-h { display: flex; align-items: center; justify-content: space-between; font: 800 12px var(--gx-font); color: var(--gx-text-2); text-transform: uppercase; letter-spacing: .04em; padding: 0 2px; }
+.gx-notif-h i { font-style: normal; margin-left: 6px; padding: 0 6px; border-radius: 6px; background: var(--gx-accent-soft); color: var(--gx-accent); }
+.gx-notif-i { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--gx-line); border-radius: 10px; background: var(--gx-surface-2); color: var(--gx-text); text-align: left; cursor: pointer; font: inherit; }
+.gx-notif-i:not(.static):hover { border-color: var(--gx-accent); background: var(--gx-accent-soft); }
+.gx-notif-i.static { cursor: default; }
+.gx-notif-av { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #e63946, #a4161a); color: #fff; font: 800 13px var(--gx-font); }
+.gx-notif-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.gx-notif-t b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-notif-t small { font-size: 11.5px; color: var(--gx-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gx-notif-i em { flex: none; font-style: normal; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--gx-accent); color: #fff; font: 800 11px/20px var(--gx-font); text-align: center; }
+.gx-notif-act { flex: none; display: flex; gap: 4px; }
+.gx-notif-act .btn { height: 26px; padding: 0 9px; font-size: 11.5px; }
+.gx-notif-clear { background: none; border: 0; color: var(--gx-text-3); font: 600 11px var(--gx-font); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.gx-notif-clear:hover { color: var(--gx-accent); }
+.gx-notif-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 36px 16px; text-align: center; color: var(--gx-text-2); }
+.gx-notif-empty-ico { font-size: 34px; opacity: .5; }
+.gx-notif-empty b { color: var(--gx-text); font-size: 14px; }
+.gx-notif-empty span { font-size: 12px; max-width: 240px; }
+
+/* ── Лоббийн нийтийн чат: LIVE мөр (2026-10-03) ── */
+.gx-live-strip { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; margin: 0 0 6px; border: 1px solid rgba(230,57,70,.35); border-radius: 10px; background: linear-gradient(90deg, rgba(230,57,70,.12), rgba(230,57,70,.04)); }
+.gx-live-strip.hidden { display: none; }
+.gx-live-strip-h { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 6px; background: #e63946; color: #fff; font: 800 11px var(--gx-font); letter-spacing: .4px; }
+.gx-live-strip-h i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: gxcl-live-blink 1.2s infinite; }
+@keyframes gxcl-live-blink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+.gx-live-chip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border-radius: 8px; background: var(--gx-surface-2); border: 1px solid var(--gx-line); font: 600 12.5px var(--gx-font); color: var(--gx-text); }
+.gx-live-chip small { color: var(--gx-text-2); font-size: 11.5px; }
+.gx-live-chip em { font-style: normal; font-size: 11px; color: var(--gx-text-3); }
+.gx-live-chip button { height: 24px; padding: 0 10px; border: 0; border-radius: 6px; background: #e63946; color: #fff; font: 800 11.5px var(--gx-font); cursor: pointer; }
+.gx-live-chip button:hover { background: #ff5a6a; }
+.gx-live-chip button:disabled { background: #7a2a33; cursor: not-allowed; }
+.gx-live-chip.full { opacity: .8; }
+.live-picker-f { display: flex; flex-direction: column; gap: 6px; }

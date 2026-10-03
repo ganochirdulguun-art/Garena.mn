@@ -69,6 +69,7 @@
       <button type="button" data-rgc="start" class="start" id="rgc-start" title="">START<small id="rgc-start-sub"></small></button>
       <button type="button" data-rgc="ladder" title="Тоглогчдын жагсаалт (Ranking)">LADDER</button>
       <button type="button" data-rgc="shop" title="Silver / Gold гишүүнчлэл">SHOP</button>
+      <button type="button" data-rgc="live" id="btn-live" class="btn-live" title="Дэлгэцээ Room-ын гишүүдэд шууд дамжуулах (720p · 30fps). Нэг LAN тоглоомд байгаа хүн үзэхгүй."><span class="live-dot"></span>LIVE</button>
     </nav>`;
   gxr.parentNode.insertBefore(root, gxr);
   gxr.classList.add('rgc-hidden');
@@ -100,6 +101,7 @@
     else if (a === 'forum') post('tab', { tab: 'discord' });
     else if (a === 'ladder') post('tab', { tab: 'ranking' });
     else if (a === 'shop') post('tab', { tab: 'premium' });
+    else if (a === 'live') { /* gx-live.js товчин дээрээ өөрөө сонсоно */ }
     else if (a === 'start') {
       // START: сонгосон НЭЭЛТТЭЙ тоглоом байвал түүнд нэгдэнэ (жагсаалтын эхний/эхэлсэн тоглоом биш) — аудит 2026-10-02
       const lan = window.gxLan; const sg = selected && lan?.games.get(selected);

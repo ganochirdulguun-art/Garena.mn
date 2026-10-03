@@ -60,6 +60,17 @@ const games = new Map([['tokA', { host_user_id: 10 }]]);   // Room 901-д 10 х�
   assert.equal(live.liveOf(10), null); assert.equal(sent.filter((x) => x.ev === 'live:ended').length, 2); ok('Streamer socket салбал Live зогсож үзэгчдэд live:ended');
   live.onSocketDisconnect(11, 'other-socket'); assert.ok(live.liveOf(11)); ok('Өөр socket салахад Live зогсохгүй');
   live.onRoomLeave(11, 901); assert.equal(live.liveOf(11), null); ok('Room-оос гарвал Live зогсоно');
+  // Нийтийн чатад зарласан Live: Room-д байхгүй хүн үзнэ; хувийн Live-ийг үзэхгүй; live:public мэдэгдэл
+  sent.length = 0;
+  r = await live.start({ userId: 40, username: 'Pub', roomId: 901, socketId: 's40', isPublic: true, roomName: 'WC3 Room 1' }); assert.equal(r.ok, true); assert.equal(r.state.public, true); assert.equal(r.state.roomName, 'WC3 Room 1');
+  assert.equal(sent.some((x) => x.room === undefined && x.ev === 'live:public'), false); ok('start(public) → төлөвт public/roomName');
+  assert.deepEqual(live.publicLives().map((l) => l.username), ['Pub']); ok('publicLives()');
+  r = await live.watch({ viewerId: 50, viewerName: 'Lobby', viewerRoomId: null, streamerId: 40, socketId: 's50', games: null, gamesOf: () => games }); assert.equal(r.ok, true); ok('Нийтийн Live-ийг лоббиос (Room-гүй) үзнэ');
+  players.push({ token: 'tokA', user_id: 51 }); games.set('tokA', { host_user_id: 40 });
+  r = await live.watch({ viewerId: 51, viewerName: 'InGame', viewerRoomId: null, streamerId: 40, socketId: 's51', games: null, gamesOf: () => games }); assert.equal(r.code, 'SAME_GAME'); ok('Лоббиос ч нэг LAN тоглоомд байгаа хүн үзэхгүй (gamesOf)');
+  r = await live.start({ userId: 41, username: 'Priv', roomId: 901, socketId: 's41' }); assert.equal(r.ok, true);
+  r = await live.watch({ viewerId: 52, viewerName: 'Lobby2', viewerRoomId: null, streamerId: 41, socketId: 's52', games: null, gamesOf: () => games }); assert.equal(r.ok, false); ok('Хувийн Live-ийг Room-гүй хүн үзэхгүй');
+  live.stop(40); live.stop(41);
   assert.deepEqual(live.stats(), { enabled: true, lives: 0, viewers: 0, max_streams: 2, max_viewers: 2, max_viewers_total: 3 }); ok('stats()');
   console.log(`\n=== live: ${pass} PASS ===`); process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

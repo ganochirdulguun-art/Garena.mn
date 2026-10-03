@@ -29,7 +29,17 @@ function setIO(io) { _io = io; }
 const lives = new Map();
 
 function publicState(l) {
-  return { userId: String(l.userId), username: l.username, roomId: String(l.roomId), viewers: l.viewers.size, max: CFG.MAX_VIEWERS, startedAt: l.startedAt };
+  return { userId: String(l.userId), username: l.username, roomId: String(l.roomId), roomName: l.roomName || '', public: !!l.public, viewers: l.viewers.size, max: CFG.MAX_VIEWERS, startedAt: l.startedAt };
+}
+// Нийтийн чатад зарласан Live-үүд (Room-д байхгүй хүн ч үзнэ — сурталчилгаа, эзэн 2026-10-03)
+function publicLives() { return [...lives.values()].filter((l) => l.public).map(publicState); }
+let _lastPublic = '';
+function broadcastPublic(force = false) {
+  try {
+    const list = publicLives();
+    const key = JSON.stringify(list.map((l) => [l.userId, l.viewers]));
+    if (force || key !== _lastPublic) { _lastPublic = key; _io?.emit('live:public', { lives: list }); }
+  } catch {}
 }
 function livesInRoom(roomId) { return [...lives.values()].filter((l) => l.roomId === String(roomId)).map(publicState); }
 function liveOf(userId) { return lives.get(String(userId)) || null; }
@@ -39,6 +49,7 @@ function broadcastRoom(roomId) {
   try { _io?.to(String(roomId)).emit('live:state', { lives: livesInRoom(roomId) }); } catch {}
   // Лоббийн жагсаалтын «● LIVE» тэмдэг: Live-тай өрөөний олонлог өөрчлөгдвөл л бүх хүнд rooms:updated (үзэгчийн тоо бүрт биш)
   try { const key = [...new Set([...lives.values()].map((l) => l.roomId))].sort().join(','); if (key !== _lastLobby) { _lastLobby = key; _io?.emit('rooms:updated'); } } catch {}
+  broadcastPublic();
 }
 
 async function mintToken({ identity, name, room, publish }) {
@@ -49,14 +60,14 @@ async function mintToken({ identity, name, room, publish }) {
 }
 
 /** Streamer Live эхлүүлнэ. */
-async function start({ userId, username, roomId, socketId }) {
+async function start({ userId, username, roomId, socketId, isPublic = false, roomName = '' }) {
   if (!enabled()) return { ok: false, error: 'Live сервер тохируулагдаагүй байна' };
   if (!roomId) return { ok: false, error: 'Эхлээд Room-д орно уу' };
   const id = String(userId);
   if (lives.has(id)) stop(id, 'restart');
   if (lives.size >= CFG.MAX_STREAMS) return { ok: false, error: `Зэрэг ${CFG.MAX_STREAMS} Live-ийн хязгаар дүүрсэн — дараа дахин оролдоно уу` };
   const lkRoom = `live-${roomId}-${id}-${Date.now().toString(36)}`;
-  const l = { userId: id, username, roomId: String(roomId), lkRoom, socketId, startedAt: new Date().toISOString(), viewers: new Map() };
+  const l = { userId: id, username, roomId: String(roomId), roomName: String(roomName || '').slice(0, 80), public: !!isPublic, lkRoom, socketId, startedAt: new Date().toISOString(), viewers: new Map() };
   lives.set(id, l);
   const token = await mintToken({ identity: `u${id}`, name: username, room: lkRoom, publish: true });
   broadcastRoom(roomId);
@@ -99,14 +110,15 @@ async function inSameLanGame(games, a, b) {
 }
 
 /** Үзэгч нэгдэнэ. games = тухайн Room-ын LAN тоглоомууд (lanhost.gamesIn). */
-async function watch({ viewerId, viewerName, viewerRoomId, streamerId, socketId, games }) {
+async function watch({ viewerId, viewerName, viewerRoomId, streamerId, socketId, games, gamesOf = null }) {
   if (!enabled()) return { ok: false, error: 'Live сервер тохируулагдаагүй байна' };
   const l = lives.get(String(streamerId));
   if (!l) return { ok: false, error: 'Энэ Live дууссан байна' };
   const vid = String(viewerId);
   if (vid === l.userId) return { ok: false, error: 'Өөрийнхөө Live-ийг үзэх шаардлагагүй' };
-  if (String(viewerRoomId || '') !== l.roomId) return { ok: false, error: 'Зөвхөн тухайн Room-ын гишүүд үзнэ' };
-  if (await inSameLanGame(games, l.userId, vid)) return { ok: false, error: 'Нэг LAN тоглоомд байгаа хүн Live үзэх боломжгүй', code: 'SAME_GAME' };
+  if (!l.public && String(viewerRoomId || '') !== l.roomId) return { ok: false, error: 'Зөвхөн тухайн Room-ын гишүүд үзнэ' };
+  const g = games || (typeof gamesOf === 'function' ? gamesOf(l.roomId) : null);   // лоббиос үзэгч: streamer-ийн Room-ын тоглоомуудаар шалгана
+  if (await inSameLanGame(g, l.userId, vid)) return { ok: false, error: 'Нэг LAN тоглоомд байгаа хүн Live үзэх боломжгүй', code: 'SAME_GAME' };
   if (!l.viewers.has(vid)) {
     if (l.viewers.size >= CFG.MAX_VIEWERS) return { ok: false, error: `Үзэгчийн хязгаар дүүрсэн (${CFG.MAX_VIEWERS})`, code: 'FULL' };
     if (totalViewers() >= CFG.MAX_VIEWERS_TOTAL) return { ok: false, error: `Платформын нийт үзэгчийн хязгаар дүүрсэн (${CFG.MAX_VIEWERS_TOTAL})`, code: 'FULL' };
@@ -158,4 +170,4 @@ async function onLanJoin({ roomId, token, userId, games }) {
 
 function stats() { return { enabled: enabled(), lives: lives.size, viewers: totalViewers(), max_streams: CFG.MAX_STREAMS, max_viewers: CFG.MAX_VIEWERS, max_viewers_total: CFG.MAX_VIEWERS_TOTAL }; }
 
-module.exports = { CFG, enabled, setIO, start, stop, watch, leave, liveOf, livesInRoom, onSocketDisconnect, onRoomLeave, onLanJoin, inSameLanGame, stats, _lives: lives };
+module.exports = { CFG, enabled, setIO, start, stop, watch, leave, liveOf, livesInRoom, publicLives, broadcastPublic, onSocketDisconnect, onRoomLeave, onLanJoin, inSameLanGame, stats, _lives: lives };
