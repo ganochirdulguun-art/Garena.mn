@@ -239,7 +239,7 @@ router.get('/player/id/:userId', async (req, res) => {
   if (await dbAvailable()) {
     try {
       const result = await db.query(
-        'SELECT id, username, avatar_url, tierbot_tier, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at FROM users WHERE id = $1',
+        'SELECT id, username, avatar_url, tierbot_tier, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, created_at, account_no FROM users WHERE id = $1',
         [userId]
       );
       if (!result.rows[0]) return res.status(404).json({ error: 'Тоглогч олдсонгүй' });

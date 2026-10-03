@@ -592,7 +592,7 @@ router.get('/me', authMW, async (req, res) => {
   if (await dbOk()) {
     try {
       const result = await db.query(
-        'SELECT id, username, email, discord_id, discord_username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, membership, membership_until, name_effect, diamonds, xp, level, block_games, block_wins, tierbot_tier, tierbot_rank, COALESCE(banned,FALSE) AS banned, ban_reason, COALESCE(play_seconds_total,0) AS play_seconds_total FROM users WHERE id = $1',
+        'SELECT id, username, email, discord_id, discord_username, avatar_url, (COALESCE(wins,0)+COALESCE(platform_wins,0)) AS wins, (COALESCE(losses,0)+COALESCE(platform_losses,0)) AS losses, membership, membership_until, name_effect, diamonds, xp, level, block_games, block_wins, tierbot_tier, tierbot_rank, COALESCE(banned,FALSE) AS banned, ban_reason, COALESCE(play_seconds_total,0) AS play_seconds_total, account_no, created_at FROM users WHERE id = $1',
         [req.user.id]
       );
       if (result.rows[0]) {

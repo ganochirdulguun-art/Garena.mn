@@ -3465,6 +3465,18 @@ function renderPagination(current, total, onPage) {
 }
 
 // ── User Profile Popup ────────────────────────────────────
+// Бүртгэлийн ID (2026-10-03, эзэн — GameRanger маяг): 20261003001 = 2026-10-03-ны эхний бүртгэл.
+// Серверээс account_no ирэхгүй (хуучин сервер) бол нуунa.
+function renderAccountNo(el, accountNo, createdAt) {
+  if (!el) return;
+  const no = String(accountNo || '').trim();
+  if (!/^\d{11,}$/.test(no)) { el.classList.add('hidden'); el.textContent = ''; return; }
+  const date = `${no.slice(0, 4)}-${no.slice(4, 6)}-${no.slice(6, 8)}`;
+  const seq = parseInt(no.slice(8), 10);
+  el.innerHTML = `<b>ID ${no}</b> <span>· ${date}-ны ${seq}-р бүртгэл</span>`;
+  el.title = `Бүртгэлийн ID — ${date}-нд ${seq}-р бүртгүүлсэн${createdAt ? ` (${new Date(createdAt).toLocaleString('mn-MN')})` : ''}`;
+  el.classList.remove('hidden');
+}
 async function openUserProfile(userId) {
   const modal = document.getElementById('user-profile-modal');
   const currentUser = await window.api.getUser();
@@ -3479,6 +3491,7 @@ async function openUserProfile(userId) {
   document.getElementById('popup-friend-btn-wrap').innerHTML = '';
   document.getElementById('popup-stats')?.classList.add('hidden');
   document.getElementById('popup-tier')?.classList.add('hidden');
+  document.getElementById('popup-account')?.classList.add('hidden');
 
   const avatarEl = document.getElementById('popup-avatar');
   avatarEl.src = ''; avatarEl.style.display = 'none';
@@ -3492,6 +3505,7 @@ async function openUserProfile(userId) {
     document.getElementById('popup-username').textContent = withTier(stats.username, stats.tierbot_tier);
     const tierEl = document.getElementById('popup-tier');
     if (tierEl) { const tr = String(stats.tierbot_tier || '').trim(); tierEl.textContent = tr ? `Tier ${tr}` : 'Tier —'; tierEl.classList.toggle('none', !tr); tierEl.classList.remove('hidden'); }
+    renderAccountNo(document.getElementById('popup-account'), stats.account_no, stats.created_at);
     document.getElementById('popup-wins').textContent     = `${stats.wins} хожил`;
     document.getElementById('popup-losses').textContent   = `${stats.losses} хожигдол`;
     document.getElementById('popup-winrate').textContent  = stats.winrate;
@@ -3607,6 +3621,7 @@ async function loadProfile() {
     const discordName = String(user.discord_username || user.discord_display_name || user.discord_global_name || '').trim();
     document.getElementById('profile-name').textContent  = displayName;
     document.getElementById('profile-email').textContent = user.email || '';
+    renderAccountNo(document.getElementById('profile-account'), user.account_no, user.created_at);
     const nameSourceEl = document.getElementById('profile-name-source');
     const nameNoteEl   = document.getElementById('profile-name-note');
     const hasDiscord   = Boolean(user.discord_id);

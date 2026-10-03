@@ -245,6 +245,7 @@ async function runMigrations(db) {
   // Кланууд, Map-ын сан — өмнөх алхам унасан ч үүсгэхийг оролдоно (ensureTables дотроо алдаагаа барина)
   await require('../routes/clans').ensureTables();
   await require('../routes/maps').ensureTables();   // Map-ын сан (bytea)
+  await ensureAccountNo(db);   // Бүртгэлийн ID 20261003001 (2026-10-03, эзэн — GameRanger маяг)
   await require('../routes/banner').ensureTables(); // профайлын дэвсгэр
   await require('../routes/social').ensureTables(); // lobby_messages.reply_to (чатын хариулт)
   await require('../routes/wishes').ensureTables(); // game_wishes (хүсэж буй тоглоомын санал)
@@ -254,4 +255,36 @@ async function runMigrations(db) {
   await require('../services/results').ensureTables(); // game_results.game_token (нэг токен = нэг дүн)
 }
 
-module.exports = { runMigrations };
+// Бүртгэлийн ID (users.account_no): «ЖЖЖЖССӨӨ» (Улаанбаатарын өдөр) + тухайн өдрийн хэд дэх бүртгэл (3 орон, 999-өөс хэтэрвэл 4 орон).
+// Жишээ: 20261003001 = 2026-10-03-ны эхний бүртгэл. Trigger INSERT бүрт автоматаар олгоно (бүх бүртгэлийн зам: register / Discord / TierSync).
+// Хуучин хэрэглэгчдэд created_at-аар нэг удаа backfill. Advisory lock — нэгэн зэрэг бүртгүүлэхэд давхардахгүй.
+async function ensureAccountNo(db) {
+  try {
+    await db.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS account_no VARCHAR(16)');
+    await db.query(`
+      CREATE OR REPLACE FUNCTION users_assign_account_no() RETURNS trigger AS $$
+      DECLARE pfx TEXT; seq INTEGER;
+      BEGIN
+        IF NEW.account_no IS NULL THEN
+          PERFORM pg_advisory_xact_lock(hashtext('users_account_no'));
+          pfx := to_char(NOW() AT TIME ZONE 'Asia/Ulaanbaatar', 'YYYYMMDD');
+          SELECT COALESCE(MAX(substr(account_no, 9)::int), 0) + 1 INTO seq FROM users WHERE account_no LIKE pfx || '%';
+          NEW.account_no := pfx || lpad(seq::text, 3, '0');
+        END IF;
+        RETURN NEW;
+      END $$ LANGUAGE plpgsql;
+      DROP TRIGGER IF EXISTS trg_users_account_no ON users;
+      CREATE TRIGGER trg_users_account_no BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION users_assign_account_no();
+    `);
+    // Backfill: created_at (timestamp, UTC-д хадгалагдсан) → Улаанбаатарын өдөр; өдөр бүрт created_at, id дарааллаар.
+    // Анхаар: COALESCE(timestamp, NOW()) нь timestamptz болж хувирч өдөр 1-ээр буруу гардаг байсан — NOW() AT TIME ZONE 'UTC' (timestamp) ашиглана.
+    const r = await db.query(`
+      UPDATE users u SET account_no = s.no FROM (
+        SELECT id, to_char(d, 'YYYYMMDD') || lpad((row_number() OVER (PARTITION BY d::date ORDER BY created_at, id))::text, 3, '0') AS no
+        FROM (SELECT id, created_at, (COALESCE(created_at, NOW() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ulaanbaatar' AS d FROM users WHERE account_no IS NULL) t
+      ) s WHERE u.id = s.id AND u.account_no IS NULL`);
+    if (r.rowCount) console.log(`[Migrate] account_no backfill: ${r.rowCount} хэрэглэгч`);
+    await db.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_account_no ON users(account_no)');
+  } catch (e) { console.error('[Migrate] account_no:', e.message); }
+}
+module.exports = { runMigrations, ensureAccountNo };

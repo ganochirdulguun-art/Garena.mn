@@ -274,3 +274,11 @@ body.rgc .rgc-mhead { grid-template-columns: 22px minmax(0, 1fr) 30px; }
 /* Профайлын цонх: Tier */
 .popup-tier { display: inline-block; padding: 1px 8px; border-radius: 5px; background: linear-gradient(#3fae4a, #237a2c); color: #fff; font: 800 12px/1.6 var(--gx-font, sans-serif); text-shadow: 0 1px 1px rgba(0,0,0,.35); }
 .popup-tier.none { background: #6b7280; }
+
+/* Бүртгэлийн ID 20261003001 — profile popup + өөрийн профайл (2026-10-03) */
+.popup-account { margin: 2px 0 6px; font: 600 12px/1.4 var(--gx-font, sans-serif); color: var(--gx-text-2, #6b7280); letter-spacing: .2px; }
+.popup-account b { font-weight: 800; color: var(--gx-text, #1f2937); font-variant-numeric: tabular-nums; }
+.popup-account.hidden, .profile-account.hidden { display: none; }
+.profile-account { display: block !important; margin: 4px 0 0; font-size: 12.5px; color: var(--gx-text-2, #6b7280); }
+.profile-account.hidden { display: none !important; }
+.profile-account b { font-weight: 800; color: var(--gx-text, #1f2937); font-variant-numeric: tabular-nums; }

@@ -5,7 +5,7 @@
   const loggedIn = q.get('login') !== '0';
   const now = Date.now();
   const user = {
-    id: 1, username: 'VitoCorleone', discord_username: 'VitoCorleone', tierbot_tier: '1-1',
+    id: 1, username: 'VitoCorleone', discord_username: 'VitoCorleone', tierbot_tier: '1-1', account_no: '20250812001', created_at: '2025-08-12T03:10:00.000Z',
     avatar_url: '', tier: q.get('tier') || 'gold', membership_until: new Date(now + 20 * 864e5).toISOString(),
     diamonds: 2480, xp: 5320, level: 17, next_level_xp: 7000, block_games: 6, block_wins: 4,
     play_seconds_total: 184000, play_next_diamond_sec: 1400, name_effect: 'neon', is_owner: true, unlimited_diamonds: false, banner_ver: q.get('banner') ? 1 : null,
@@ -43,7 +43,7 @@
     getRooms: async () => (q.get('nochan') ? rooms : q.get('demo') ? DEMO_CH : [...CHANNELS, ...CH_EXTRA, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],
     getAppVersion: async () => (q.get('v3') ? '3.0.0' : '2.9.0 (preview)'), getUnreadCount: async () => ({}), getDiscordServers: async () => [], getStreamers: async () => [],
-    getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getCacheSize: async () => ({ total: 0 }),
+    getRanking: async () => ({ rows: [], total: 0 }), getGameHistory: async () => ({ rows: [], total: 0 }), getPlayerStatsById: async (id) => ({ id, username: String(id) === '1' ? 'VitoCorleone' : 'Purevdulam', tierbot_tier: '2-1', wins: 142, losses: 97, winrate: '59.4%', avatar_url: '', account_no: '20261003001', created_at: new Date().toISOString(), stats: null }), getCacheSize: async () => ({ total: 0 }),
     getAd: async () => (q.get('noad') ? null : [{ image_tall: '/dev/ads/gs-ad-1-tall.png', text: 'GarenaSystem' }, { image_tall: '/dev/ads/gmn-ad-zeon-tall.png', text: 'ZEON' }, { image_tall: '/dev/ads/gmn-ad-diamond-tall.png', text: 'Diamond' }]),
     ipGameKind: async (t) => (/counter|cs/i.test(String(t)) ? 'cs16' : /quake/i.test(String(t)) ? 'q3' : null),
     ipGameHost: async () => ({ kind: 'cs16', ip: '100.64.0.1', port: 27015, map: 'de_dust2' }),
