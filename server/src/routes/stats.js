@@ -33,6 +33,21 @@ async function notifyRZRBot(payload) {
   }
 }
 
+// TierSystem-ийн тэмцээний тоглолтууд ч Level/XP-д тоологдоно (2026-10-03, эзэн): хожил = XP_WIN (40), хожигдол = XP_LOSS (10).
+// Өмнө нь тооцсон тоог (tierbot_xp_wins/losses) хадгалж ЗӨВХӨН ӨСӨЛТИЙГ л нэмнэ — sync 10 мин тутам давтагддаг тул давхар олгохгүй.
+async function creditTierXp(userId, wins, losses) {
+  const n = (v) => Math.max(0, parseInt(v, 10) || 0);
+  const r = await db.query('SELECT xp, COALESCE(tierbot_xp_wins, 0) AS cw, COALESCE(tierbot_xp_losses, 0) AS cl FROM users WHERE id = $1', [userId]);
+  const row = r.rows[0];
+  if (!row) return 0;
+  const dw = Math.max(0, n(wins) - n(row.cw)), dl = Math.max(0, n(losses) - n(row.cl));
+  if (!dw && !dl) return 0;
+  const { RULES, levelFromXp } = require('../services/progression');
+  const delta = dw * RULES.XP_WIN + dl * RULES.XP_LOSS;
+  const xp = Math.max(0, n(row.xp) + delta);
+  await db.query('UPDATE users SET xp = $1, level = $2, tierbot_xp_wins = $3, tierbot_xp_losses = $4 WHERE id = $5', [xp, levelFromXp(xp), n(wins), n(losses), userId]);
+  return delta;
+}
 async function ensureTierBotColumns() {
   if (tierBotColumnsReady) return;
   if (!db) return;
@@ -45,7 +60,9 @@ async function ensureTierBotColumns() {
       ADD COLUMN IF NOT EXISTS tierbot_synced_at TIMESTAMP,
       ADD COLUMN IF NOT EXISTS platform_wins INTEGER DEFAULT 0,
       ADD COLUMN IF NOT EXISTS platform_losses INTEGER DEFAULT 0,
-      ADD COLUMN IF NOT EXISTS custom_username BOOLEAN DEFAULT FALSE;
+      ADD COLUMN IF NOT EXISTS custom_username BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS tierbot_xp_wins INTEGER DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS tierbot_xp_losses INTEGER DEFAULT 0;
 
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_id ON users(tierbot_id);
     CREATE INDEX IF NOT EXISTS idx_users_tierbot_rating ON users(tierbot_rating DESC);
@@ -153,6 +170,7 @@ async function upsertTierBotPlayer(player, opts = {}) {
        WHERE id = $7`,
       [player.wins, player.losses, player.tierbot_id, player.rating, player.tier, player.rank, existing.id]
     );
+    try { await creditTierXp(existing.id, player.wins, player.losses); } catch (e) { console.warn('[TierSync] xp:', e.message); }
     return 'updated';
   }
 
@@ -182,6 +200,7 @@ async function upsertTierBotPlayer(player, opts = {}) {
        WHERE id = $9`,
       [...params, existing.id]
     );
+    try { await creditTierXp(existing.id, player.wins, player.losses); } catch (e) { console.warn('[TierSync] xp:', e.message); }
     return 'updated';
   }
 
@@ -531,4 +550,4 @@ function memberIdToNumber(id) {
 }
 
 module.exports = router;
-module.exports.tierBotHelpers = { ensureTierBotColumns, extractTierBotRows, normalizeTierBotPlayer, upsertTierBotPlayer, tierBotSourceUrl, tierBotHeaders };
+module.exports.tierBotHelpers = { ensureTierBotColumns, creditTierXp, extractTierBotRows, normalizeTierBotPlayer, upsertTierBotPlayer, tierBotSourceUrl, tierBotHeaders };
