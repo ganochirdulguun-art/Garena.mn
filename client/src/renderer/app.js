@@ -2,6 +2,14 @@ const SERVER = 'https://garenamn-production.up.railway.app';
 
 // Богино туслах (локал const el-ууд үүнийг өөрсдийн scope-д shadow хийнэ)
 function el(id) { return document.getElementById(id); }
+// Цонх хаагдах / iframe DOM-оос устгагдах үеийн цэвэрлэгээ: шигтгэсэн өрөөний iframe-д beforeunload ХЭЗЭЭ Ч ажилладаггүй
+// (зөвхөн pagehide/unload) тул room:leave, relay зогсоох зэрэг цэвэрлэгээ орхигддог байв (аудит 2026-10-02) — хоёуланд нь, нэг удаа
+function onUnloadOnce(fn) {
+  let done = false;
+  const h = () => { if (done) return; done = true; try { fn(); } catch {} };
+  window.addEventListener('beforeunload', h);
+  window.addEventListener('pagehide', h);
+}
 
 // ── Socket.io ─────────────────────────────────────────────
 let socket = null;
@@ -224,6 +232,7 @@ async function connectSocket() {
       pendingRequests.push({ id: fromUserId, username: fromUsername, avatar_url: null });
       updatePendingBadge();
       renderFriendsTab();
+      if (isRoomMode() && window.parent !== window) return;   // дуу/мэдэгдэл зөвхөн үндсэн цонхонд
       playSound('notify');
       showDesktopNotif('👋 Найзын хүсэлт', `${fromUsername} найз болохыг хүсэж байна`);
       showDMNotification(`${fromUsername} найз болохыг хүсэж байна`);
@@ -243,6 +252,7 @@ async function connectSocket() {
 
   // Өрөөнд урих
   socket.on('room:invited', ({ fromUsername, fromUserId, roomId, roomName }) => {
+    if (isRoomMode() && window.parent !== window) return;   // үндсэн цонх боловсруулна (давхар мэдэгдэлгүй)
     playSound('notify');
     showDesktopNotif('🎮 Өрөөний урилга', `${fromUsername} "${roomName}" өрөөнд урив`);
     showRoomInvite(fromUsername, roomId, roomName);
@@ -664,7 +674,7 @@ async function init() {
     const p = new URLSearchParams(window.location.search);
     document.getElementById('dm-fullpage').classList.add('active');
     initDMWindowMode(p.get('dmUserId'), p.get('dmUsername'));
-    window.addEventListener('beforeunload', () => {
+    onUnloadOnce(() => {
       if (socket && activeDmUserId) socket.emit('typing:stop', { toUserId: activeDmUserId });
     });
     return;
@@ -698,7 +708,7 @@ async function init() {
     if (currentRoom.kind === 'channel') { currentRoom.isHost = false; currentRoom.hostId = ''; document.body.classList.add('channel-room'); }
 
     // Цонх хаагдахад өрөөнөөс гарах + relay зогсоох
-    window.addEventListener('beforeunload', () => {
+    onUnloadOnce(() => {
       if (currentRoom) {
         if (socket) {
           socket.emit('room:leave', { roomId: currentRoom.id });
@@ -1902,9 +1912,19 @@ function chatAvatarEl(userId, username, isMe) {
   return img;
 }
 
-function appendMessage({ userId, username, text, time, replyTo, quiet }) {
+function appendMessage({ userId, username, text, time, replyTo, quiet, system }) {
   const box  = document.getElementById('chat-messages');
-  const isMe = username === currentUser?.username;
+  if (system === true && (!userId || String(userId) === '0')) {   // системийн мэдэгдэл — тусдаа хэв маяг (дуурайлтаас хамгаална)
+    const d = document.createElement('div');
+    d.className = 'sys-msg room-sys';
+    d.dataset.time = time;
+    d.innerHTML = `<span class="sys-tag">СИСТЕМ</span> ${parseMentions(escHtml(text), false)}`;
+    const stick0 = quiet || chatStick(box);
+    box.appendChild(d);
+    if (stick0) box.scrollTop = box.scrollHeight;
+    return;
+  }
+  const isMe = String(userId || '') === String(currentUser?.id || '') || (!userId && username === currentUser?.username);
   const t    = formatChatTime(time);
   const div  = document.createElement('div');
   const toMe = !isMe && isReplyToMe(replyTo);
@@ -1987,7 +2007,7 @@ function renderRoomHistory(msgs) {
     box.dataset.histWired = '1';
     box.dataset.more = msgs.length >= 200 ? '1' : '';
     box.addEventListener('scroll', () => { if (box.scrollTop < 40) loadOlderRoomMessages(); }, { passive: true });
-    window.addEventListener('beforeunload', markRoomSeen);
+    onUnloadOnce(markRoomSeen);
     setInterval(markRoomSeen, 15000);
   }
   markRoomSeen();
@@ -2227,7 +2247,7 @@ async function kickPlayer(targetId, targetName) {
 // ── Нийтийн лобби чат ────────────────────────────────────
 const lobbyMessages = []; // Лобби чатын мессежүүд санах ойд хадгалагдана
 
-function appendLobbyMessage({ userId, username, text, time, replyTo }, isHistory = false) {
+function appendLobbyMessage({ userId, username, text, time, replyTo, system }, isHistory = false) {
   // Санах ойд хадгалах
   lobbyMessages.push({ userId, username, text, time, replyTo });
   // Хэт олон мессеж хуримтлагдахаас сэргийлэх (сүүлийн 200)
@@ -2235,7 +2255,7 @@ function appendLobbyMessage({ userId, username, text, time, replyTo }, isHistory
 
   const box = document.getElementById('lobby-chat-messages');
   if (!box) return;
-  _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, isHistory);
+  _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system }, isHistory);
 
   if (username !== currentUser?.username && !isHistory) {
     const chatTab = document.getElementById('tab-chat');
@@ -2246,8 +2266,18 @@ function appendLobbyMessage({ userId, username, text, time, replyTo }, isHistory
   }
 }
 
-function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo }, quiet = false) {
-  const isMe = username === currentUser?.username;
+function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system }, quiet = false) {
+  // Системийн мэдэгдэл (сервер userId=0, system=true) — тусдаа хэв маяг; энгийн хэрэглэгч ижил нэрээр дуурайж чадахгүй
+  if (system === true && (!userId || String(userId) === '0')) {
+    const d = document.createElement('div');
+    d.className = 'sys-msg lobby-sys';
+    d.dataset.time = time;
+    d.innerHTML = `<span class="sys-tag">СИСТЕМ</span> ${parseMentions(escHtml(text), false)}`;
+    box.appendChild(d);
+    if (quiet || box.scrollHeight - box.scrollTop - box.clientHeight < 80) box.scrollTop = box.scrollHeight;
+    return;
+  }
+  const isMe = String(userId || '') === String(currentUser?.id || '') || (!userId && username === currentUser?.username);
   const t    = formatChatTime(time);
   const div  = document.createElement('div');
   const toMe = !isMe && isReplyToMe(replyTo);
@@ -2335,13 +2365,13 @@ async function loadUnreadDMCounts() {
 }
 
 // ── Private мессеж (DM) — Floating Popup систем ──────────
-function openDM(userId, username) {
+function openDM(userId, username, { background = false } = {}) {
   const uid = String(userId);
   const uname = username || dmConversations[uid]?.username || 'DM';
   // Yahoo Messenger маягийн ТУСДАА цонхоор нээнэ (доторх popup биш).
-  // dm:openWindow нь аль хэдийн нээлттэй бол зөвхөн focus хийдэг (давхардлахгүй).
+  // dm:openWindow нь аль хэдийн нээлттэй бол зөвхөн focus хийдэг (давхардлахгүй); background = ирсэн мессежээр (фокус булаахгүй)
   if (window.api?.openDMWindow) {
-    window.api.openDMWindow({ userId: uid, username: uname });
+    window.api.openDMWindow({ userId: uid, username: uname, background });
     return;
   }
   // Fallback (хэрэв тусдаа цонх боломжгүй бол): хуучин popup
@@ -2661,6 +2691,7 @@ async function initDMWindowMode(userId, username) {
       }));
     }
   } catch {}
+  for (const m of (window._dmPendingMedia || [])) if (String(m.fromUserId) === String(activeDmUserId)) mergePendingDM(dmConversations[activeDmUserId].messages, m);
   renderDMWindowMessages();
   window.api.markDMRead(userId).catch(() => {});
   setDMAvatars(username);
@@ -2811,15 +2842,18 @@ function renderDMWindowMessages() {
 }
 
 function handleIncomingDM({ fromUsername, fromUserId, text, time, image, file }) {
+  if (isRoomMode() && window.parent !== window) return;   // шигтгэсэн өрөөний iframe — үндсэн цонх боловсруулна (давхар дуу/цонхгүй)
   const uid = String(fromUserId);
   if (!dmConversations[uid]) {
     dmConversations[uid] = { username: fromUsername, messages: [], unread: 0 };
   }
   dmConversations[uid].messages.push({ fromUsername, text, time, image, file });
 
-  // Sound + desktop notification
-  playSound('dm');
-  showDesktopNotif(`💬 ${fromUsername}`, text?.slice(0, 100) || '');
+  // Sound + desktop notification — зөвхөн үндсэн цонхонд (DM цонх бүр давхар дуугардаг байв)
+  if (!isDMMode()) {
+    playSound('dm');
+    showDesktopNotif(`💬 ${fromUsername}`, text?.slice(0, 100) || '');
+  }
 
   if (isDMMode()) {
     if (activeDmUserId === uid) {
@@ -2842,8 +2876,26 @@ function handleIncomingDM({ fromUsername, fromUserId, text, time, image, file })
     return;
   }
 
-  // Popup нээгдээгүй — автоматаар popup нээж шууд харуулах
-  openDM(uid, fromUsername);
+  // Зураг/файл DB-д хадгалагддаггүй — DM цонх руу main процессоор дамжуулна (цонх нээгдэхэд харагдана)
+  if ((image || file) && window.api?.sendPendingDM) { try { window.api.sendPendingDM({ userId: uid, msg: { fromUsername, fromUserId: uid, text, time, image, file } }); } catch {} }
+  // DM цонхыг фокус булаалгүй (ард нь) нээнэ
+  openDM(uid, fromUsername, { background: true });
+}
+// DM цонх: нээгдэхээс өмнө ирсэн зураг/файл (main dm:pending) — түүхийн «[📷 Зураг]» маркерыг жинхэнэ зургаар солино
+window._dmPendingMedia = [];
+window.api?.onPendingDM?.((list) => {
+  for (const m of (list || [])) {
+    const uid = String(m.fromUserId);
+    if (!dmConversations[uid]) dmConversations[uid] = { username: m.fromUsername, messages: [], unread: 0 };
+    mergePendingDM(dmConversations[uid].messages, m);
+    window._dmPendingMedia.push(m);
+  }
+  if (isDMMode()) { try { renderDMWindowMessages(); } catch {} }
+});
+function mergePendingDM(arr, m) {
+  const i = arr.findIndex((x) => x.time === m.time && /^\[(📷|📎)/.test(String(x.text || '')));
+  if (i >= 0) arr[i] = { ...arr[i], ...m };
+  else if (!arr.some((x) => x.time === m.time && (x.image || x.file))) arr.push(m);
 }
 
 function handleSentDM({ fromUsername, toUserId, text, time, image, file }) {
@@ -3212,7 +3264,7 @@ function renderDMUsersBadges() {
 
 // DM popup cleanup (зөвхөн үндсэн цонхонд)
 if (!isDMMode()) {
-  window.addEventListener('beforeunload', () => {
+  onUnloadOnce(() => {
     activePopups.forEach((state, uid) => {
       if (state.isTyping && socket) {
         socket.emit('typing:stop', { toUserId: uid });
@@ -5890,7 +5942,7 @@ init();
     if (typeof socket !== 'undefined' && socket && !socket.__lanHandlers) { socket.__lanHandlers = true; attach(socket); }
     if (currentRoom?.id && !panel.dataset.loaded) { panel.dataset.loaded = '1'; loadExisting(); }
   }, 800);
-  window.addEventListener('beforeunload', () => { clearInterval(timer); if (hosting) window.api.stopLanHost?.().catch(() => {}); window.api.stopLanJoin?.().catch(() => {}); });
+  onUnloadOnce(() => { clearInterval(timer); if (hosting) window.api.stopLanHost?.().catch(() => {}); window.api.stopLanJoin?.().catch(() => {}); });
 })();
 
 // ══════════════════════════════════════════════════════════════

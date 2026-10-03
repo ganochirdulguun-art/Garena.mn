@@ -48,7 +48,8 @@
     catch (e) { toast(errMsg(e), 'warning', 5000); return false; }
   }
   window.gxRequestModerator = requestModerator;
-  const onSocket = (fn) => { const t = setInterval(() => { if (typeof socket !== 'undefined' && socket) { clearInterval(t); fn(socket); } }, 500); };
+  // Socket бүрт (гараад дахин нэвтрэхэд connectSocket шинэ socket үүсгэдэг) сонсогчийг нэг удаа залгана — хуучин socket дээр үлддэг байв
+  const onSocket = (fn) => { setInterval(() => { if (typeof socket !== 'undefined' && socket) { if (!socket.__gxCh) socket.__gxCh = new Set(); if (!socket.__gxCh.has(fn)) { socket.__gxCh.add(fn); fn(socket); } } }, 1000); };
   const fmtAgo = (ts) => {
     if (!ts) return '—'; const s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
     if (s < 60) return 'дөнгөж сая'; if (s < 3600) return `${Math.floor(s / 60)}м өмнө`; if (s < 86400) return `${Math.floor(s / 3600)}ц өмнө`; return `${Math.floor(s / 86400)} өдөр өмнө`;
@@ -168,8 +169,8 @@
     });
     // 🏆 Ranked товч (Ranked таб): Ranked Room 1–5-аас багтаамжтай, хамгийн олон хүнтэйг сонгоно
     window.gxJoinRanked = async () => {
-      let list = Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && r.ranked);
-      if (!list.length) { try { await loadRooms(); } catch {} list = Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && r.ranked); }
+      try { await loadRooms(); } catch {}   // хуучирсан кэшээр биш, шинэ тоогоор Room сонгоно
+      const list = Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && r.ranked);
       if (!list.length) { showTab('lobby'); return; }
       const cap = (r) => Number(r.visible_cap || 200);
       const free = list.filter((r) => Number(r.player_count || 0) < cap(r));
@@ -208,7 +209,8 @@
     // Нийтийн WC3 Room руу оруулна: багтаамжтай, хамгийн олон хүнтэйг (хүн цуглардаг) сонгоно
     window.gxJoinPublic = async (kind = 'wc3') => {
       const pick = () => Object.values(roomsCache || {}).filter((r) => r.kind === 'channel' && (typeof gameKindOf !== 'function' || gameKindOf(r.game_type) === kind));
-      let list = pick(); if (!list.length) { try { await loadRooms(); } catch {} list = pick(); }
+      try { await loadRooms(); } catch {}   // хуучирсан кэшээр биш, шинэ тоогоор Room сонгоно
+      const list = pick();
       if (!list.length) { showTab('lobby'); return; }
       const free = list.filter((r) => Number(r.player_count || 0) < Number(r.visible_cap || 200));
       const r = (free.length ? free : list).sort((a, b) => Number(b.player_count || 0) - Number(a.player_count || 0) || Number(a.channel_no) - Number(b.channel_no))[0];
@@ -252,12 +254,17 @@
     }
 
     // Эзэн/админ: эзний цэс (рекламын оронд) + самбар + мэдэгдэл
-    const t = setInterval(async () => {
-      if (typeof currentUser === 'undefined' || !currentUser) return;
-      clearInterval(t);
+    // Хэрэглэгч солигдох (гараад өөр акаунтаар нэвтрэх) бүрт me/staff төлөвийг шинэчилнэ
+    let lastUid = null;
+    setInterval(async () => {
+      if (typeof currentUser === 'undefined' || !currentUser) { if (lastUid !== null) { lastUid = null; teardownStaff(); } return; }
+      const uid = String(currentUser.id || '');
+      if (uid === lastUid) return;
+      lastUid = uid;
       await loadMe();
-      if (me?.staff) setupStaff();
-      onSocket((s) => {
+      if (me?.staff) setupStaff(); else teardownStaff();
+    }, 700);
+    onSocket((s) => {
         s.on('role:decided', ({ role, approved, revoked } = {}) => {
           if (role !== 'moderator') return;
           if (revoked) toast('Таны Moderator эрх цуцлагдлаа', 'warning', 6000);
@@ -265,8 +272,12 @@
           else toast('Таны Moderator хүсэлтийг татгалзлаа', 'warning', 6000);
           loadMe();
         });
-      });
-    }, 700);
+    });
+  }
+  function teardownStaff() {
+    document.body.classList.remove('gx-staff');
+    $('gxo-menu')?.remove();
+    const t = $('tab-owner'); if (t) { if (t.classList.contains('active')) { try { showTab('lobby'); } catch {} } t.remove(); }
   }
 
   function setupStaff() {
@@ -294,13 +305,13 @@
         <div id="gxo-body" class="gxo-body"></div>`;
       host.appendChild(tab);
     }
-    document.addEventListener('click', (e) => {
+    if (!setupStaff._bound) { setupStaff._bound = true; document.addEventListener('click', (e) => {
       const m = e.target.closest('[data-gxo]');
       if (m) { if (m.dataset.gxo === 'admin') { $('btn-admin-dashboard')?.click(); return; } openOwner(m.dataset.gxo); return; }
       const tb = e.target.closest('[data-gxo-tab]'); if (tb) { openOwner(tb.dataset.gxoTab); return; }
       const act = e.target.closest('[data-gxo-act]'); if (act) { ownerAction(act); }
       const row = e.target.closest('[data-gxo-user]'); if (row && !e.target.closest('button')) toggleDetail(row);
-    });
+    }); }
     setBadge(me.pending_count || 0);
     onSocket((s) => s.on('staff:notify', (p = {}) => {
       if (typeof p.pending_count === 'number') setBadge(p.pending_count);

@@ -34,7 +34,7 @@ function isGameFirewallReady(gamePaths) {
 // Windows Firewall: порт 6112 + тоглоомын exe дүрмүүд (нэг UAC prompt-оор)
 // gamePaths: тоглоомын exe файлуудын path-ын массив (optional)
 // force: true бол шалгалтгүйгээр шууд тохируулна
-function elevatedNetworkSetup(gamePaths, force) {
+async function elevatedNetworkSetup(gamePaths, force) {
   const firewallOk = !force && isFirewallReady();
   const gameRulesOk = !force && isGameFirewallReady(gamePaths);
 
@@ -85,12 +85,14 @@ function elevatedNetworkSetup(gamePaths, force) {
       }
     }
 
-    fs.writeFileSync(scriptPath, lines.join('\r\n'), 'utf8');
+    fs.writeFileSync(scriptPath, '\ufeff' + lines.join('\r\n'), 'utf8');   // BOM: кирилл замтай скриптийг PowerShell зөв уншина
 
-    execSync(
+    // async: UAC цонх + netsh-ийн турш main (LAN proxy) блоклогдохгүй; 20с-д UAC дарахгүй бол худал «амжилтгүй» гардаг байв
+    await new Promise((resolve, reject) => require('child_process').exec(
       `powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process powershell -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-WindowStyle','Hidden','-File','${scriptPath}' -Verb RunAs -Wait -WindowStyle Hidden"`,
-      { stdio: 'pipe', timeout: 20000 }
-    );
+      { timeout: 180000, windowsHide: true },
+      (err) => (err ? reject(err) : resolve())
+    ));
 
     console.log('[Firewall] Тохиргоо хийгдлээ (port 6112 + games)');
     try { fs.rmSync(scriptDir, { recursive: true, force: true }); } catch {}

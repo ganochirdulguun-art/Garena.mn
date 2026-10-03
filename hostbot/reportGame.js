@@ -91,7 +91,7 @@ async function postRadar(payload) {
 
 async function post(payload) {
   const url = `${URL_BASE}/relay/game-stats`;
-  const delays = [0, 5000, 20000];
+  const delays = [0, 5000, 30000, 120000, 300000, 600000];   // сервер deploy/restart (1–3 мин) үед ч дүн алдагдахгүй; token-оор idempotent
   let last = null;
   for (let i = 0; i < delays.length; i++) {
     if (delays[i]) await new Promise((r) => setTimeout(r, delays[i]));

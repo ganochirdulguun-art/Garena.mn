@@ -25,6 +25,22 @@ function ensureCustomNameColumn() {
   return _customNameCol;
 }
 const OWNER_NAME_MAX = 32;
+// Нэрийн дүрэм (бүртгэл, нэр солих): 2–20 тэмдэгт, хяналтын тэмдэгтгүй; системийн/ажилтны нэр хориотой; давхардахгүй
+const RESERVED_NAMES = ['garena.mn', 'garena', 'garenamn', 'system', 'admin', 'administrator', 'moderator', 'эзэн', 'garenasystem', 'bot'];
+function cleanUsername(raw) {
+  return String(raw || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, '').replace(/\s+/g, ' ').trim();
+}
+async function usernameProblem(name, { exceptId = null, max = 20 } = {}) {
+  if (name.length < 2 || name.length > max) return `Нэр 2–${max} тэмдэгт байна`;
+  if (RESERVED_NAMES.includes(name.toLowerCase())) return 'Энэ нэрийг ашиглах боломжгүй';
+  if (db) {
+    try {
+      const r = await db.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND ($2::int IS NULL OR id <> $2) LIMIT 1', [name, exceptId]);
+      if (r.rows[0]) return 'Энэ нэртэй хэрэглэгч аль хэдийн байна';
+    } catch {}
+  }
+  return null;
+}
 
 async function dbOk() {
   if (!db) return false;
@@ -110,6 +126,9 @@ router.post('/register', async (req, res) => {
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
+  const cleanName = cleanUsername(username);
+  const nameErr = await usernameProblem(cleanName);
+  if (nameErr) return res.status(400).json({ error: nameErr });
 
   const hash = await bcrypt.hash(password, 10);
 
@@ -120,9 +139,9 @@ router.post('/register', async (req, res) => {
 
       const result = await db.query(
         'INSERT INTO users (username, email, password_hash) VALUES ($1, $2, $3) RETURNING *',
-        [username, email, hash]
+        [cleanName, email, hash]
       );
-      welcome.grantWelcomeSafe(result.rows[0].id, { username });   // шинэ хэрэглэгчийн урамшуулал (+💎, DM)
+      welcome.grantWelcomeSafe(result.rows[0].id, { username: cleanName });   // шинэ хэрэглэгчийн урамшуулал (+💎, DM)
       return res.status(201).json({ token: makeJWT(result.rows[0]), user: result.rows[0] });
     } catch (e) {
       console.error(e);
@@ -513,9 +532,13 @@ router.put('/username', authMW, async (req, res) => {
   const isOwner = require('../middleware/admin').isOwnerUser(req.user);
   const max = isOwner ? OWNER_NAME_MAX : 20;
   // хяналтын тэмдэгт арилгаж, олон зайг нэг болгоно
-  const clean = String(req.body?.username || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u2028-\u202e]/g, '').replace(/\s+/g, ' ').trim();
+  const clean = cleanUsername(req.body?.username);
   if (clean.length < 2 || clean.length > max) {
     return res.status(400).json({ error: isOwner ? `Нэр 2–${max} тэмдэгт байна` : 'Username must be 2-20 characters' });
+  }
+  if (!isOwner) {   // хориотой нэр / давхардал (эзэн чөлөөтэй)
+    const nameErr = await usernameProblem(clean, { exceptId: req.user.id, max });
+    if (nameErr) return res.status(400).json({ error: nameErr });
   }
 
   if (await dbOk()) {

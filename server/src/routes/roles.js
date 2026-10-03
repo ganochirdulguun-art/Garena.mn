@@ -407,4 +407,4 @@ router.delete('/moderators/:userId', auth, staffOnly, async (req, res) => {
   } catch (e) { console.error('[roles] revoke', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, loadMods, revokeOnBan };
+module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, loadMods, revokeOnBan, cacheRole };

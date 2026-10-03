@@ -21,7 +21,7 @@ function addReplayDir(dir) {
   extraReplayDirs.add(dir);
   console.log(`[Replay] хавтас нэмэгдлээ: ${dir}`);
   if (watcher) {
-    try { watcher.add(toGlob(dir)); } catch {}
+    try { watcher.add(dir); } catch {}
   } else if (currentRoomId) {
     startWatcher(currentRoomId);
   }
@@ -59,29 +59,34 @@ function setMembers(members) {
 }
 
 // Replay тоглогчийн нэрийг platform user-тай тааруулах
-function matchPlayerToMember(playerName) {
+function matchPlayerToMember(playerName, used = new Set()) {
   if (!roomMembers.length) return null;
   const pLower = String(playerName || '').toLowerCase().trim();
   if (!pLower) return null;
+  const free = roomMembers.filter((m) => !used.has(String(m.id)));
 
   // 1. Яг таарч байвал
-  const exact = roomMembers.find(m => String(m.name || '').toLowerCase() === pLower);
+  const exact = free.find(m => String(m.name || '').toLowerCase() === pLower);
   if (exact) return exact;
 
-  // 2. Нэг нь нөгөөгөө агуулж байвал (WC3 нэр ≠ platform нэр байж болно)
-  const partial = roomMembers.find(m => {
+  // 2. Нэг нь нөгөөгөө агуулж байвал (WC3 нэр ≠ platform нэр байж болно) — хоёулаа ≥4 тэмдэгт, ГАНЦ нэр дэвшигч
+  //    (богино нэр санамсаргүй таарч хожил/хожигдол буруу хүнд бичигддэг байв — аудит 2026-10-02)
+  if (pLower.length < 4) return null;
+  const partial = free.filter(m => {
     const n = String(m.name || '').toLowerCase();
-    return n.length >= 3 && (pLower.includes(n) || n.includes(pLower));
+    return n.length >= 4 && (pLower.includes(n) || n.includes(pLower));
   });
-  if (partial) return partial;
+  if (partial.length === 1) return partial[0];
 
   return null;
 }
 
 // Replay watcher эхлүүлэх
-function startWatcher(roomId) {
+let postResults = true;   // хувийн өрөөнд зөвхөн хост серверт илгээнэ; бусдад дүн локал харагдана (403 цонх гарахгүй)
+function startWatcher(roomId, { post = true } = {}) {
   stopWatcher(true);
   currentRoomId = roomId;
+  postResults = !!post;
   processedReplays.clear();
 
   // Байгаа хавтсуудыг л хянана. Documents\Warcraft III\Replays 1.26a-д байдаггүй тул
@@ -93,23 +98,31 @@ function startWatcher(roomId) {
   }
   console.log(`[Replay] Хавтас хянаж байна: ${dirs.join(' | ')}`);
 
-  watcher = chokidar.watch(dirs.map(toGlob), {
+  // Glob биш хавтсыг өөрийг нь хянана: 'C:/Program Files (x86)/…' зэрэг замыг glob гэж уншаад
+  // '(x86)' бүлэг, '[1.26a]' тэмдэгтийн анги болж replay хэзээ ч илэрдэггүй байв (аудит 2026-10-02)
+  watcher = chokidar.watch(dirs, {
     ignoreInitial: true,
+    disableGlobbing: true,
+    depth: 3,
+    ignored: (p, st) => !!(st && st.isFile() && !/\.w3g$/i.test(p)),
     awaitWriteFinish: {
       stabilityThreshold: 3000,
       pollInterval: 500,
     },
   });
 
-  watcher.on('add', async (filePath) => {
-    // Давтагдсан файл шалгах
-    const normalized = path.resolve(filePath);
-    if (processedReplays.has(normalized)) return;
-    processedReplays.add(normalized);
-
-    console.log(`[Replay] Шинэ replay олдлоо: ${filePath}`);
+  const onReplay = async (filePath, ev) => {
+    if (!/\.w3g$/i.test(filePath)) return;
+    // Давтагдсан файл шалгах: LastReplay.w3g дахин бичигддэг тул mtime+size-аар ялгана
+    let key = path.resolve(filePath);
+    try { const st = fs.statSync(filePath); key += `|${st.mtimeMs}|${st.size}`; } catch {}
+    if (processedReplays.has(key)) return;
+    processedReplays.add(key);
+    console.log(`[Replay] ${ev === 'change' ? 'Шинэчлэгдсэн' : 'Шинэ'} replay олдлоо: ${filePath}`);
     await parseReplay(filePath);
-  });
+  };
+  watcher.on('add', (p) => onReplay(p, 'add'));
+  watcher.on('change', (p) => onReplay(p, 'change'));
 
   watcher.on('error', (err) => {
     console.error('[Replay] Watcher алдаа:', err);
@@ -183,8 +196,10 @@ async function parseReplay(filePath) {
     }
     let kdaMatched = 0;
 
+    const usedMembers = new Set();
     const players = rawPlayers.map((p) => {
-      const matched = matchPlayerToMember(p.name);
+      const matched = matchPlayerToMember(p.name, usedMembers);
+      if (matched) usedMembers.add(String(matched.id));
       const lv = leaveById.get(Number(p.id));
       const leftAtSec = lv ? Math.round(lv.at / 1000) : null;
       const dp = kdaBySlot.get(Number(p.color)) || null;
@@ -246,7 +261,12 @@ async function parseReplay(filePath) {
 
     console.log('[Replay] Тоглоомын үр дүн:', JSON.stringify(result, null, 2));
 
-    // Серверт илгээх
+    // Серверт илгээх (зөвхөн хост — бусдад сервер 403 буцааж «Зөвхөн host» цонх гардаг байв)
+    if (!postResults) {
+      result.saved = false; result.localOnly = true;
+      if (resultCallback) resultCallback(result);
+      return;
+    }
     try {
       const serverRes = await apiService.postGameResult(result);
       console.log('[Replay] Серверт амжилттай илгээлээ:', serverRes?.message);

@@ -100,6 +100,14 @@ async function recordGameResult({
       wards: clampStat(p.wards),
     };
   });
+  // Ranked «team-size» шалгалтыг НЭР/wc3_name-ээр нөхөн таньсны дараа дахин тооцно — relayStats нь үүнээс өмнө
+  // тооцдог тул бүртгэлтэй тоглогчтой баг хүчингүй болж 💎 алддаг байв (аудит 2026-10-02)
+  if (ranked && rankedValid === false && rankedReason === 'team-size') {
+    try {
+      const v = require('../routes/relayStats').rankedValidity({ gameTimeSec: toInt(durationMinutes) * 60, winnerTeam, players: resolved });
+      if (v.valid) { rankedValid = true; rankedReason = null; }
+    } catch {}
+  }
   // Lineup hash — ижил бүрэлдэхүүн өдөрт олон удаа тоглож 💎 фермлэхээс хамгаална (ranked)
   const lineupIds = resolved.map((p) => p.user_id).filter(Boolean).map(String).sort();
   const lineupHash = lineupIds.length ? crypto.createHash('sha1').update(lineupIds.join(',')).digest('hex') : null;
@@ -133,7 +141,7 @@ async function recordGameResult({
     let reason = rankedOk ? null : (rankedReason || (ranked ? 'invalid' : 'not-ranked'));
     if (rankedOk && lineupHash) {
       const same = await client.query(
-        `SELECT COUNT(*)::int AS n FROM game_results WHERE lineup_hash = $1 AND ranked AND played_at > NOW() - INTERVAL '24 hours'`,
+        `SELECT COUNT(*)::int AS n FROM game_results WHERE lineup_hash = $1 AND ranked AND ranked_valid AND played_at > NOW() - INTERVAL '24 hours'`,
         [lineupHash]
       );
       if ((same.rows[0]?.n || 0) >= RANKED_MAX_SAME_LINEUP_PER_DAY) { rankedOk = false; reason = 'same-lineup'; }
@@ -173,7 +181,9 @@ async function recordGameResult({
     }
     // Өрөөг ХААХГҮЙ — 'waiting' болгоно: тоглогчид өрөөндөө үлдэж дараагийн тоглолтоо эхлүүлнэ (RGC маяг).
     // ('done' болговол /rooms жагсаалтаас алга болж, isUserInRoom false → өрөөний чат хаагддаг байсан.)
-    await client.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status <> 'done'`, [roomId]);
+    // Өөр LAN тоглоом идэвхтэй хэвээр бол (хувийн өрөө) 'playing' хэвээр — статусын эзэн нь lanhost.syncRoomStatus
+    let lanActive = false; try { lanActive = !!require('../routes/lanhost').gameCounts(roomId)?.started; } catch {}
+    if (!lanActive) await client.query(`UPDATE rooms SET status = 'waiting' WHERE id = $1 AND status <> 'done'`, [roomId]);
     await client.query('COMMIT');
 
     // FOGCLICK (maphack) илэрсэн тоглогчид — w3mhdet DLL replay чатад бичсэнийг клиент задалж

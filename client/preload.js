@@ -103,6 +103,8 @@ contextBridge.exposeInMainWorld('api', {
 
   // DM тусдаа цонх
   openDMWindow:      (data) => ipcRenderer.invoke('dm:openWindow', data),
+  sendPendingDM:     (data) => ipcRenderer.send('dm:pending', data),
+  onPendingDM:       (cb)   => ipcRenderer.on('dm:pending', (_, list) => cb(list)),
   // Найзуудын тусдаа цонх
   openFriendsWindow: () => ipcRenderer.invoke('friends:openWindow'),
   openRadarWindow:   (data) => ipcRenderer.invoke('radar:openWindow', data),   // 📡 Радар always-on-top цонх

@@ -72,5 +72,8 @@
       socket.on('room:ipserver_gone', () => { server = null; render(); appendSysMsg?.('⏹ Сервер хаагдлаа.'); });
     }
   }, 700);
-  window.addEventListener('beforeunload', () => { clearInterval(t); if (mine()) api('delete', `/rooms/${currentRoom.id}/ipserver`).catch(() => {}); });
+  // iframe устахад beforeunload ажилладаггүй → pagehide-ээр ч (нэг удаа)
+  let _bye = false;
+  const bye = () => { if (_bye) return; _bye = true; clearInterval(t); if (mine()) api('delete', `/rooms/${currentRoom.id}/ipserver`).catch(() => {}); };
+  window.addEventListener('beforeunload', bye); window.addEventListener('pagehide', bye);
 })();

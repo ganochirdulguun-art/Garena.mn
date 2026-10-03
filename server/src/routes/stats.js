@@ -500,8 +500,10 @@ router.post('/result', auth, perUser('result', 30, 60 * 60 * 1000), async (req, 
     const saved = await recordGameResult({
       roomId: room_id, winnerTeam: Number(winner_team), durationMinutes: duration_minutes, replayPath: replay_path,
       players: resolvedPlayers, source: 'replay',
-      fogclick: Array.isArray(fogclick) ? fogclick.slice(0, 24) : [],
+      // Хост клиентийн илгээсэн fogclick-ээр бусдад сануулга/бан өгөхгүй (хуурамч илгээж болно, аудит 2026-10-02) — зөвхөн лог
+      fogclick: [],
     });
+    if (Array.isArray(fogclick) && fogclick.length) console.warn(`[AntiCheat] replay fogclick (баталгаагүй, хост #${req.user.id}): ${fogclick.slice(0, 24).map((f) => String(f && typeof f === 'object' ? f.name : f).slice(0, 64)).join(', ')}`);
     if (saved.duplicate) {
       return res.json({ message: 'Үр дүн аль хэдийн бүртгэгдсэн', result: saved.result, duplicate: true });
     }

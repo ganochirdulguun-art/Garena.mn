@@ -42,6 +42,7 @@ autoUpdater.on('download-progress', (p) => {
 });
 autoUpdater.on('update-downloaded', (info) => {
   _downloadedVersion = info.version;
+  _downloadPending = false; autoUpdater.autoInstallOnAppQuit = true;
   mainWindow?.webContents.send('update:downloaded', { version: info.version });
   const w = _downloadWaiters.splice(0); w.forEach((r) => r(info.version));
   autoApplyOnStartup(info.version);
@@ -59,6 +60,7 @@ function autoApplyOnStartup(version) {
   if (!app.isPackaged || _isInstallingUpdate) return;
   if (Date.now() - _bootAt > AUTO_APPLY_MS) return;
   if (_roomOpenedSinceBoot) return;
+  if (_qrPollInterval) { console.log('[AutoUpdater] нэвтрэлт явагдаж байна — товчоор үлдээнэ'); return; }   // Discord/QR poll дундуур дахин асвал state алдагдана
   try { if (gameRelayService.isRunning()) return; } catch { return; }
   // Гогцооноос хамгаалалт: суулгалт бүтэлгүйтээд хуучин хувилбар дахин асвал нэг хувилбарыг 15 мин-д нэг л удаа оролдоно
   const mark = require('path').join(app.getPath('userData'), 'auto-update-attempt.json');
@@ -100,8 +102,15 @@ async function ensureLatestDownloaded(maxWaitMs) {
     const t = setTimeout(() => resolve(null), maxWaitMs);
     _downloadWaiters.push((v) => { clearTimeout(t); resolve(v); });
   });
-  return got || _downloadedVersion;
+  if (!got) {
+    // electron-updater шинэ таталт эхлэхдээ өмнөх татагдсан installer-ийг устгадаг → одоо суулгах юм байхгүй
+    _downloadPending = true;
+    autoUpdater.autoInstallOnAppQuit = false;   // хаахад устсан файлыг суулгах гэж оролдохгүй; дараагийн асалтад autoApply
+    return null;
+  }
+  return got;
 }
+let _downloadPending = false;
 autoUpdater.on('error', (err) => {
   console.error('[AutoUpdater]', err.message);
   mainWindow?.webContents.send('update:error', err.message);
@@ -165,6 +174,21 @@ function createWindow() {
   mainWindow.on('moved', dockFriendsWindow);
   mainWindow.on('resized', dockFriendsWindow);
   mainWindow.on('closed', () => { closeFriendsWindow(); mainWindow = null; });
+  // Тоглолт/relay явж байхад санамсаргүй хаахаас сэргийлнэ (өрөө iframe-д тул roomWindow-ийн хамгаалалт ажилладаггүй байв)
+  let _closeConfirmed = false;
+  mainWindow.on('close', (e) => {
+    if (_closeConfirmed || _isInstallingUpdate || _quitCleanupDone) return;
+    let busy = false; try { busy = !!_gameProc || gameRelayService.isRunning(); } catch {}
+    if (!busy) return;
+    e.preventDefault();
+    dialog.showMessageBox(mainWindow, {
+      type: 'warning', buttons: ['Хаах', 'Болих'], defaultId: 1, cancelId: 1,
+      title: 'Тоглолт явагдаж байна', message: 'WC3 тоглолт / LAN холболт ажиллаж байна!',
+      detail: 'Garena.mn-ийг хаавал тоглоомын холболт тасарна (хост бол бүх тоглогч салнa).',
+    }).then(({ response }) => {
+      if (response === 0 && mainWindow && !mainWindow.isDestroyed()) { _closeConfirmed = true; mainWindow.close(); }
+    }).catch(() => {});
+  });
 }
 
 // Discord OAuth2 deep link: garenamn://auth?token=...
@@ -213,6 +237,7 @@ function stopPlatformPresence() {
 }
 
 app.whenReady().then(() => {
+  if (!gotLock) return;   // хоёр дахь instance: app.quit() дуудсан — цонх/таймер үүсгэхгүй
   createWindow();
 
   // WarKey-д "платформ идэвхтэй" дохиог 5 сек тутам бичнэ
@@ -235,7 +260,12 @@ app.whenReady().then(() => {
   if (app.isPackaged) {
     setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 2000);
     // 30 мин тутам дахин шалгана — өдөрт олон хувилбар гарахад хэрэглэгч хоцрохгүй
-    setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 30 * 60 * 1000).unref?.();
+    setInterval(() => {
+      // тоглолт/relay явж байхад 132MB таталт эхлүүлэхгүй (LAN proxy энэ процесст) — дараагийн шалгалтад нөхнө
+      let busy = false; try { busy = !!_gameProc || gameRelayService.isRunning(); } catch {}
+      autoUpdater.autoDownload = !busy;
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 30 * 60 * 1000).unref?.();
   }
 
   app.on('activate', () => {
@@ -299,11 +329,14 @@ app.on('open-url', (event, url) => {
   handleDeepLink(url);
 });
 
+let _authStartedAt = 0;   // auth:login / auth:qr — энэ клиент нэвтрэлт эхлүүлсэн цаг (deep link-ийн login-CSRF хамгаалалт)
 function handleDeepLink(url) {
   try {
     const parsed = new URL(url);
     if (parsed.hostname === 'auth') {
       const token = parsed.searchParams.get('token');
+      if (token && authService.getToken()) { console.warn('[DeepLink] аль хэдийн нэвтэрсэн — гаднын токеныг үл тоов'); return; }
+      if (token && Date.now() - _authStartedAt > 10 * 60 * 1000) { console.warn('[DeepLink] нэвтрэлт эхлүүлээгүй байхад ирсэн токен — үл тоов'); return; }
       if (token) {
         authService.saveToken(token); // гэмтэлтэй/хуурамч token бол throw хийнэ
         // Серверээс бүрэн мэдээлэл (avatar_url г.м.) авах
@@ -326,6 +359,7 @@ ipcMain.handle('auth:login', async () => {
   const url = `${apiService.SERVER_URL}/auth/discord?state=${sessionId}`;
 
   console.log('[Discord Login] Browser нээж байна:', url);
+  _authStartedAt = Date.now();
   startAuthPoll(sessionId, 'Discord Login');
   await shell.openExternal(url);
 
@@ -341,7 +375,8 @@ function startAuthPoll(sessionId, label = 'Auth') {
   }
 
   const axios = require('axios');
-  let attempts = 0;
+  let attempts = 0, busy = false;
+  _authStartedAt = Date.now();
   _qrPollInterval = setInterval(async () => {
     attempts++;
     if (attempts > 200) {
@@ -349,10 +384,12 @@ function startAuthPoll(sessionId, label = 'Auth') {
       _qrPollInterval = null;
       return;
     }
+    if (busy) return;   // удаан хариу ирж байхад давхар хүсэлт илгээхгүй
+    busy = true;
     try {
       const { data } = await axios.get(
         `${apiService.SERVER_URL}/auth/poll/${sessionId}`,
-        { timeout: 2000 }
+        { timeout: 10000 }   // 2с байхад Railway саатал → хүсэлт тасарч, сервер токеныг аль хэдийн устгасан тул нэвтрэлт хэзээ ч дуусдаггүй байв
       );
       if (data.token) {
         clearInterval(_qrPollInterval);
@@ -364,6 +401,7 @@ function startAuthPoll(sessionId, label = 'Auth') {
         console.log(`[${label}] Нэвтэрлээ!`);
       }
     } catch {}
+    finally { busy = false; }
   }, 3000);
 }
 
@@ -476,7 +514,12 @@ ipcMain.handle('auth:changePassword', async (_, { oldPassword, newPassword }) =>
 // Update суулгаж restart хийх
 ipcMain.handle('update:install', async () => {
   // Суулгахын өмнө дахин шалгана: татагдсанаас шинэ гарсан бол түүнийг татаж (≤2 мин) дараа нь суулгана
-  try { await ensureLatestDownloaded(120000); } catch {}
+  let ready = _downloadedVersion;
+  try { ready = await ensureLatestDownloaded(120000); } catch {}
+  if (!ready) {   // шинэ хувилбар татагдаж дуусаагүй — хоосон суулгалт хийж апп алга болохоос сэргийлнэ
+    mainWindow?.webContents.send('update:error', 'Шинэ хувилбар татагдаж дуусаагүй — хэсэг хүлээгээд дахин оролдоно уу');
+    return { ok: false };
+  }
   _isInstallingUpdate = true; // before-quit cleanup алгасах
   // Цонхыг нуухын тулд UAC dialog харагдана
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
@@ -504,6 +547,8 @@ ipcMain.handle('update:check', async () => {
 
 ipcMain.handle('auth:logout', async () => {
   closeFriendsWindow();
+  try { gameRelayService.stopAll(); } catch {}
+  _lastRoomId = null;
   // User-ийн өрөөг сервер дээр хаах/гарах
   try {
     const myRoom = await apiService.getMyRoom();
@@ -538,7 +583,7 @@ ipcMain.handle('auth:getToken', () => authService.getToken());
 // Өрөөнүүд
 ipcMain.handle('rooms:list',       async () => apiService.getRooms());
 ipcMain.handle('rooms:quickmatch', async (_, game_type) => {
-  try { return await apiService.quickMatch(game_type); } catch (err) { throw apiError(err); }
+  try { const r = await apiService.quickMatch(game_type); noteRoom(r?.room?.id ?? r?.id); return r; } catch (err) { throw apiError(err); }
 });
 ipcMain.handle('rooms:mine', async () => {
   try { return await apiService.getMyRoom(); } catch { return null; }
@@ -571,14 +616,29 @@ ipcMain.handle('rooms:create', async (event, { name, max_players, game_type, pas
   try {
     room = await apiService.createRoom({ name, max_players, game_type, password, description, game_mode, background_url, ranked: !!ranked, clan_id: clan_id || null });
   } catch (err) { throw apiError(err); }
-  try { replayService.startWatcher(room.id); } catch {}
+  noteRoom(room?.id);
+  try { replayService.startWatcher(room.id, { post: true }); } catch {}
   return room;
 });
 
+// Сүүлд орсон өрөө — ӨӨР өрөөнд ороход хуучны LAN host/join-ийг зогсооно (ижил өрөөнд дахин нэгдэх = хөндөхгүй)
+let _lastRoomId = null;
+function noteRoom(roomId) {
+  const id = roomId == null ? null : String(roomId);
+  if (_lastRoomId && id && _lastRoomId !== id) { try { gameRelayService.stopAll(); } catch {} }
+  _lastRoomId = id;
+}
 ipcMain.handle('rooms:join', async (event, roomId, password) => {
   try {
     const result = await apiService.joinRoom(roomId, password);
-    try { if ((result?.room?.kind || 'room') !== 'channel') replayService.startWatcher(roomId); else replayService.stopWatcher(); } catch {}
+    noteRoom(roomId);
+    try {
+      const room = result?.room || {};
+      if ((room.kind || 'room') !== 'channel') {
+        const me = authService.getUser();
+        replayService.startWatcher(roomId, { post: String(room.host_id) === String(me?.id) });   // зөвхөн хост серверт илгээнэ
+      } else replayService.stopWatcher();
+    } catch {}
     return result;
   } catch (err) { throw apiError(err); }
 });
@@ -916,17 +976,30 @@ ipcMain.handle('room:openWindow', (event, roomData) => {
 });
 
 // ── DM тусдаа цонх нээх ────────────────────────────────────
-ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
+// DM цонх нээлттэй биш үед ирсэн зураг/файл (DB-д зөвхөн «[📷 Зураг]» маркер хадгалагддаг) — цонх нээгдэхэд дамжуулна
+const dmPending = new Map();   // uid -> [msg]
+ipcMain.on('dm:pending', (_e, { userId, msg } = {}) => {
+  if (!userId || !msg) return;
   const uid = String(userId);
-  // Аль хэдийн нээлттэй бол focus
+  const list = dmPending.get(uid) || [];
+  list.push(msg); if (list.length > 20) list.shift();
+  dmPending.set(uid, list);
+  const win = dmWindows.get(uid);
+  if (win && !win.isDestroyed()) { try { win.webContents.send('dm:pending', list); dmPending.delete(uid); } catch {} }
+});
+ipcMain.handle('dm:openWindow', (event, { userId, username, background } = {}) => {
+  const uid = String(userId);
+  // Аль хэдийн нээлттэй бол: хэрэглэгч өөрөө нээсэн бол focus; ирсэн мессежээр бол зөвхөн анивчуулна (фокус булаахгүй — аудит 2026-10-02)
   if (dmWindows.has(uid)) {
     const existing = dmWindows.get(uid);
-    if (!existing.isDestroyed()) { existing.focus(); return; }
+    if (!existing.isDestroyed()) { if (background) { try { existing.flashFrame(true); } catch {} } else existing.focus(); return; }
     dmWindows.delete(uid);
   }
+  if (background && _gameProc) return;   // тоглолтын дундуур шинэ цонх гаргахгүй (мэдэгдэл + badge хангалттай; зураг pending-д үлдэнэ)
   const dmWin = new BrowserWindow({
     width: 540, height: 600,
     minWidth: 470, minHeight: 460,
+    show: !background,
     title: `${username} — DM`,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -939,6 +1012,11 @@ ipcMain.handle('dm:openWindow', (event, { userId, username }) => {
     query: { mode: 'dm', dmUserId: uid, dmUsername: username },
   });
   hardenWindow(dmWin);
+  if (background) dmWin.once('ready-to-show', () => { try { dmWin.showInactive(); dmWin.flashFrame(true); } catch {} });
+  dmWin.webContents.on('did-finish-load', () => {
+    const list = dmPending.get(uid);
+    if (list?.length) { try { dmWin.webContents.send('dm:pending', list); } catch {} dmPending.delete(uid); }
+  });
   dmWin.on('closed', () => {
     dmWindows.delete(uid);
     mainWindow?.webContents.send('dm:window-closed', { userId: uid });
@@ -1190,7 +1268,7 @@ ipcMain.handle('mesh:ensure', async () => { try { return await meshEnsure(true);
 ipcMain.handle('firewall:setup', async () => {
   const s = migrateSettings(readSettings());
   const gamePaths = (s.games || []).map(g => g.path).filter(p => p);
-  const result = firewallService.elevatedNetworkSetup(gamePaths, true);
+  const result = await firewallService.elevatedNetworkSetup(gamePaths, true);
   return result;
 });
 
@@ -1232,19 +1310,22 @@ ipcMain.handle('relay:stopLanJoin', () => { gameRelayService.stopLanJoin(); retu
 // GHost++ зөвхөн autohost_owner-тэй ижил нэртэй тоглогчийн !start-ыг зөвшөөрдөг, дүн ч энэ нэрээр ирдэг тул
 // платформын нэр биш WC3 нэрийг серверт мэдэгдэнэ. (PowerShell: кирилл нэрийг UTF-8-аар зөв уншина.)
 let _wc3NameCache = { at: 0, name: null };
-function readWc3LocalName() {
+let _wc3NamePending = null;
+async function readWc3LocalName() {
   if (process.platform !== 'win32') return null;
-  if (Date.now() - _wc3NameCache.at < 15000) return _wc3NameCache.name;
-  let name = null;
-  try {
-    const out = execFileSync('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command',
-      "[Console]::OutputEncoding=[Text.Encoding]::UTF8; (Get-ItemProperty -Path 'HKCU:\\Software\\Blizzard Entertainment\\Warcraft III\\String' -ErrorAction SilentlyContinue).userlocal",
-    ], { encoding: 'utf8', timeout: 8000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
-    name = String(out || '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 31) || null;
-  } catch {}
-  _wc3NameCache = { at: Date.now(), name };
-  return name;
+  if (Date.now() - _wc3NameCache.at < 5 * 60 * 1000) return _wc3NameCache.name;   // хост лобби үед announce бүрт дуудагддаг → урт кэш
+  if (_wc3NamePending) return _wc3NamePending;
+  // async — өмнө нь execFileSync байсан тул хост лоббитой үед 15с тутам main (LAN proxy) 0.2–2с царцдаг байв (аудит 2026-10-02)
+  _wc3NamePending = execFileAsync('powershell.exe', [
+    '-NoProfile', '-NonInteractive', '-Command',
+    "[Console]::OutputEncoding=[Text.Encoding]::UTF8; (Get-ItemProperty -Path 'HKCU:\\Software\\Blizzard Entertainment\\Warcraft III\\String' -ErrorAction SilentlyContinue).userlocal",
+  ], { timeout: 8000 }).then((out) => {
+    const name = String(out || '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 31) || null;
+    _wc3NameCache = { at: Date.now(), name };
+    _wc3NamePending = null;
+    return name;
+  });
+  return _wc3NamePending;
 }
 ipcMain.handle('wc3:name', () => readWc3LocalName());
 // WC3 ботын lobby руу REQJOIN явуулахад бодит нэрийг бүх цонх руу (өрөөний цонх тусдаа)
@@ -1300,15 +1381,26 @@ function execFileAsync(cmd, args, opts = {}) {
 // tasklist /V — процессын нэр + цонхны гарчгийг шалгана (нэр сольсныг ч барих гэж оролдоно).
 // Удаан (20с+) тул async + давхар скан хамгаалалт — тоглоомын урсгалд огт нөлөөлөхгүй.
 let _mhScanBusy = false;
+let _mhLastReport = { tool: null, at: 0, rep: null };
 async function scanForMaphack() {
   if (_mhScanBusy) return null;
   _mhScanBusy = true;
   try {
     const out = await execFileAsync('tasklist', ['/V', '/FO', 'CSV', '/NH'], { timeout: 45000 });
     if (out == null) return null;   // tasklist алдаа/timeout — блоклохгүй (false negative)
-    const low = out.toLowerCase();
-    for (const sig of _maphackList) {
-      if (sig && low.includes(sig)) return sig;
+    // CSV: "Image Name","PID","Session Name","Session#","Mem Usage","Status","User Name","CPU Time","Window Title"
+    // Өмнө нь бүтэн гаралтад substring хайдаг тул Windows хэрэглэгчийн нэр, браузерын табын гарчиг таарахад
+    // гэмгүй хүн сануулга/бан авдаг байв (аудит 2026-10-02). Одоо: процессын нэр үргэлж; цонхны гарчиг зөвхөн
+    // «энгийн» програм биш процесст (браузер, Explorer, Garena.mn, Discord г.м.-ийн гарчгийг үл тооно).
+    const BENIGN = /^(msedge|chrome|firefox|opera|brave|explorer|garena\.mn|discord|notepad|code|telegram|steam|searchhost|textinputhost|applicationframehost)\.exe$/i;
+    for (const line of out.split(/\r?\n/)) {
+      if (!line.startsWith('"')) continue;
+      const cols = line.slice(1, -1).split('","');
+      const image = String(cols[0] || '').toLowerCase();
+      const title = BENIGN.test(image) ? '' : String(cols[8] || '').toLowerCase();
+      for (const sig of _maphackList) {
+        if (sig && (image.includes(sig) || (title && title.includes(sig)))) return sig;
+      }
     }
   } catch { /* блоклохгүй */ }
   finally { _mhScanBusy = false; }
@@ -1344,7 +1436,9 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   // MapHack скан — тоглолт эхлэхээс ӨМНӨ. Илэрвэл WC3 нээхгүй, сануулга авна.
   const mh = await scanForMaphack();
   if (mh) {
-    const rep = await reportMaphack(mh);
+    // ижил tool-ийг 10 минутад нэг л удаа тайлагнана — дараалан «Тоглох» дарахад 3 сануулга → автомат бан болдог байв
+    const rep = (_mhLastReport.tool === mh && Date.now() - _mhLastReport.at < 10 * 60 * 1000) ? _mhLastReport.rep : await reportMaphack(mh);
+    _mhLastReport = { tool: mh, at: Date.now(), rep };
     broadcastToWindows('game:maphack', { tool: mh, warnings: rep?.warnings ?? null, banned: !!rep?.banned, max: rep?.max ?? 3, midgame: false });
     return { blocked: true, tool: mh, banned: !!rep?.banned };
   }
@@ -1412,18 +1506,20 @@ async function isWar3Running() {
 }
 // WC3 UDP 6112-г эзэлсэн эсэх — ботын bridge 6112-т bind хийхээсээ ӨМНӨ WC3 эзэлсэн байх ёстой,
 // эс бөгөөс WC3 өөрөө 6112-т bind хийж чадахгүй LAN алдаа гаргадаг (v1.8.8-ийн гаж нөлөө).
-function isUdp6112InUse() {
+async function isUdp6112InUse() {
   // ЗӨВХӨН war3.exe өөрөө 6112-ыг эзэлсэн үед true — өөр процесс эзэлсэн бол WC3 bind хийж
-  // чадаагүй гэсэн үг (тэр процесс GAMEINFO-г булаадаг) тул "бэлэн" гэж тооцох нь буруу.
+  // чадаагүй гэсэн үг (тэр процесс GAMEINFO-г булаадаг) тул "бэлэн" гэж тооцох нь буруу. (async — main-ийг блоклохгүй)
   try {
-    const ns = execFileSync('netstat', ['-ano', '-p', 'UDP'], { encoding: 'utf8', timeout: 6000, windowsHide: true });
+    const ns = await execFileAsync('netstat', ['-ano', '-p', 'UDP'], { timeout: 6000 });
+    if (ns == null) return false;
     const pids = new Set();
     for (const line of ns.split('\n')) {
       const m = line.match(/^\s*UDP\s+\S+:6112\s+\S+\s+(\d+)\s*$/i);
       if (m) pids.add(m[1]);
     }
     if (!pids.size) return false;
-    const tl = execFileSync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH', '/FO', 'CSV'], { encoding: 'utf8', timeout: 5000, windowsHide: true });
+    const tl = await execFileAsync('tasklist', ['/FI', 'IMAGENAME eq war3.exe', '/NH', '/FO', 'CSV'], { timeout: 5000 });
+    if (tl == null) return false;
     return [...pids].some((pid) => new RegExp(`"war3\\.exe","${pid}"`).test(tl));
   } catch { return false; }
 }

@@ -24,7 +24,7 @@ const fmtMin = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? `${Ma
 // Цэвэр функц (tests/playtime.test.js): нэг тоглолтын нэг тоглогчийн тоологдох секунд + XP задаргаа
 function computePlaytime({ gameSeconds, leftAtSec = null, ranked = false, todaySeconds = 0 }) {
   const total = Math.max(0, Math.floor(Number(gameSeconds) || 0));
-  const stayed = leftAtSec == null || Number(leftAtSec) >= total;
+  const stayed = leftAtSec == null || Number(leftAtSec) >= total - 60;   // throne унасны дараа Quit дарсан хүн «эрт гарсан» болдог байв
   let sec = stayed ? total : Math.max(0, Math.min(total, Math.floor(Number(leftAtSec))));
   const lines = [];
   if (sec < RULES.MIN_COUNT_SEC) return { counted_sec: 0, xp: 0, stayed, capped: false, lines: [`⏱ ${fmtMin(sec)} — 8 минутаас богино (remake), тоологдохгүй`] };

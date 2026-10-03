@@ -511,7 +511,7 @@ adminRouter.get('/reports/summary', adminMW, async (req, res) => {
   const months = Math.min(24, Math.max(1, Number(req.query.months) || 6));
   try {
     const orders = await db.query(
-      `SELECT to_char(date_trunc('month', COALESCE(paid_at, created_at)), 'YYYY-MM') AS month,
+      `SELECT to_char(date_trunc('month', (COALESCE(paid_at, created_at) AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ulaanbaatar'), 'YYYY-MM') AS month,
               COUNT(*) FILTER (WHERE status = 'PAID' AND currency = 'MNT') AS qpay_orders,
               COALESCE(SUM(amount) FILTER (WHERE status = 'PAID' AND currency = 'MNT'), 0) AS qpay_mnt,
               COUNT(*) FILTER (WHERE status = 'PAID' AND kind = 'membership' AND tier = 'silver') AS silver,
@@ -522,7 +522,7 @@ adminRouter.get('/reports/summary', adminMW, async (req, res) => {
         WHERE COALESCE(paid_at, created_at) >= date_trunc('month', NOW()) - ($1 || ' months')::interval
         GROUP BY 1 ORDER BY 1 DESC`, [String(months - 1)]);
     const dia = await db.query(
-      `SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+      `SELECT to_char(date_trunc('month', (created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Ulaanbaatar'), 'YYYY-MM') AS month,
               COALESCE(SUM(amount) FILTER (WHERE type = 'block_bonus'), 0) AS bonus,
               COALESCE(SUM(amount) FILTER (WHERE type = 'purchase'), 0) AS purchased,
               COALESCE(-SUM(amount) FILTER (WHERE type = 'membership'), 0) AS spent_membership,

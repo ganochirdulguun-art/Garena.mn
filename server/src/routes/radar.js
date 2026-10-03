@@ -177,6 +177,8 @@ async function liveMeta(token, s) {
     if (game) {
       meta.room_id = game.room_id ?? null; meta.host_user_id = game.host_user_id ?? null;
       if (meta.host_user_id != null) meta.participants.add(String(meta.host_user_id));
+      // joiner-ууд (lan_game_players) — өмнө нь зөвхөн хост + memRooms (prod-д хоосон) тул GOLD оролцогч өөрийн тоглолтоо хардаг байв
+      if (db) { try { (await db.query('SELECT user_id FROM lan_game_players WHERE token = $1', [token])).rows.forEach((r) => { if (r.user_id != null) meta.participants.add(String(r.user_id)); }); } catch {} }
       const room = meta.room_id != null && roomRoutes?.memRooms ? roomRoutes.memRooms.get(Number(meta.room_id)) || roomRoutes.memRooms.get(meta.room_id) : null;
       if (room) { meta.room_name = room.name || null; for (const id of (room.players?.keys?.() || [])) meta.participants.add(String(id)); }
       if (!meta.room_name && meta.room_id && db) { try { meta.room_name = (await db.query('SELECT name FROM rooms WHERE id = $1', [meta.room_id])).rows[0]?.name || null; } catch {} }

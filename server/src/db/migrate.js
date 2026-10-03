@@ -107,6 +107,11 @@ async function runMigrations(db) {
       created_at  TIMESTAMP DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_diamond_tx_user ON diamond_transactions(user_id, created_at DESC);
+    -- Хэрэглэгч устгахад төлбөр/дэвтрийн мөр устахгүй (ON DELETE CASCADE → SET NULL), аудит 2026-10-02
+    ALTER TABLE payment_orders DROP CONSTRAINT IF EXISTS payment_orders_user_id_fkey;
+    ALTER TABLE payment_orders ADD CONSTRAINT payment_orders_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
+    ALTER TABLE diamond_transactions DROP CONSTRAINT IF EXISTS diamond_transactions_user_id_fkey;
+    ALTER TABLE diamond_transactions ADD CONSTRAINT diamond_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL;
 
     -- ⏱ Тоглосон цагийн урамшуулал: нэг тоглолт (relay token) нэг тоглогчид нэг л удаа (services/playtime.js)
     CREATE TABLE IF NOT EXISTS play_awards (

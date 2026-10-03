@@ -11,6 +11,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+if (!process.env.NODE_ENV && (process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PROJECT_ID)) process.env.NODE_ENV = 'production';
 const jwt = require('jsonwebtoken');
 
 const authRoutes          = require('./routes/auth');
@@ -240,29 +241,39 @@ function evThrottled(socket, key, ms) {
   t[key] = now;
   return false;
 }
+// Хязгаарын төлөв ХЭРЭГЛЭГЧЭЭР (socket-оор биш) — олон socket нээж лобби/DM-ийг үерлүүлэх боломжтой байв (аудит 2026-10-02)
+const rlByUser = new Map();   // userId -> төлөв
+function rlState(socket) {
+  const id = socket.user?.id;
+  if (id == null) return socket.data;
+  let st = rlByUser.get(String(id));
+  if (!st) { st = {}; rlByUser.set(String(id), st); if (rlByUser.size > 5000) rlByUser.delete(rlByUser.keys().next().value); }
+  return st;
+}
 function checkRateLimit(socket) {
   const now = Date.now();
+  const st = rlState(socket);
   // 30 секундийн хоригтой эсэх
-  if (socket.data.rateLimitUntil && now < socket.data.rateLimitUntil) {
+  if (st.rateLimitUntil && now < st.rateLimitUntil) {
     return true;
   }
   // 500ms cooldown
-  if (socket.data.lastMessageTime && now - socket.data.lastMessageTime < 500) {
+  if (st.lastMessageTime && now - st.lastMessageTime < 500) {
     return true;
   }
   // 1 минутад 30 мессеж хязгаар
-  if (!socket.data.messageWindowStart || now - socket.data.messageWindowStart > 60000) {
-    socket.data.messageCount = 0;
-    socket.data.messageWindowStart = now;
+  if (!st.messageWindowStart || now - st.messageWindowStart > 60000) {
+    st.messageCount = 0;
+    st.messageWindowStart = now;
   }
-  socket.data.messageCount = (socket.data.messageCount || 0) + 1;
-  if (socket.data.messageCount > 30) {
-    socket.data.rateLimitUntil = now + 30000;
-    socket.data.messageCount = 0;
+  st.messageCount = (st.messageCount || 0) + 1;
+  if (st.messageCount > 30) {
+    st.rateLimitUntil = now + 30000;
+    st.messageCount = 0;
     console.log(`[RateLimit] ${socket.user?.username || socket.id} хаагдлаа (30 секунд)`);
     return true;
   }
-  socket.data.lastMessageTime = now;
+  st.lastMessageTime = now;
   return false;
 }
 
@@ -363,6 +374,25 @@ async function setRoomWaitingIfNoPlayersInGame(roomId) {
   return true;
 }
 
+// Ишлэл (replyTo): клиентийн өгсөн username/text-д итгэхгүй — санах ойн түүх эсвэл DB-ээс цагаар нь олж өөрөө бөглөнө;
+// олдохгүй бол ишлэлгүй. Устгасан мессеж → «[Устгагдсан мессеж]» (аудит 2026-10-02)
+async function resolveReply(reply, roomId) {
+  if (!reply) return null;
+  const mem = roomId ? (roomMessages[roomId] || []) : lobbyHistory;
+  const hit = mem.find((m) => m.time === reply.time);
+  if (hit) return { username: hit.username, text: String(hit.text || '').replace(/\s+/g, ' ').trim().slice(0, 80), time: hit.time };
+  if (!dbForMigration) return null;
+  try {
+    const r = roomId
+      ? await dbForMigration.query('SELECT username, text, deleted FROM room_messages WHERE room_id = $1 AND created_at = $2::timestamptz LIMIT 1', [roomId, reply.time])
+      : await dbForMigration.query('SELECT username, text, deleted FROM lobby_messages WHERE created_at = $1::timestamptz LIMIT 1', [reply.time]);
+    const row = r.rows[0];
+    if (!row) return null;
+    const text = row.deleted ? '[Устгагдсан мессеж]' : String(row.text || '').replace(/\s+/g, ' ').trim();
+    return { username: row.username, text: text.length > 80 ? text.slice(0, 79) + '…' : text, time: reply.time };
+  } catch { return null; }
+}
+
 // ── Socket.io — Чат & өрөөний event ─────────────────────
 // roomId → Map<username, userId>
 const roomMembers = {};
@@ -435,15 +465,31 @@ const REJOIN_GRACE_MS = 45000; // 45 секунд
 const roomReady = {};
 
 // ── Socket.io JWT middleware ──────────────────────────────
+const MAX_SOCKETS_PER_USER = 24;   // үндсэн цонх + өрөөний iframe + найзууд + DM цонхнууд (+ салсан ч ping timeout хүртэл үлдэх хуучин socket-ууд) — үүнээс олон = скрипт
 io.use((socket, next) => {
   const token = socket.handshake.auth?.token;
   if (!token) return next(new Error('Authentication required'));
   try {
     socket.user = jwt.verify(token, process.env.JWT_SECRET);
+    if (require('./middleware/auth').isRevoked(socket.user?.id)) return next(new Error('Invalid token'));
+    let n = 0;
+    for (const s of io.sockets.sockets.values()) if (String(s.user?.id) === String(socket.user.id)) n++;
+    if (n >= MAX_SOCKETS_PER_USER) return next(new Error('Too many connections'));
     next();
   } catch {
     next(new Error('Invalid token'));
   }
+});
+
+// Admin DELETE /api/users/:id → хостолж буй өрөөг хаах, socket салгах, цол/JWT хүчингүй (#40)
+adminRoutes.setOnUserDeleted(async (userId, hostedRoomIds) => {
+  require('./middleware/auth').revokeUser(userId);
+  try { require('./routes/roles').cacheRole?.(userId, null); } catch {}
+  for (const rid of hostedRoomIds || []) {
+    try { io.to(String(rid)).emit('room:closed', { reason: 'Өрөөний эзэн устгагдлаа' }); cleanupRoomState(String(rid)); } catch {}
+  }
+  for (const s of [...io.sockets.sockets.values()]) if (String(s.user?.id) === String(userId)) { try { s.disconnect(true); } catch {} }
+  io.emit('rooms:updated');
 });
 
 async function ensureRoomMembership(socket, roomId) {
@@ -599,7 +645,7 @@ io.on('connection', (socket) => {
   socket.on('lobby:chat', async ({ text, replyTo } = {}) => {
     if (typeof text !== 'string' || !text.trim()) return;
     if (checkRateLimit(socket)) return;
-    const reply = socialRoutes.sanitizeReplyTo(replyTo);
+    const reply = await resolveReply(socialRoutes.sanitizeReplyTo(replyTo), null);
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
@@ -675,10 +721,15 @@ io.on('connection', (socket) => {
       if (!stillInPrev) { try { lanHostRoutes.removeUserGames(prevRoom, userId); } catch {} }   // «сүнс» OPEN GAME үлдээхгүй
     }
 
+    // Өрөөний чатын түүх (2026-10-02): DB-д байнга хадгалсан сүүлийн 200 — join-ээс ӨМНӨ татна, join-ийн дараа шууд өгнө
+    // (өмнө нь join → await түүх хооронд ирсэн live мессеж түүхийн урд зурагдаж дараалал эвдэрдэг байв)
+    const hist = await require('./routes/roomChat').history(roomId).catch(() => null);
+    if (!socket.connected) return;
     socket.join(roomId);
     socket.data.roomId   = roomId;
     socket.data.username = username;
     touchRoomActivity(roomId, userId);
+    socket.emit('room:history', hist && hist.length ? hist : (roomMessages[roomId] || []));
 
     if (!roomMembers[roomId]) roomMembers[roomId] = new Map();
 
@@ -714,9 +765,6 @@ io.on('connection', (socket) => {
     }
 
     io.to(roomId).emit('room:members', membersArray(roomId));
-    // Өрөөний чатын түүх (2026-10-02): DB-д байнга хадгалсан сүүлийн 200 — гараад удсан хүн ч байхгүй үеийнхээ чатыг уншина
-    const hist = await require('./routes/roomChat').history(roomId).catch(() => null);
-    socket.emit('room:history', hist && hist.length ? hist : (roomMessages[roomId] || []));
   });
 
   // Өрөөний урилга
@@ -740,7 +788,7 @@ io.on('connection', (socket) => {
     if (!await ensureSocketRoomState(socket, roomId)) return;
     if (!await ensureRoomMembership(socket, roomId)) return;
     touchRoomActivity(roomId, socket.user.id);
-    const reply = socialRoutes.sanitizeReplyTo(replyTo);
+    const reply = await resolveReply(socialRoutes.sanitizeReplyTo(replyTo), String(roomId));
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,

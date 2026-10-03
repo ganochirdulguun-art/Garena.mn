@@ -14,6 +14,9 @@ const router = express.Router();
 // оруулна — socket төлөв index.js-ийн scope-д амьдардаг тул шууд авах боломжгүй.
 let presenceAccessor = () => [];
 router.setPresence = (fn) => { presenceAccessor = typeof fn === 'function' ? fn : () => []; };
+// Хэрэглэгч устгахад: хостолж буй өрөөг хаах, socket-уудыг салгах, цолын кэш/JWT хүчингүй (index.js өгнө)
+let onUserDeleted = async () => {};
+router.setOnUserDeleted = (fn) => { onUserDeleted = typeof fn === 'function' ? fn : async () => {}; };
 
 async function dbOk() {
   if (!db) return false;
@@ -163,9 +166,11 @@ router.delete('/api/users/:id', adminMW, async (req, res) => {
   if (!(await dbOk()))
     return res.status(503).json({ error: 'Service temporarily unavailable' });
   try {
+    const hosted = (await db.query('SELECT id FROM rooms WHERE host_id = $1', [id]).catch(() => ({ rows: [] }))).rows.map((x) => x.id);
     const r = await db.query('DELETE FROM users WHERE id = $1', [id]);
     if (r.rowCount === 0)
       return res.status(404).json({ error: 'User not found' });
+    try { await onUserDeleted(id, hosted); } catch (e) { console.warn('[Admin] delete cleanup:', e.message); }
     res.json({ ok: true, removed: r.rowCount });
   } catch (e) {
     console.error('[Admin] delete user:', e.message);
