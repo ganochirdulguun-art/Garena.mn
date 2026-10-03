@@ -289,6 +289,19 @@
       socket.on('clan:updated', (d) => {
         loadMine();
         if (d?.accepted) toast('Кланы элсэх хүсэлт тань батлагдлаа 🎉', 'success');
+        // 🔔 мэдэгдлийн цэс (2026-10-03, эзэн): кланы хүсэлт ирсэн / батлагдсан / татгалзсан / нэмэгдсэн / хасагдсан
+        try {
+          const n = window.gxNotif; const cn = d?.clan_name ? `«${d.clan_name}»` : 'Клан';
+          if (n && d) {
+            if (d.request) n.push({ type: 'clan', icon: '🛡', clanId: d.clan_id, text: `${d.from_username || 'Хэн нэгэн'} ${cn} кланд элсэх хүсэлт илгээлээ`, sub: d.message || '', btn: 'Харах' });
+            else if (d.accepted) n.push({ type: 'clan', icon: '🎉', clanId: d.clan_id, text: `${cn} кланд элсэх хүсэлт тань батлагдлаа`, sub: d.by_username ? `Баталсан: ${d.by_username}` : '', btn: 'Нээх' });
+            else if (d.declined) { n.push({ type: 'info', icon: '✖', text: `${cn} кланд элсэх хүсэлт тань татгалзагдлаа` }); toast(`${cn} кланд элсэх хүсэлт тань татгалзагдлаа`, 'warning'); }
+            else if (d.added) { n.push({ type: 'clan', icon: '🛡', clanId: d.clan_id, text: `Таныг ${cn} кланд нэмлээ`, sub: d.by_username ? `Нэмсэн: ${d.by_username}` : '', btn: 'Нээх' }); toast(`Таныг ${cn} кланд нэмлээ`, 'success'); }
+            else if (d.removed) n.push({ type: 'info', icon: '🚪', text: `Таныг ${cn} клангаас хаслаа` });
+            else if (d.role) n.push({ type: 'clan', icon: '⭐', clanId: d.clan_id, text: `${cn} кланд таны эрх: ${d.role === 'admin' ? 'Админ' : 'Гишүүн'}`, btn: 'Нээх' });
+            else if (d.deleted) n.push({ type: 'info', icon: '🗑', text: 'Таны байсан клан устгагдлаа' });
+          }
+        } catch {}
         if (d?.removed || d?.deleted) { loadRooms?.(); if (curClan && String(curClan.id) === String(d.clan_id)) closeDetail(); }
         if (curClan && String(curClan.id) === String(d?.clan_id)) openClan(curClan.id);
       });

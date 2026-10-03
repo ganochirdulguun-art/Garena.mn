@@ -777,3 +777,4 @@ body.gx .rank-badge { background: var(--gx-surface-3) !important; color: var(--g
 .gx-live-chip button:disabled { background: #7a2a33; cursor: not-allowed; }
 .gx-live-chip.full { opacity: .8; }
 .live-picker-f { display: flex; flex-direction: column; gap: 6px; }
+.gx-notif-i.static .gx-notif-t b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; font-size: 12.5px; }

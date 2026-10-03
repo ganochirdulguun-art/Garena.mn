@@ -100,6 +100,8 @@ async function memberClanIds(userId) {
     return r.rows.map((x) => Number(x.clan_id));
   } catch { return []; }
 }
+// Кланы нэрийг мэдэгдэлд хавсаргана (🔔 мэдэгдлийн цэс, 2026-10-03)
+async function clanName(id) { try { const r = await db.query('SELECT name FROM clans WHERE id = $1', [id]); return r.rows[0]?.name || ''; } catch { return ''; } }
 function notify(userIds, payload) {
   if (!_io) return;
   (Array.isArray(userIds) ? userIds : [userIds]).forEach((id) => { try { _io.to(`user:${id}`).emit('clan:updated', payload); } catch {} });
@@ -295,7 +297,7 @@ router.post('/:id/join', auth, async (req, res) => {
     }
     const msg = String(req.body?.message || '').trim().slice(0, 200);
     await db.query("INSERT INTO clan_requests (clan_id, user_id, message) VALUES ($1,$2,$3) ON CONFLICT (clan_id, user_id) WHERE status = 'pending' DO NOTHING", [clan.id, req.user.id, msg]);
-    notify(await clanManagers(clan.id), { clan_id: clan.id, request: true });
+    notify(await clanManagers(clan.id), { clan_id: clan.id, request: true, clan_name: clan.name, from_user_id: req.user.id, from_username: req.user.username, message: msg });
     return res.json({ ok: true, status: 'pending' });
   } catch (e) { console.error('[clans] join', e.message); return bad(res, 500, 'Server error'); }
 });
@@ -321,7 +323,7 @@ router.post('/:id/requests/:rid/:action(accept|decline)', auth, async (req, res)
     const accept = req.params.action === 'accept';
     await db.query('UPDATE clan_requests SET status = $1, decided_by = $2, decided_at = NOW() WHERE id = $3', [accept ? 'accepted' : 'declined', req.user.id, r.id]);
     if (accept) await db.query("INSERT INTO clan_members (clan_id, user_id, role) VALUES ($1,$2,'member') ON CONFLICT DO NOTHING", [r.clan_id, r.user_id]);
-    notify(r.user_id, { clan_id: Number(r.clan_id), accepted: accept });
+    notify(r.user_id, { clan_id: Number(r.clan_id), accepted: accept, declined: !accept, clan_name: await clanName(r.clan_id), by_username: req.user.username });
     return res.json({ ok: true });
   } catch (e) { console.error('[clans] decide', e.message); return bad(res, 500, 'Server error'); }
 });
@@ -341,7 +343,7 @@ router.post('/:id/members', auth, async (req, res) => {
     const target = u.rows[0];
     await db.query("INSERT INTO clan_members (clan_id, user_id, role) VALUES ($1,$2,'member') ON CONFLICT DO NOTHING", [req.params.id, target.id]);
     await db.query("UPDATE clan_requests SET status = 'accepted', decided_by = $1, decided_at = NOW() WHERE clan_id = $2 AND user_id = $3 AND status = 'pending'", [req.user.id, req.params.id, target.id]);
-    notify(target.id, { clan_id: Number(req.params.id), added: true });
+    notify(target.id, { clan_id: Number(req.params.id), added: true, clan_name: await clanName(req.params.id), by_username: req.user.username });
     return res.json({ ok: true, user: { id: String(target.id), username: target.username } });
   } catch (e) { console.error('[clans] add', e.message); return bad(res, 500, 'Server error'); }
 });
@@ -357,7 +359,7 @@ router.delete('/:id/members/:uid', auth, async (req, res) => {
     const allowed = myRole === 'lord' || (myRole === 'admin' && theirRole === 'member');
     if (!allowed) return bad(res, 403, 'Эрх хүрэхгүй');
     await db.query('DELETE FROM clan_members WHERE clan_id = $1 AND user_id = $2', [req.params.id, req.params.uid]);
-    notify(req.params.uid, { clan_id: Number(req.params.id), removed: true });
+    notify(req.params.uid, { clan_id: Number(req.params.id), removed: true, clan_name: await clanName(req.params.id) });
     return res.json({ ok: true });
   } catch (e) { console.error('[clans] remove', e.message); return bad(res, 500, 'Server error'); }
 });
@@ -378,7 +380,7 @@ router.patch('/:id/members/:uid', auth, async (req, res) => {
     } else {
       await db.query('UPDATE clan_members SET role = $1 WHERE clan_id = $2 AND user_id = $3', [role, req.params.id, req.params.uid]);
     }
-    notify(req.params.uid, { clan_id: Number(req.params.id), role });
+    notify(req.params.uid, { clan_id: Number(req.params.id), role, clan_name: await clanName(req.params.id) });
     return res.json({ ok: true });
   } catch (e) { console.error('[clans] role', e.message); return bad(res, 500, 'Server error'); }
 });
