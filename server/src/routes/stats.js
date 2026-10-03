@@ -113,10 +113,14 @@ function normalizeTierBotPlayer(row, index) {
     'nickname', 'nick',
   ]));
   if (!username) return null;
+  const discordId = cleanText(firstValue(row, ['discord_id', 'discordId', 'discord', 'discord_user_id', 'discordUserId']));
+  // TierSystem-ийн нэрэнд брэнд (Garena/Гарена) байвал «Тоглогч#####» (эзэн чөлөөтэй) — 2026-10-04
+  let safe = username;
+  try { if (!require('../middleware/admin').isEnvAdmin(discordId)) safe = require('../services/brandName').safeName(username, discordId || index); } catch {}
 
   return {
-    username,
-    discord_id: cleanText(firstValue(row, ['discord_id', 'discordId', 'discord', 'discord_user_id', 'discordUserId'])),
+    username: safe,
+    discord_id: discordId,
     tierbot_id: cleanText(firstValue(row, ['tierbot_id', 'tierbotId', 'player_id', 'playerId', 'id'])),
     wins: toNonNegativeInt(firstValue(row, ['wins', 'win', 'w']), 0),
     losses: toNonNegativeInt(firstValue(row, ['losses', 'loss', 'loses', 'l']), 0),

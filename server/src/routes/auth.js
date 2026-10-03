@@ -33,6 +33,9 @@ function cleanUsername(raw) {
 async function usernameProblem(name, { exceptId = null, max = 20 } = {}) {
   if (name.length < 2 || name.length > max) return `Нэр 2–${max} тэмдэгт байна`;
   if (RESERVED_NAMES.includes(name.toLowerCase())) return 'Энэ нэрийг ашиглах боломжгүй';
+  // Брэнд (2026-10-04, эзэн): Garena/Гарена-г ямар ч хэлбэрээр (том/жижиг, кирилл/латин, G4r3na, G.a.r.e.n.a…) хориглоно
+  const brand = require('../services/brandName');
+  if (brand.isBrandName(name)) return brand.BRAND_ERROR;
   if (db) {
     try {
       const r = await db.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND ($2::int IS NULL OR id <> $2) LIMIT 1', [name, exceptId]);
@@ -278,7 +281,9 @@ router.get('/discord/callback', async (req, res) => {
       global_name: globalName,
       avatar,
     } = userRes.data;
-    const discordName = String(globalName || username || `Discord-${discordId}`).trim();
+    // Discord нэрэнд брэнд (Garena/Гарена) байвал платформын нэрийг «Тоглогч#####» болгоно — эзэн чөлөөтэй (2026-10-04)
+    const discordRawName = String(globalName || username || `Discord-${discordId}`).trim();
+    const discordName = require('../middleware/admin').isEnvAdmin(discordId) ? discordRawName : require('../services/brandName').safeName(discordRawName, discordId);
     const avatarUrl = avatar
       ? `https://cdn.discordapp.com/avatars/${discordId}/${avatar}.png`
       : null;

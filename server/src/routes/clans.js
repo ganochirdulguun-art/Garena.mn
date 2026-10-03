@@ -216,6 +216,8 @@ router.post('/', auth, async (req, res) => {
   const kind = req.body?.kind === 'discord' ? 'discord' : 'player';
   if (!NAME_RE.test(name)) return bad(res, 400, 'Кланы нэр 3–32 тэмдэгт (үсэг, тоо, зай, . _ -) байна');
   if (!TAG_RE.test(tag)) return bad(res, 400, 'Таг 2–6 үсэг/тоо байна');
+  // Брэнд (Garena/Гарена) кланы нэр/тагт хориотой — эзэн чөлөөтэй (2026-10-04)
+  { const brand = require('../services/brandName'); if (!adminMW.isOwnerUser(req.user) && (brand.isBrandName(name) || brand.isBrandName(tag))) return bad(res, 400, brand.BRAND_ERROR); }
   try {
     const staff = await isStaff(req.user);
     if (!staff && !await topTier(uid)) {
