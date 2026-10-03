@@ -430,7 +430,7 @@ function membersArray(roomId) {
     // шууд холболт (mesh) идэвхтэй эсэх — өрөөнд «⚡ шууд» / «relay» тэмдэг; MESH_DISABLED үед талбаргүй (хуучин клиент тэмдэг харуулахгүй)
     ...(meshRoutes.meshDisabled() ? {} : { mesh: meshRoutes.hasMesh(id) }),
     ...(require('./routes/roles').isModCached(id) ? { mod: true } : {}),   // Moderator «MOD» тэмдэг
-    ...(require('./routes/roles').isAdminCached(id) ? { admin: true } : {}),   // платформын ADMIN тэмдэг
+    ...(require('./routes/roles').isRoomAdmin(id, roomId) ? { admin: true } : {}),   // энэ Room-ын ADMIN тэмдэг
     ...(require('./middleware/admin').isOwnerUser({ id }) ? { owner: true } : {}),   // 👑 Эзэн — жагсаалтын хамгийн дээр
   }));
 }
@@ -445,7 +445,7 @@ const STATUS_PRIORITY = { in_game: 3, in_room: 2, online: 1 };
 async function everyoneGate(socket, text) {
   if (!/@(everyone|here)\b/i.test(text)) return text;
   let ok = false;
-  try { ok = await require('./middleware/admin').isAdminUser(socket.user); } catch {}
+  try { ok = await require('./middleware/admin').isRoomAdminUser(socket.user, socket.data?.roomId); } catch {}
   return ok ? text : text.replace(/@(everyone|here)\b/gi, '@​$1');
 }
 
@@ -958,7 +958,7 @@ io.on('connection', (socket) => {
   socket.on('room:afk_list', async (ack) => {
     if (typeof ack !== 'function') return;
     const rid = socket.data.roomId ? String(socket.data.roomId) : '';
-    if (!rid || !await require('./middleware/admin').isAdminUser(socket.user)) return ack({ ok: false });
+    if (!rid || !await require('./middleware/admin').isRoomAdminUser(socket.user, rid)) return ack({ ok: false });
     const out = {};
     // LAN урсгал room:game_started илгээдэггүй тул идэвхтэй LAN тоглоомын хост/joiner-ийг тоглож буйд тооцно (sweepChannelGhosts-той ижил эх)
     const playing = lanHostRoutes.activeHostIds();

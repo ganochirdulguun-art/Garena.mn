@@ -16,19 +16,28 @@ function setIO(io) { _io = io; }
 const NOTE_MAX = 300;
 // Moderator-уудын санах ойн жагсаалт — өрөөний гишүүдийн «MOD» тэмдэгт (DB асуулгагүй, хурдан)
 const modSet = new Set();
-const adminSet = new Set();   // платформын ADMIN цол (эзэн олгоно) — isAdminUser() энэ кэшийг шалгана
+// ADMIN цол ЗӨВХӨН ӨӨРИЙН ROOM-Д (2026-10-03, эзэн): platform_roles.room_id — тэр Room-д л kick/зарлал/LAN нээх/@everyone эрхтэй.
+// room_id NULL (хуучин олголт) = глобал ажилтан хэвээр (эзэн самбараас Room сонгож дахин олговол Room-д хязгаарлагдана).
+const adminRooms = new Map();   // userId -> room_id (String) | null (глобал)
 async function loadMods() {
   try {
-    const r = await db.query("SELECT user_id, role FROM platform_roles WHERE role IN ('moderator','admin')");
-    modSet.clear(); adminSet.clear();
-    r.rows.forEach((x) => (x.role === 'admin' ? adminSet : modSet).add(String(x.user_id)));
+    const r = await db.query("SELECT user_id, role, room_id FROM platform_roles WHERE role IN ('moderator','admin')");
+    modSet.clear(); adminRooms.clear();
+    r.rows.forEach((x) => (x.role === 'admin' ? adminRooms.set(String(x.user_id), x.room_id == null ? null : String(x.room_id)) : modSet.add(String(x.user_id))));
   } catch {}
 }
 // Кэшийг 5 мин тутам DB-ээс сэргээнэ — асах үед DB түр унасан / миграц алгассан үед ADMIN цолтнууд эрхгүй үлддэг байв
 if (db) setInterval(() => { loadMods(); }, 5 * 60 * 1000).unref();
 function isModCached(userId) { return modSet.has(String(userId)); }
-function isAdminCached(userId) { return adminSet.has(String(userId)); }
-function cacheRole(userId, role) { const id = String(userId); modSet.delete(id); adminSet.delete(id); if (role === 'moderator') modSet.add(id); if (role === 'admin') adminSet.add(id); }
+// Глобал ADMIN (room_id NULL) — платформын хэмжээний эрх (эзний самбар, хүсэлт батлах, өрөө нээх г.м.)
+function isAdminCached(userId) { return adminRooms.has(String(userId)) && adminRooms.get(String(userId)) === null; }
+// Тухайн Room-ын ADMIN (эсвэл глобал ADMIN)
+function isRoomAdmin(userId, roomId) {
+  const id = String(userId); if (!adminRooms.has(id)) return false;
+  const rid = adminRooms.get(id); return rid === null || (roomId != null && rid === String(roomId));
+}
+function adminRoomOf(userId) { return adminRooms.has(String(userId)) ? adminRooms.get(String(userId)) : undefined; }
+function cacheRole(userId, role, roomId = null) { const id = String(userId); modSet.delete(id); adminRooms.delete(id); if (role === 'moderator') modSet.add(id); if (role === 'admin') adminRooms.set(id, roomId == null ? null : String(roomId)); }
 
 async function dbOk() { if (!db) return false; try { await db.query('SELECT 1'); return true; } catch { return false; } }
 
@@ -87,6 +96,7 @@ async function ensureTables() {
       decision_note TEXT DEFAULT ''
     )`);
     await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS role_requests_one_pending ON role_requests (user_id, role) WHERE status = 'pending'`);
+    await db.query('ALTER TABLE platform_roles ADD COLUMN IF NOT EXISTS room_id INTEGER');   // ADMIN → Room (2026-10-03)
   } catch (e) { console.error('[Migration] roles:', e.message); }
   await loadMods();   // хүснэгт үүсгэлт алдсан ч кэшийг ачаална
   // /roles/activity-ийн дэд асуулгууд бүтэн скан хийдэг байв
@@ -150,8 +160,9 @@ async function roleOf(userId) {
   try { const r = await db.query('SELECT role FROM platform_roles WHERE user_id = $1', [userId]); return r.rows[0]?.role || null; } catch { return null; }
 }
 // Room 1–20-д LAN тоглоом нээх эрх: Moderator эсвэл ажилтан (эзэн/админ)
-async function canHostInChannel(user) {
+async function canHostInChannel(user, roomId = null) {
   if (await isStaff(user)) return true;
+  if (roomId != null && isRoomAdmin(user.id, roomId)) return true;   // тухайн Room-ын ADMIN
   return (await roleOf(user.id)) === 'moderator';
 }
 /** Бан авсан хэрэглэгчийн Moderator/ADMIN цолыг хураана (anticheat.js дуудна). */
@@ -182,10 +193,14 @@ async function notifyStaff(payload) {
 router.get('/me', auth, async (req, res) => {
   if (!await dbOk()) return res.status(503).json({ error: 'Service temporarily unavailable' });
   try {
-    const staff = await isStaff(req.user);
+    const globalStaff = await isStaff(req.user);
     const role = await roleOf(req.user.id);
+    const roomQ = req.query.room != null && req.query.room !== '' ? String(req.query.room) : null;
+    const adminRoomId = role === 'admin' ? (adminRoomOf(req.user.id) ?? null) : null;
+    const roomAdmin = !!(roomQ && role === 'admin' && isRoomAdmin(req.user.id, roomQ));   // ?room=<id> — тэр Room-д ажилтны эрхтэй
+    const staff = globalStaff || roomAdmin;
     const p = await db.query("SELECT id, role, created_at FROM role_requests WHERE user_id = $1 AND status = 'pending' ORDER BY id DESC LIMIT 1", [req.user.id]);
-    return res.json({ role, staff, owner: adminMW.isOwnerUser(req.user), can_host_channel: staff || role === 'moderator', pending: p.rows[0] || null, auto_approve: await autoActive(), pending_count: staff ? await pendingCount() : undefined });
+    return res.json({ role, staff, global_staff: globalStaff, room_admin: roomAdmin, admin_room_id: adminRoomId, owner: adminMW.isOwnerUser(req.user), can_host_channel: staff || role === 'moderator', pending: p.rows[0] || null, auto_approve: await autoActive(), pending_count: globalStaff ? await pendingCount() : undefined });
   } catch (e) { console.error('[roles] me', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -359,38 +374,78 @@ router.get('/user/:userId', auth, staffOnly, async (req, res) => {
     const owner = adminMW.isOwnerUser(u.rows[0]);
     const role = owner ? 'owner' : (await roleOf(uid)) || (await isStaff(u.rows[0]) ? 'admin' : null);
     const iAmOwner = adminMW.isOwnerUser(req.user);
-    return res.json({ id: uid, username: u.rows[0].username, role, can_set_admin: iAmOwner && !owner, can_set_mod: !owner && (iAmOwner || role !== 'admin') });
+    let roomId = null, roomName = null;
+    if (role === 'admin') {
+      const pr = await db.query('SELECT pr.room_id, rm.name FROM platform_roles pr LEFT JOIN rooms rm ON rm.id = pr.room_id WHERE pr.user_id = $1', [uid]);
+      roomId = pr.rows[0]?.room_id ?? null; roomName = pr.rows[0]?.name || null;
+    }
+    return res.json({ id: uid, username: u.rows[0].username, role, room_id: roomId, room_name: roomName, can_set_admin: iAmOwner && !owner, can_set_mod: !owner && (iAmOwner || role !== 'admin') });
   } catch (e) { console.error('[roles] user', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
+// Цол олгох/хураах нийтлэг логик — /set/:userId (баруун товчны цэс) ба /admins (эзний самбар) хоёулаа дуудна.
+// ADMIN → заавал Room (room_id): тэр Room-д л эрх нь хэрэгжинэ (2026-10-03, эзэн).
+async function applyRole(actor, uid, role, roomIdRaw) {
+  if (role !== null && role !== 'moderator' && role !== 'admin') return [400, { error: 'Буруу цол' }];
+  if (String(uid) === String(actor.id)) return [400, { error: 'Өөрийнхөө цолыг өөрчлөх боломжгүй' }];
+  const u = await db.query('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id = $1', [uid]);
+  const target = u.rows[0]; if (!target) return [404, { error: 'Хэрэглэгч олдсонгүй' }];
+  if (adminMW.isOwnerUser(target)) return [403, { error: 'Эзний цолыг өөрчлөх боломжгүй' }];
+  const iAmOwner = adminMW.isOwnerUser(actor);
+  const cur = await roleOf(uid);
+  if (!iAmOwner && (role === 'admin' || cur === 'admin')) return [403, { error: 'ADMIN цолыг зөвхөн эзэн өгнө/хураана' }];
+  if (role && target.banned) return [400, { error: 'Бандуулсан хэрэглэгч' }];
+  let roomId = null, roomName = null;
+  if (role === 'admin') {
+    roomId = Number.parseInt(roomIdRaw, 10);
+    if (!Number.isInteger(roomId)) return [400, { error: 'ADMIN цолыг Room сонгож олгоно (аль Room-д эрхтэй байх вэ)' }];
+    const rm = await db.query("SELECT id, name FROM rooms WHERE id = $1 AND COALESCE(kind,'room') = 'channel'", [roomId]);
+    if (!rm.rows[0]) return [404, { error: 'Ийм нийтийн Room олдсонгүй' }];
+    roomName = rm.rows[0].name;
+  }
+  if (role === null) await db.query('DELETE FROM platform_roles WHERE user_id = $1', [uid]);
+  else await db.query(`INSERT INTO platform_roles (user_id, role, granted_by, room_id) VALUES ($1, $2, $3, $4)
+    ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by, granted_at = NOW(), room_id = EXCLUDED.room_id`, [uid, role, actor.id, roomId]);
+  if (role) await db.query(`UPDATE role_requests SET status = 'approved', decided_by = $2, decided_at = NOW() WHERE user_id = $1 AND status = 'pending'`, [uid, actor.id]);
+  cacheRole(uid, role, roomId);
+  if (_io) _io.to(`user:${uid}`).emit('role:decided', { role: role || cur || 'moderator', approved: !!role, revoked: !role, room_id: roomId, room_name: roomName });
+  notifyStaff({ type: 'role_decided', pending_count: await pendingCount() });
+  console.log(`[Roles] ${actor.username} → ${target.username}: ${cur || '—'} → ${role || '—'}${roomId ? ` (Room #${roomId} ${roomName})` : ''}`);
+  return [200, { ok: true, role, room_id: roomId, room_name: roomName, username: target.username }];
+}
 router.post('/set/:userId', auth, staffOnly, async (req, res) => {
   try {
-    const uid = Number(req.params.userId);
     const role = req.body?.role == null || req.body.role === '' ? null : String(req.body.role);
-    if (role !== null && role !== 'moderator' && role !== 'admin') return res.status(400).json({ error: 'Буруу цол' });
-    if (String(uid) === String(req.user.id)) return res.status(400).json({ error: 'Өөрийнхөө цолыг өөрчлөх боломжгүй' });
-    const u = await db.query('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id = $1', [uid]);
-    const target = u.rows[0]; if (!target) return res.status(404).json({ error: 'Хэрэглэгч олдсонгүй' });
-    if (adminMW.isOwnerUser(target)) return res.status(403).json({ error: 'Эзний цолыг өөрчлөх боломжгүй' });
-    const iAmOwner = adminMW.isOwnerUser(req.user);
-    const cur = await roleOf(uid);
-    if (!iAmOwner && (role === 'admin' || cur === 'admin')) return res.status(403).json({ error: 'ADMIN цолыг зөвхөн эзэн өгнө/хураана' });
-    if (role && target.banned) return res.status(400).json({ error: 'Бандуулсан хэрэглэгч' });
-    if (role === null) await db.query('DELETE FROM platform_roles WHERE user_id = $1', [uid]);
-    else await db.query(`INSERT INTO platform_roles (user_id, role, granted_by) VALUES ($1, $2, $3)
-      ON CONFLICT (user_id) DO UPDATE SET role = EXCLUDED.role, granted_by = EXCLUDED.granted_by, granted_at = NOW()`, [uid, role, req.user.id]);
-    if (role) await db.query(`UPDATE role_requests SET status = 'approved', decided_by = $2, decided_at = NOW() WHERE user_id = $1 AND status = 'pending'`, [uid, req.user.id]);
-    cacheRole(uid, role);
-    if (_io) _io.to(`user:${uid}`).emit('role:decided', { role: role || cur || 'moderator', approved: !!role, revoked: !role });
-    notifyStaff({ type: 'role_decided', pending_count: await pendingCount() });
-    console.log(`[Roles] ${req.user.username} → ${target.username}: ${cur || '—'} → ${role || '—'}`);
-    return res.json({ ok: true, role });
+    const [code, body] = await applyRole(req.user, Number(req.params.userId), role, req.body?.room_id);
+    return res.status(code).json(body);
   } catch (e) { console.error('[roles] set', e.message); return res.status(500).json({ error: 'Server error' }); }
+});
+
+// ── Эзний самбар → «ADMIN-ууд»: хэнд, аль Room-д ADMIN өгөх/солих/хураах (2026-10-03) ──
+const ownerOnly = (req, res, next) => (adminMW.isOwnerUser(req.user) ? next() : res.status(403).json({ error: 'Зөвхөн эзэн' }));
+router.get('/admins', auth, ownerOnly, async (req, res) => {
+  try {
+    const a = await db.query(`SELECT pr.user_id, u.username, u.tierbot_tier AS tier, pr.room_id, rm.name AS room_name, pr.granted_at, g.username AS granted_by_name
+      FROM platform_roles pr JOIN users u ON u.id = pr.user_id LEFT JOIN rooms rm ON rm.id = pr.room_id LEFT JOIN users g ON g.id = pr.granted_by
+      WHERE pr.role = 'admin' ORDER BY pr.room_id NULLS FIRST, pr.granted_at DESC LIMIT 500`);
+    const r = await db.query("SELECT id, name, game_type FROM rooms WHERE COALESCE(kind,'room') = 'channel' ORDER BY id");
+    return res.json({ admins: a.rows, rooms: r.rows });
+  } catch (e) { console.error('[roles] admins', e.message); return res.status(500).json({ error: 'Server error' }); }
+});
+router.post('/admins', auth, ownerOnly, async (req, res) => {
+  try {
+    const name = String(req.body?.username || '').trim();
+    if (!name) return res.status(400).json({ error: 'Хэрэглэгчийн нэр оруулна уу' });
+    const u = await db.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1', [name]);
+    if (!u.rows[0]) return res.status(404).json({ error: `«${name}» нэртэй хэрэглэгч олдсонгүй` });
+    const [code, body] = await applyRole(req.user, Number(u.rows[0].id), 'admin', req.body?.room_id);
+    return res.status(code).json(body);
+  } catch (e) { console.error('[roles] admins add', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 
 router.get('/moderators', auth, staffOnly, async (req, res) => {
   try {
-    const r = await db.query(`SELECT pr.user_id, u.username, u.tierbot_tier AS tier, pr.role, pr.granted_at, g.username AS granted_by_name
-      FROM platform_roles pr JOIN users u ON u.id = pr.user_id LEFT JOIN users g ON g.id = pr.granted_by
+    const r = await db.query(`SELECT pr.user_id, u.username, u.tierbot_tier AS tier, pr.role, pr.granted_at, g.username AS granted_by_name, pr.room_id, rm.name AS room_name
+      FROM platform_roles pr JOIN users u ON u.id = pr.user_id LEFT JOIN users g ON g.id = pr.granted_by LEFT JOIN rooms rm ON rm.id = pr.room_id
       ORDER BY pr.granted_at DESC LIMIT 1000`);
     return res.json({ moderators: r.rows });
   } catch (e) { console.error('[roles] mods', e.message); return res.status(500).json({ error: 'Server error' }); }
@@ -407,4 +462,4 @@ router.delete('/moderators/:userId', auth, staffOnly, async (req, res) => {
   } catch (e) { console.error('[roles] revoke', e.message); return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, loadMods, revokeOnBan, cacheRole };
+module.exports = { router, ensureTables, setIO, canHostInChannel, roleOf, isStaff, isModCached, isAdminCached, isRoomAdmin, adminRoomOf, loadMods, revokeOnBan, cacheRole };

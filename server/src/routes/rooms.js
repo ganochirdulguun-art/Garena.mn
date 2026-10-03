@@ -489,7 +489,7 @@ router.post('/:id/kick/:targetId', strictAuth, async (req, res) => {
       const result = await db.query("SELECT host_id, COALESCE(kind,'room') AS kind FROM rooms WHERE id = $1", [id]);
       if (!result.rows[0]) return res.status(404).json({ error: 'Room not found' });
       // Нийтийн Room-д хост байхгүй — эзэн/админ гаргана (Ш2: шалтгаан заавал + лог)
-      const staffKick = result.rows[0].kind === 'channel' && await require('../middleware/admin').isAdminUser(req.user);
+      const staffKick = result.rows[0].kind === 'channel' && await require('../middleware/admin').isRoomAdminUser(req.user, id);
       if (String(result.rows[0].host_id) !== String(userId) && !staffKick) {
         return res.status(403).json({ error: 'Only the host can kick players' });
       }
@@ -682,7 +682,7 @@ router.patch('/:id', strictAuth, async (req, res) => {
 router.patch('/:id/notice', strictAuth, async (req, res) => {
   if (!await dbOk()) return requireOperationalDb(res);
   try {
-    if (!await require('../middleware/admin').isAdminUser(req.user)) return res.status(403).json({ error: 'Зөвхөн эзэн/админ' });
+    if (!await require('../middleware/admin').isRoomAdminUser(req.user, req.params.id)) return res.status(403).json({ error: 'Зөвхөн эзэн/админ' });
     const notice = String(req.body?.notice ?? '').replace(/\r/g, '').slice(0, 1500);
     const r = await db.query('UPDATE rooms SET pinned_notice = $2 WHERE id = $1 RETURNING id', [req.params.id, notice]);
     if (!r.rows[0]) return res.status(404).json({ error: 'Room not found' });

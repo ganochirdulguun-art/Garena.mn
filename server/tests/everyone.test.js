@@ -14,5 +14,10 @@ const { _everyoneGate: gate } = require(path.join(serverDir, 'src', 'index.js'))
   assert.equal(await gate({ user: { id: 7 } }, '@everyone тоглоё'), '@everyone тоглоё'); ok('Эзэн (OWNER_USER_IDS) хэвээр');
   assert.equal(await gate({ user: { id: 2, discord_id: 'd-admin' } }, '@Everyone!'), '@Everyone!'); ok('Админ (ADMIN_DISCORD_IDS) хэвээр');
   assert.equal(await gate({ user: { id: 1 } }, 'mail@everyone.mn'), 'mail@\u200beveryone.mn'); ok('Хүрээ: имэйл маягийн текст ч саармагжина (хор хөнөөлгүй)');
+  // Room ADMIN (2026-10-03): зөвхөн өөрийн Room-д @everyone
+  require(path.join(serverDir, 'src', 'routes', 'roles.js')).cacheRole(9, 'admin', 901);
+  assert.equal(await gate({ user: { id: 9 }, data: { roomId: '901' } }, '@everyone тоглоё'), '@everyone тоглоё'); ok('Room ADMIN өөрийн Room-д @everyone хэвээр');
+  assert.equal(await gate({ user: { id: 9 }, data: { roomId: '902' } }, '@everyone тоглоё'), '@\u200beveryone тоглоё'); ok('Room ADMIN өөр Room-д саармагжина');
+  assert.equal(await gate({ user: { id: 9 } }, '@everyone тоглоё'), '@\u200beveryone тоглоё'); ok('Room ADMIN лоббид саармагжина');
   console.log(`=== everyone: ${pass} PASS ===`); process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

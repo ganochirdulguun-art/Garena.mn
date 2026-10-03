@@ -34,7 +34,9 @@
   };
 
   let me = null;   // /roles/me — { role, staff, owner, can_host_channel, pending, pending_count }
-  async function loadMe() { try { me = await api('get', '/roles/me'); } catch { me = null; } try { document.dispatchEvent(new Event('gx:me')); } catch {} return me; }
+  // roomId өгвөл тэр Room-ын ADMIN-д staff/can_host_channel = true ирнэ (ADMIN цол зөвхөн өөрийн Room-д, 2026-10-03)
+  let meRoom = null;
+  async function loadMe(roomId) { if (roomId !== undefined) meRoom = roomId; try { me = await api('get', `/roles/me${meRoom ? `?room=${encodeURIComponent(meRoom)}` : ''}`); } catch { me = null; } try { document.dispatchEvent(new Event('gx:me')); } catch {} return me; }
   window.gxRoleMe = () => me;   // gx-rgc.js (RGC маягийн өрөө) — Moderator хэсэг
   async function requestModerator() {
     const note = await window.gxPrompt('🛡 Moderator авах хүсэлт', 'Moderator нь нийтийн Room-д LAN тоглоом нээж бусдыг тоглуулна. Өөрийнхөө тухай товч бичнэ үү (заавал биш):', '', { okText: 'Хүсэлт илгээх' });
@@ -65,7 +67,7 @@
     document.addEventListener('scroll', hide, true);
     document.addEventListener('contextmenu', async (e) => {
       const el = e.target.closest('[data-user-id]');
-      if (!el || !me?.staff) return;
+      if (!el || !(me?.global_staff ?? me?.staff)) return;   // цол өгөх цэс — зөвхөн эзэн/глобал админ (Room-ын ADMIN биш)
       const uid = String(el.dataset.userId || '');
       if (!uid || uid === String((typeof currentUser !== 'undefined' && currentUser?.id) || '')) return;
       e.preventDefault(); e.stopPropagation();
@@ -73,7 +75,7 @@
       box.innerHTML = '<div class="gxu-h">Ачааллаж байна…</div>';
       place(e);
       let u; try { u = await api('get', `/roles/user/${uid}`); } catch (err) { box.innerHTML = `<div class="gxu-h">${esc(errMsg(err))}</div>`; return; }
-      const roleLbl = { owner: '👑 Эзэн', admin: '🛡 ADMIN', moderator: '⭐ Moderator' }[u.role] || 'Энгийн гишүүн';
+      const roleLbl = { owner: '👑 Эзэн', admin: `🛡 ADMIN${u.room_name ? ' · ' + esc(u.room_name) : u.room_id ? ' · Room #' + u.room_id : ' · бүх Room'}`, moderator: '⭐ Moderator' }[u.role] || 'Энгийн гишүүн';
       const item = (act, label, cls = '') => `<button type="button" class="gx-ctx-i ${cls}" data-gxu="${act}" data-uid="${u.id}" data-name="${esc(u.username)}">${label}</button>`;
       box.innerHTML = [
         `<div class="gxu-h"><b>${esc(u.username)}</b><span>${roleLbl}</span></div>`,
@@ -96,9 +98,15 @@
       const act = b.dataset.gxu, uid = b.dataset.uid, name = b.dataset.name;
       if (act === 'profile') { try { openUserProfile(uid); } catch {} return; }
       const role = act === 'unset' ? null : act;
-      const q = role ? `${name}-д ${role === 'admin' ? 'ADMIN' : 'Moderator'} цол өгөх үү?` : `${name}-ийн цолыг хураах уу?`;
+      // ADMIN цол зөвхөн нэг Room-д: өрөөн дотроос бол энэ Room-д; лоббиос бол эзний самбар «ADMIN-ууд»-аас Room сонгож олгоно
+      let roomId = null, roomName = '';
+      if (role === 'admin') {
+        if (mode === 'room' && typeof currentRoom !== 'undefined' && currentRoom?.kind === 'channel') { roomId = currentRoom.id; roomName = currentRoom.name || `Room #${roomId}`; }
+        else { admPrefill = name; try { openOwner('admins'); } catch {} toast('ADMIN цолыг Room сонгож олгоно — нэрийг самбарт бэлдлээ', 'info'); return; }
+      }
+      const q = role ? `${name}-д ${role === 'admin' ? `ADMIN (зөвхөн «${roomName}» Room-д) ` : 'Moderator '}цол өгөх үү?` : `${name}-ийн цолыг хураах уу?`;
       if (!await showConfirm('Цол', q)) return;
-      try { await api('post', `/roles/set/${uid}`, { role }); toast(role ? `✓ ${name} → ${role === 'admin' ? 'ADMIN' : 'Moderator'}` : `${name}-ийн цол хураагдлаа`, 'success'); }
+      try { await api('post', `/roles/set/${uid}`, { role, ...(roomId != null ? { room_id: roomId } : {}) }); toast(role ? `✓ ${name} → ${role === 'admin' ? `ADMIN · ${roomName}` : 'Moderator'}` : `${name}-ийн цол хураагдлаа`, 'success'); }
       catch (err) { toast(errMsg(err), 'error'); }
     }
   })();
@@ -291,6 +299,7 @@
         <button type="button" data-gxo="activity">📊 Гишүүдийн идэвх</button>
         <button type="button" data-gxo="requests">🛡 Moderator хүсэлт <b class="gxo-badge hidden" id="gxo-badge">0</b></button>
         <button type="button" data-gxo="mods">⭐ Moderator-ууд</button>
+        ${me.owner ? '<button type="button" data-gxo="admins">🛡 ADMIN-ууд</button>' : ''}
         <button type="button" data-gxo="kicks">🚪 Kick бүртгэл</button>
         ${$('btn-admin-dashboard') ? '<button type="button" data-gxo="admin">⚙️ Админ самбар</button>' : ''}`;
       fill.appendChild(menu);
@@ -301,7 +310,7 @@
       const tab = document.createElement('div');
       tab.id = 'tab-owner'; tab.className = 'tab gxo';
       tab.innerHTML = `<div class="gx-page-head"><div><h2>${me.owner ? '👑 Эзний самбар' : '🛡 Админы самбар'}</h2><p class="gx-sub">Гишүүдийн идэвхийг харж, хамгийн идэвхтэй тоглогчдод Moderator олгоно.</p></div></div>
-        <div class="gx-subtabs gxo-tabs"><button type="button" data-gxo-tab="activity" class="on">📊 Гишүүдийн идэвх</button><button type="button" data-gxo-tab="requests">🛡 Хүсэлтүүд <i id="gxo-tab-n">0</i></button><button type="button" data-gxo-tab="mods">⭐ Moderator-ууд</button><button type="button" data-gxo-tab="kicks">🚪 Kick бүртгэл</button></div>
+        <div class="gx-subtabs gxo-tabs"><button type="button" data-gxo-tab="activity" class="on">📊 Гишүүдийн идэвх</button><button type="button" data-gxo-tab="requests">🛡 Хүсэлтүүд <i id="gxo-tab-n">0</i></button><button type="button" data-gxo-tab="mods">⭐ Moderator-ууд</button>${me.owner ? '<button type="button" data-gxo-tab="admins">🛡 ADMIN-ууд</button>' : ''}<button type="button" data-gxo-tab="kicks">🚪 Kick бүртгэл</button></div>
         <div id="gxo-body" class="gxo-body"></div>`;
       host.appendChild(tab);
     }
@@ -311,7 +320,10 @@
       const tb = e.target.closest('[data-gxo-tab]'); if (tb) { openOwner(tb.dataset.gxoTab); return; }
       const act = e.target.closest('[data-gxo-act]'); if (act) { ownerAction(act); }
       const row = e.target.closest('[data-gxo-user]'); if (row && !e.target.closest('button')) toggleDetail(row);
-    }); }
+    });
+    // ADMIN-ы Room солих (сонголт өөрчлөгдөхөд); нэрийн талбарт Enter → томилох
+    document.addEventListener('change', (e) => { const s = e.target.closest('[data-gxo-adm-room]'); if (s) adminMove(s); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.id === 'gxo-adm-name') $('gxo-adm-add')?.click(); }); }
     setBadge(me.pending_count || 0);
     onSocket((s) => s.on('staff:notify', (p = {}) => {
       if (typeof p.pending_count === 'number') setBadge(p.pending_count);
@@ -328,7 +340,17 @@
     const t = $('gxo-tab-n'); if (t) t.textContent = n;
   }
 
-  let curTab = 'activity', actQ = '', actSort = 'active';
+  let curTab = 'activity', actQ = '', actSort = 'active', admPrefill = '';
+  // ADMIN-ы Room солих: сонголт → баталгаажуулалт → /roles/set (ADMIN цолыг шинэ Room-д дахин олгоно)
+  async function adminMove(sel) {
+    const uid = sel.dataset.gxoAdmRoom, name = sel.dataset.name, cur = sel.dataset.cur, roomId = sel.value;
+    const roomName = sel.selectedOptions?.[0]?.textContent || '';
+    if (roomId === cur) return;
+    if (!roomId) { sel.value = cur; toast('«Бүх Room» сонголт шинээр олгогдохгүй — Room заавал сонгоно', 'warning'); return; }
+    if (!await showConfirm('ADMIN-ы Room солих', `${name}-ийн ADMIN эрхийг зөвхөн «${roomName}» Room-д шилжүүлэх үү?`)) { sel.value = cur; return; }
+    try { await api('post', `/roles/set/${uid}`, { role: 'admin', room_id: roomId }); toast(`✓ ${name} → ADMIN · ${roomName}`, 'success'); renderOwner(); }
+    catch (err) { sel.value = cur; toast(errMsg(err), 'error'); }
+  }
   function openOwner(tabName) {
     curTab = tabName || curTab;
     document.body.classList.remove('gx-roomview-on');   // өрөөний харагдацаас нээхэд самбар гүйлгэгдэнэ
@@ -370,8 +392,20 @@
       } else if (curTab === 'mods') {
         const r = await api('get', '/roles/moderators');
         body.innerHTML = r.moderators.length ? `<div class="gxo-table gxo-mods"><div class="gxo-tr gxo-th"><span>Moderator</span><span>Олгосон</span><span>Хэзээ</span><span></span></div>
-          ${r.moderators.map((m) => `<div class="gxo-tr"><span><b>${esc(m.username)}</b> ${m.role === 'admin' ? '<span class="mod-badge admin">ADMIN</span>' : ''} ${m.tier ? `<span class="gxo-tier">${esc(m.tier)}</span>` : ''}</span><span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span>${m.role === 'admin' ? '<small class="gxo-muted">нэр дээр баруун товч</small>' : `<button type="button" class="btn btn-sm" data-gxo-act="revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Эрх хасах</button>`}</span></div>`).join('')}</div>`
+          ${r.moderators.map((m) => `<div class="gxo-tr"><span><b>${esc(m.username)}</b> ${m.role === 'admin' ? `<span class="mod-badge admin">ADMIN${m.room_name ? ' · ' + esc(m.room_name) : ''}</span>` : ''} ${m.tier ? `<span class="gxo-tier">${esc(m.tier)}</span>` : ''}</span><span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span>${m.role === 'admin' ? '<small class="gxo-muted">«ADMIN-ууд» таб</small>' : `<button type="button" class="btn btn-sm" data-gxo-act="revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Эрх хасах</button>`}</span></div>`).join('')}</div>`
           : '<div class="gx-empty"><b>Moderator алга</b><span>«Гишүүдийн идэвх»-ээс хамгийн идэвхтэй тоглогчдод олгоно уу.</span></div>';
+      } else if (curTab === 'admins') {
+        const r = await api('get', '/roles/admins');
+        if (seq !== ownerSeq) return;
+        const roomOpt = (sel) => r.rooms.map((x) => `<option value="${x.id}" ${String(x.id) === String(sel ?? '') ? 'selected' : ''}>${esc(x.name)}${x.game_type ? ` · ${esc(x.game_type)}` : ''}</option>`).join('');
+        body.innerHTML = `<div class="gxo-auto gxo-adm-form"><div><b>🛡 ADMIN томилох</b><span>ADMIN цол зөвхөн сонгосон Room-д хэрэгжинэ: тэр Room-д kick, зарлал, LAN нээх, @everyone эрхтэй. Бусад Room-д энгийн гишүүн.</span>
+            <div class="gxo-adm-row"><input id="gxo-adm-name" class="input" placeholder="Хэрэглэгчийн нэр" maxlength="32" value="${esc(admPrefill || '')}"><select id="gxo-adm-room" class="input">${roomOpt(r.rooms[0]?.id)}</select><button type="button" class="btn btn-primary btn-sm" id="gxo-adm-add" data-gxo-act="adm-grant">ADMIN өгөх</button></div></div></div>
+          ${r.admins.length ? `<div class="gxo-table gxo-adms"><div class="gxo-tr gxo-th"><span>ADMIN</span><span>Room</span><span>Олгосон</span><span>Хэзээ</span><span></span></div>
+          ${r.admins.map((m) => `<div class="gxo-tr"><span><b>${esc(m.username)}</b> ${m.tier ? `<span class="gxo-tier">${esc(m.tier)}</span>` : ''}${m.room_id == null ? ' <span class="gxo-req">бүх Room</span>' : ''}</span>
+            <span><select class="input" data-gxo-adm-room="${m.user_id}" data-name="${esc(m.username)}" data-cur="${m.room_id ?? ''}"><option value="" ${m.room_id == null ? 'selected' : ''}>— бүх Room (хуучин) —</option>${roomOpt(m.room_id)}</select></span>
+            <span>${esc(m.granted_by_name || '—')}</span><span>${fmtAgo(m.granted_at)}</span><span><button type="button" class="btn btn-sm" data-gxo-act="adm-revoke" data-uid="${m.user_id}" data-name="${esc(m.username)}">Хураах</button></span></div>`).join('')}</div>`
+          : '<div class="gx-empty"><b>ADMIN алга</b><span>Дээрх хэсгээс хэрэглэгч ба Room сонгож томилно уу.</span></div>'}`;
+        admPrefill = '';
       } else if (curTab === 'kicks') {
         const r = await api('get', '/roles/kicks');
         body.innerHTML = r.kicks.length ? `<div class="gxo-table gxo-kicks"><div class="gxo-tr gxo-th"><span>Хэзээ</span><span>Өрөө</span><span>Гаргасан</span><span>Гаргуулсан</span><span>Шалтгаан</span></div>
@@ -409,6 +443,14 @@
         toast(d ? `⚡ Автомат батлалт ${d} хоног идэвхтэй${r.swept ? ` — хүлээгдэж байсан ${r.swept} хүсэлт батлагдлаа` : ''}` : 'Автомат батлалт унтарлаа', d ? 'success' : 'info', 6000);
       }
       else if (a === 'revoke') { if (!await showConfirm('Moderator эрх хасах', `${b.dataset.name}-ийн Moderator эрхийг хасах уу?`)) { b.disabled = false; return; } await api('delete', `/roles/moderators/${b.dataset.uid}`); toast('Эрх хасагдлаа', 'info'); }
+      else if (a === 'adm-grant') {
+        const name = String($('gxo-adm-name')?.value || '').trim(), sel = $('gxo-adm-room');
+        const roomName = sel?.selectedOptions?.[0]?.textContent || '';
+        if (!name) { toast('Хэрэглэгчийн нэр оруулна уу', 'warning'); b.disabled = false; return; }
+        if (!await showConfirm('ADMIN томилох', `${name}-д зөвхөн «${roomName}» Room-д ADMIN цол өгөх үү?`)) { b.disabled = false; return; }
+        const r = await api('post', '/roles/admins', { username: name, room_id: sel?.value }); toast(`✓ ${r.username} → ADMIN · ${r.room_name}`, 'success');
+      }
+      else if (a === 'adm-revoke') { if (!await showConfirm('ADMIN цол хураах', `${b.dataset.name}-ийн ADMIN цолыг хураах уу?`)) { b.disabled = false; return; } await api('delete', `/roles/moderators/${b.dataset.uid}`); toast('ADMIN цол хураагдлаа', 'info'); }
       renderOwner();
     } catch (e) { toast(errMsg(e), 'error'); b.disabled = false; }
   }
@@ -419,7 +461,7 @@
       if (typeof currentRoom === 'undefined' || !currentRoom?.id || !$('gxr-chat-body')) return;
       clearInterval(ready);
       const isChannel = currentRoom.kind === 'channel';
-      await loadMe();
+      await loadMe(isChannel ? currentRoom.id : null);   // энэ Room-ын ADMIN → энд staff
       currentRoom.staff = !!me?.staff;
       currentRoom.canHostChannel = isChannel && !!me?.can_host_channel;
       // эрх хожуу ирсэн бол Kick товч / AFK тэмдэг шууд гарна (дараагийн гишүүний өөрчлөлтийг хүлээхгүй)

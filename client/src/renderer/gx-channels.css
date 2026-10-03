@@ -187,3 +187,13 @@ body .gxw-hero h3 { margin: 2px 0 2px !important; font: 900 28px var(--gx-font) 
 .gxw-act { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px; }
 /* Нийтийн Room-д явагдаж буй тоглолт (лобби жагсаалт) */
 .gxcl-live { color: var(--gx-green); font-weight: 800; white-space: nowrap; }
+
+/* Эзний самбар → ADMIN-ууд (ADMIN цол зөвхөн нэг Room-д, 2026-10-03) */
+.gxo-adm-form { flex-direction: column; align-items: stretch; }
+.gxo-adm-form > div { display: block; }
+.gxo-adm-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.gxo-adm-row .input { height: 32px; padding: 0 10px; font-size: 13px; }
+.gxo-adm-row input { flex: 1 1 160px; min-width: 140px; }
+.gxo-adm-row select { flex: 1 1 220px; }
+.gxo-adms .gxo-tr { grid-template-columns: 1.4fr 1.6fr 1fr 1fr auto; cursor: default; }
+.gxo-adms select.input { height: 28px; padding: 0 6px; font-size: 12px; max-width: 260px; }

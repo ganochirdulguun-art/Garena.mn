@@ -16,6 +16,7 @@ const users = { 1: { id: 1, username: 'owner' }, 2: { id: 2, username: 'bronze',
 const channel = { id: 901, name: 'WC3 Room 1', kind: 'channel', status: 'waiting', has_password: false, max_players: 300, visible_cap: 200, host_id: null, clan_id: null };
 let channelCount = 200;               // одоо өрөөнд байгаа хүн
 const roles = new Map();              // user_id -> role
+const roleRoom = new Map();           // user_id -> room_id (ADMIN зөвхөн тэр Room-д)
 const requests = [];                  // { id, user_id, role, note, status }
 let notice = '';
 let autoUntilVal = null;              // platform_settings.mod_auto_approve_until
@@ -44,13 +45,18 @@ async function query(sql, p = []) {
   if (s.startsWith("UPDATE role_requests SET status = 'approved'")) { const r = requests.find((x) => x.id === Number(p[0]) && x.status === 'pending'); if (r) r.status = 'approved'; return { rows: [] }; }
   if (s.includes("FROM role_requests rq JOIN users u ON u.id = rq.user_id WHERE rq.status = 'pending' AND rq.role = 'moderator'")) return { rows: requests.filter((x) => x.status === 'pending') };
   if (s.startsWith('UPDATE role_requests SET status = $2')) { const r = requests.find((x) => x.id === Number(p[0])); if (r) r.status = p[1]; return { rows: [] }; }
-  if (s.startsWith('INSERT INTO platform_roles')) { roles.set(Number(p[0]), p[1]); return { rows: [] }; }
-  if (s.startsWith('DELETE FROM platform_roles WHERE user_id')) { const had = roles.delete(Number(p[0])); return { rows: had ? [{ role: 'x' }] : [], rowCount: had ? 1 : 0 }; }
+  if (s.startsWith('INSERT INTO platform_roles')) { roles.set(Number(p[0]), p[1]); roleRoom.set(Number(p[0]), p[3] ?? null); return { rows: [] }; }
+  if (s.startsWith('DELETE FROM platform_roles WHERE user_id')) { const had = roles.delete(Number(p[0])); roleRoom.delete(Number(p[0])); return { rows: had ? [{ role: 'x' }] : [], rowCount: had ? 1 : 0 }; }
+  if (s.includes('SELECT pr.room_id, rm.name FROM platform_roles pr')) { const rid = roleRoom.get(Number(p[0])) ?? null; return { rows: [{ room_id: rid, name: rid === 901 ? 'WC3 Room 1' : rid === 941 ? 'CS Room' : null }] }; }
+  if (s.includes("SELECT id, name FROM rooms WHERE id = $1 AND COALESCE(kind,'room') = 'channel'")) return { rows: String(p[0]) === '901' ? [{ id: 901, name: 'WC3 Room 1' }] : String(p[0]) === '941' ? [{ id: 941, name: 'CS Room' }] : [] };
+  if (s.includes("WHERE pr.role = 'admin' ORDER BY")) return { rows: [...roles].filter(([, r]) => r === 'admin').map(([id]) => ({ user_id: id, username: users[id]?.username, room_id: roleRoom.get(id) ?? null, room_name: roleRoom.get(id) === 901 ? 'WC3 Room 1' : null })) };
+  if (s.includes("SELECT id, name, game_type FROM rooms WHERE COALESCE(kind,'room') = 'channel'")) return { rows: [{ id: 901, name: 'WC3 Room 1', game_type: 'Warcraft III: The Frozen Throne' }, { id: 941, name: 'CS Room', game_type: 'Counter-Strike 1.6' }] };
+  if (s.includes('SELECT id FROM users WHERE LOWER(username) = LOWER($1)')) { const u = Object.values(users).find((x) => x.username.toLowerCase() === String(p[0]).toLowerCase()); return { rows: u ? [{ id: u.id }] : [] }; }
   if (s.includes('SELECT id, username, discord_id, COALESCE(banned,FALSE) AS banned FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean).map((u) => ({ ...u, banned: false })) };
   if (s.includes('SELECT id, username, discord_id FROM users WHERE id')) return { rows: [users[p[0]]].filter(Boolean) };
-  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : String(p[0]) === '941' ? [{ kind: 'channel', game_type: 'Counter-Strike 1.6' }] : [{ kind: 'room' }] };
-  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id = $1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : [{ kind: 'room' }] };
-  if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' || String(p[0]) === '942' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : String(p[0]) === '941' ? [{ kind: 'channel', game_type: 'Counter-Strike 1.6' }] : [{ kind: 'room' }] };
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind, game_type FROM rooms WHERE id = $1")) return { rows: String(p[0]) === '901' || String(p[0]) === '942' ? [{ kind: 'channel', game_type: 'Warcraft III: The Frozen Throne' }] : [{ kind: 'room' }] };
+  if (s.includes("SELECT COALESCE(kind,'room') AS kind FROM rooms WHERE id=$1")) return { rows: String(p[0]) === '901' || String(p[0]) === '942' ? [{ kind: 'channel' }] : [{ kind: 'room' }] };
   if (s.includes('FROM room_players rp JOIN rooms r') || s.includes('isUserInRoom')) return { rows: [{}] };
   if (s.startsWith('UPDATE rooms SET pinned_notice')) { notice = p[1]; return { rows: [{ id: 901 }] }; }
   return { rows: [], rowCount: 0 };
@@ -102,15 +108,32 @@ async function main() {
   r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Гишүүдийн идэвх зөвхөн ажилтанд');
   // Баруун товчны цол: эзэн ADMIN өгнө, админ зөвхөн Moderator, эзэнд/админд хүрэхгүй
   r = await call(2, 'POST', '/roles/set/3', { role: 'moderator' }); assert.equal(r.status, 403); ok('Moderator өөр хүнд цол өгч чадахгүй');
-  r = await call(1, 'POST', '/roles/set/3', { role: 'admin' }); assert.equal(r.status, 200); ok('Эзэн ADMIN цол өгнө');
-  r = await call(3, 'GET', '/roles/activity'); assert.notEqual(r.status, 403); ok('Шинэ ADMIN ажилтны эрхтэй болно (кэш)');
-  r = await call(3, 'POST', '/roles/set/2', { role: 'admin' }); assert.equal(r.status, 403); ok('Админ ADMIN цол өгч чадахгүй');
-  r = await call(3, 'POST', '/roles/set/2', { role: null }); assert.equal(r.status, 200); assert.equal(roles.has(2), false); ok('Админ Moderator хураана');
+  // ADMIN цол ЗӨВХӨН нэг Room-д (2026-10-03): Room-гүй олгогдохгүй; тэр Room-д л ажилтан, бусад Room-д энгийн гишүүн
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin' }); assert.equal(r.status, 400); ok('ADMIN цол Room сонгоогүй бол олгогдохгүй');
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin', room_id: 555 }); assert.equal(r.status, 404); ok('Байхгүй / нийтийн биш Room-д ADMIN олгогдохгүй');
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin', room_id: 901 }); j = await r.json(); assert.equal(r.status, 200); assert.equal(j.room_id, 901); assert.equal(roleRoom.get(3), 901); ok('Эзэн Room 901-д ADMIN цол өгнө');
+  r = await call(3, 'GET', '/roles/me?room=901'); j = await r.json(); assert.equal(j.staff, true); assert.equal(j.room_admin, true); assert.equal(j.can_host_channel, true); assert.equal(j.global_staff, false); assert.equal(j.admin_room_id, '901'); ok('Room ADMIN өөрийн Room-д ажилтан (staff, LAN нээх)');
+  r = await call(3, 'GET', '/roles/me?room=941'); j = await r.json(); assert.equal(j.staff, false); assert.equal(j.can_host_channel, false); ok('Өөр Room-д энгийн гишүүн');
+  r = await call(3, 'GET', '/roles/me'); j = await r.json(); assert.equal(j.staff, false); ok('Лоббид ажилтны эрхгүй');
+  r = await call(3, 'PATCH', '/rooms/901/notice', { notice: 'ADMIN зарлал' }); assert.equal(r.status, 200); assert.equal(notice, 'ADMIN зарлал'); ok('Room ADMIN өөрийн Room-ын зарлалыг засна');
+  r = await call(3, 'PATCH', '/rooms/941/notice', { notice: 'hack' }); assert.equal(r.status, 403); ok('Өөр Room-ын зарлалыг засахгүй');
+  r = await call(3, 'POST', '/rooms/901/lan-host/begin'); j = await r.json(); assert.notEqual(j.code, 'MODERATOR_REQUIRED'); ok('Room ADMIN өөрийн Room-д LAN нээнэ');
+  r = await call(3, 'POST', '/rooms/942/lan-host/begin'); j = await r.json(); assert.equal(r.status, 403); assert.equal(j.code, 'MODERATOR_REQUIRED'); ok('Өөр (WC3) Room-д LAN нээхгүй');
+  r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Room ADMIN платформын самбар/хүсэлт батлах эрхгүй');
+  r = await call(3, 'POST', '/roles/set/2', { role: 'admin', room_id: 901 }); assert.equal(r.status, 403); ok('Room ADMIN бусдад цол өгч чадахгүй');
   r = await call(3, 'POST', '/roles/set/1', { role: null }); assert.equal(r.status, 403); ok('Эзний цолд хүрэхгүй');
+  r = await call(1, 'POST', '/roles/set/3', { role: 'admin', room_id: 941 }); j = await r.json(); assert.equal(j.room_id, 941); r = await call(3, 'GET', '/roles/me?room=901'); j = await r.json(); assert.equal(j.staff, false); r = await call(3, 'GET', '/roles/me?room=941'); j = await r.json(); assert.equal(j.staff, true); ok('Эзэн ADMIN-ы Room-ыг солино → хуучин Room-д эрхгүй, шинэд эрхтэй');
+  // Эзний самбар «ADMIN-ууд»: нэрээр томилох, жагсаалт, хураах
+  r = await call(3, 'GET', '/roles/admins'); assert.equal(r.status, 403); ok('ADMIN-ууд самбар зөвхөн эзэнд');
+  r = await call(1, 'POST', '/roles/admins', { username: 'nobody', room_id: 901 }); assert.equal(r.status, 404); ok('Байхгүй нэрээр томилохгүй');
+  r = await call(1, 'POST', '/roles/admins', { username: 'SILVER', room_id: 901 }); j = await r.json(); assert.equal(r.status, 200); assert.equal(j.username, 'silver'); assert.equal(roleRoom.get(3), 901); ok('Самбараас нэрээр (том/жижиг үсэг ялгахгүй) Room 901-д томилно');
+  r = await call(1, 'GET', '/roles/admins'); j = await r.json(); assert.equal(j.admins.length, 1); assert.equal(j.admins[0].room_id, 901); assert.equal(j.rooms.length, 2); ok('Самбар: ADMIN жагсаалт + Room сонголт');
   r = await call(1, 'POST', '/roles/set/3', { role: null }); assert.equal(r.status, 200); ok('Эзэн ADMIN хураана');
-  r = await call(3, 'GET', '/roles/activity'); assert.equal(r.status, 403); ok('Хураасны дараа ажилтны эрхгүй');
-  // ADMIN апп-аас Moderator хүсэлт батална
-  r = await call(1, 'POST', '/roles/set/3', { role: 'admin' }); assert.equal(r.status, 200);
+  r = await call(3, 'GET', '/roles/me?room=901'); j = await r.json(); assert.equal(j.staff, false); ok('Хураасны дараа Room-д ч эрхгүй');
+  r = await call(1, 'POST', '/roles/set/2', { role: null }); assert.equal(r.status, 200); assert.equal(roles.has(2), false); ok('Эзэн Moderator хураана');
+  // Хуучин (room_id NULL) глобал ADMIN: платформын ажилтан хэвээр — Moderator хүсэлт батална
+  roles.set(3, 'admin'); roleRoom.set(3, null); require(path.join(serverDir, 'src', 'routes', 'roles.js')).cacheRole(3, 'admin', null);
+  r = await call(3, 'GET', '/roles/me'); j = await r.json(); assert.equal(j.global_staff, true); assert.equal(j.admin_room_id, null); ok('Хуучин глобал ADMIN ажилтан хэвээр (room_id NULL)');
   r = await call(2, 'POST', '/roles/request', { note: 'дахин хүсье' }); j = await r.json(); assert.equal(r.status, 200); assert.ok(!j.auto); ok('Автомат унтраалттай үед хүсэлт хүлээгдэнэ');
   r = await call(3, 'POST', `/roles/requests/${j.id}/approve`); assert.equal(r.status, 200); assert.equal(roles.get(2), 'moderator'); ok('ADMIN Moderator хүсэлтийг батална');
   // Автомат батлалт (7 хоног) — зөвхөн эзэн асаана

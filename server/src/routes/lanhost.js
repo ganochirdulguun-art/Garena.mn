@@ -162,7 +162,7 @@ router.post('/:id/lan-host/begin', authMW, async (req, res) => {
       if (k.rows[0]?.kind === 'channel' && k.rows[0]?.game_type && !/warcraft|frozen throne/i.test(k.rows[0].game_type)) {
         return res.status(400).json({ error: 'Энэ тоглоомын онлайн холболт удахгүй нээгдэнэ.', code: 'GAME_NOT_READY' });
       }
-      if (k.rows[0]?.kind === 'channel' && !await require('./roles').canHostInChannel(req.user)) {
+      if (k.rows[0]?.kind === 'channel' && !await require('./roles').canHostInChannel(req.user, roomId)) {
         return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д. Зарлалын самбар дээрх «Moderator авах» товчоор хүсэлт илгээнэ үү.', code: 'MODERATOR_REQUIRED' });
       }
     } catch {}
@@ -206,7 +206,7 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   const meta = await roomMeta(roomId);
   if (meta && meta.kind === 'channel') {
     if (meta.game_type && !/warcraft|frozen throne/i.test(meta.game_type)) return res.status(400).json({ error: 'Энэ тоглоомын онлайн холболт удахгүй нээгдэнэ.', code: 'GAME_NOT_READY' });
-    if (!await require('./roles').canHostInChannel(req.user)) return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д.', code: 'MODERATOR_REQUIRED' });
+    if (!await require('./roles').canHostInChannel(req.user, roomId)) return res.status(403).json({ error: 'Нийтийн Room-д тоглоом нээх эрх зөвхөн Moderator-д.', code: 'MODERATOR_REQUIRED' });
   }
   const m = gamesOf(roomId);
   const existing = m.get(tok);

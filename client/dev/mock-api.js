@@ -80,6 +80,7 @@
       ] };
       if (P === '/roles/auto') return { until: '2026-10-09T15:59:59.000Z', active: true, can_edit: staff };
       if (P.startsWith('/roles/requests')) return { pending_count: 1, requests: [{ id: 1, user_id: 3, username: 'Eboshdee', tier: '3-1', note: 'Өдөр бүр LoD хостлодог, 10 хүн цуглуулна', created_at: new Date(Date.now() - 3600e3).toISOString(), wins: 70, losses: 71 }] };
+      if (P === '/roles/admins') return { admins: [{ user_id: 41, username: 'Purevdulam', tier: '2-1', room_id: 901, room_name: 'WC3 Room 1', granted_at: new Date(Date.now() - 7200e3).toISOString(), granted_by_name: 'VitoCorleone' }, { user_id: 42, username: 'OldAdmin', tier: null, room_id: null, room_name: null, granted_at: new Date(Date.now() - 30 * 864e5).toISOString(), granted_by_name: 'VitoCorleone' }], rooms: Array.from({ length: 6 }, (_, i) => ({ id: 901 + i, name: `WC3 Room ${i + 1}`, game_type: 'Warcraft III: The Frozen Throne' })).concat([{ id: 921, name: 'CS 1.6 Room 1', game_type: 'Counter-Strike 1.6' }]) };
       if (P === '/roles/moderators') return { moderators: [{ user_id: 2, username: 'Billionaire', tier: '2-3', granted_at: new Date(Date.now() - 864e5).toISOString(), granted_by_name: 'VitoCorleone' }] };
       if (P === '/roles/kicks') return { kicks: [{ id: 1, room_id: 903, room_name: 'WC3 Room 3', reason: 'AFK 45 мин', created_at: new Date(Date.now() - 1800e3).toISOString(), target_name: 'afk_guy', by_name: 'Billionaire' }] };
       if (P === '/wishes') return { counts: { umk3: 214, ctr: 187, goldeneye: 96 }, mine: ['ctr'] };

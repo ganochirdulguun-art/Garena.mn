@@ -84,6 +84,12 @@ async function adminMiddleware(req, res, next) {
 module.exports = adminMiddleware;
 module.exports.isAdminDiscordId = isAdminDiscordId;
 module.exports.isAdminUser = isAdminUser;
+// Тухайн Room-ын ажилтан: эзэн / глобал админ / тэр Room-д томилогдсон ADMIN (2026-10-03)
+async function isRoomAdminUser(payload, roomId) {
+  if (await isAdminUser(payload)) return true;
+  try { return payload?.id != null && require('../routes/roles').isRoomAdmin(payload.id, roomId); } catch { return false; }
+}
+module.exports.isRoomAdminUser = isRoomAdminUser;
 module.exports.isOwnerUser = isOwnerUser;
 module.exports.isOwnerUser = isOwnerUser;
 module.exports.isEnvAdmin = isEnvAdmin;
