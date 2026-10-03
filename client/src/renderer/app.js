@@ -3571,6 +3571,13 @@ function renderPagination(current, total, onPage) {
 }
 
 // ── User Profile Popup ────────────────────────────────────
+// Level цол (2026-10-03, эзэн): Grunt 1–9 · Overlord 10–19 · Blademaster 20–29 · Shaman 30–49 · DemiGod 50–99 · GOD 100 (дээд).
+const LEVEL_MAX = 100;
+function levelTitle(level) {
+  const l = Math.max(1, Math.min(LEVEL_MAX, Number(level) || 1));
+  return l >= 100 ? 'GOD' : l >= 50 ? 'DemiGod' : l >= 30 ? 'Shaman' : l >= 20 ? 'Blademaster' : l >= 10 ? 'Overlord' : 'Grunt';
+}
+window.levelTitle = levelTitle;
 // Бүртгэлийн ID (2026-10-03, эзэн — GameRanger маяг): 20261003001 = 2026-10-03-ны эхний бүртгэл.
 // Серверээс account_no ирэхгүй (хуучин сервер) бол нуунa.
 function renderAccountNo(el, accountNo, createdAt) {
@@ -3598,6 +3605,7 @@ async function openUserProfile(userId) {
   document.getElementById('popup-stats')?.classList.add('hidden');
   document.getElementById('popup-tier')?.classList.add('hidden');
   document.getElementById('popup-account')?.classList.add('hidden');
+  document.getElementById('popup-level')?.classList.add('hidden');
 
   const avatarEl = document.getElementById('popup-avatar');
   avatarEl.src = ''; avatarEl.style.display = 'none';
@@ -3612,6 +3620,8 @@ async function openUserProfile(userId) {
     const tierEl = document.getElementById('popup-tier');
     if (tierEl) { const tr = String(stats.tierbot_tier || '').trim(); tierEl.textContent = tr ? `Tier ${tr}` : 'Tier —'; tierEl.classList.toggle('none', !tr); tierEl.classList.remove('hidden'); }
     renderAccountNo(document.getElementById('popup-account'), stats.account_no, stats.created_at);
+    const lvEl = document.getElementById('popup-level');
+    if (lvEl) { const L = Number(stats.level || 0); if (L >= 1) { lvEl.textContent = `LV ${L} · ${stats.level_title || levelTitle(L)}`; lvEl.classList.remove('hidden'); } else lvEl.classList.add('hidden'); }
     document.getElementById('popup-wins').textContent     = `${stats.wins} хожил`;
     document.getElementById('popup-losses').textContent   = `${stats.losses} хожигдол`;
     document.getElementById('popup-winrate').textContent  = stats.winrate;
@@ -5705,7 +5715,7 @@ init();
     el('btn-admin-dashboard')?.classList.toggle('hidden', !(currentUser.is_admin || currentUser.is_owner));
     document.querySelectorAll('.diamond-amount').forEach((n) => n.classList.toggle('unlimited', unlimited));
     const lv = el('user-level');
-    if (lv) { lv.textContent = `LV ${level}`; lv.classList.remove('hidden'); }
+    if (lv) { lv.textContent = `LV ${level} · ${levelTitle(level)}`; lv.title = `Level ${level} — ${levelTitle(level)} цол`; lv.classList.remove('hidden'); }
     const tierPill = el('user-tier');
     if (tierPill) { const t = myTier(); tierPill.textContent = TIER_NAME[t]; tierPill.classList.toggle('hidden', t === 'bronze'); }
 
@@ -5721,7 +5731,7 @@ init();
     const bar = el('diamond-block-bar');
     if (bar) bar.style.width = `${Math.round((bg / 10) * 100)}%`;
     const lvText = el('diamond-level-text');
-    if (lvText) lvText.textContent = `LV ${level} · ${fmtN(xp)} XP · дараагийн түвшин ${fmtN(nextXp)} XP`;
+    if (lvText) lvText.textContent = level >= LEVEL_MAX ? `LV ${level} · ${levelTitle(level)} · ${fmtN(xp)} XP · дээд түвшин ✓` : `LV ${level} · ${levelTitle(level)} · ${fmtN(xp)} XP · дараагийн түвшин ${fmtN(nextXp)} XP`;
     const xpBar = el('diamond-xp-bar');
     if (xpBar) xpBar.style.width = `${Math.round(prog * 100)}%`;
     // ⏱ Тоглосон цаг → 💎 (1ц = 2💎, минут хуримтлагдана) + XP (2/мин, дуустал +10, ranked ×1.25)

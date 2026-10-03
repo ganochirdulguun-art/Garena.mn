@@ -20,19 +20,27 @@ const RULES = {
   RANKED_DIAMONDS_PER_WIN: 2,
 };
 
+// Level цол (2026-10-03, эзэн): Grunt 1–9 · Overlord 10–19 · Blademaster 20–29 · Shaman 30–49 · DemiGod 50–99 · GOD 100. Дээд level 100.
+const MAX_LEVEL = 100;
+const LEVEL_TITLES = [[100, 'GOD'], [50, 'DemiGod'], [30, 'Shaman'], [20, 'Blademaster'], [10, 'Overlord'], [1, 'Grunt']];
+function levelTitle(level) {
+  const l = Math.max(1, Math.min(MAX_LEVEL, Number(level) || 1));
+  return (LEVEL_TITLES.find(([min]) => l >= min) || LEVEL_TITLES[LEVEL_TITLES.length - 1])[1];
+}
 function xpForLevel(n) {
   return Math.round(100 * Math.pow(Math.max(1, n), 1.5));
 }
 function levelFromXp(xp) {
   let lvl = 1;
-  while (xp >= xpForLevel(lvl + 1) && lvl < 999) lvl += 1;
+  while (lvl < MAX_LEVEL && xp >= xpForLevel(lvl + 1)) lvl += 1;
   return lvl;
 }
 function levelProgress(xp) {
   const level = levelFromXp(xp);
   const cur = xpForLevel(level);
-  const next = xpForLevel(level + 1);
-  return { level, xp, next_level_xp: next, progress: Math.max(0, Math.min(1, (xp - cur) / Math.max(1, next - cur))) };
+  const maxed = level >= MAX_LEVEL;
+  const next = maxed ? cur : xpForLevel(level + 1);
+  return { level, xp, next_level_xp: next, progress: maxed ? 1 : Math.max(0, Math.min(1, (xp - cur) / Math.max(1, next - cur))), title: levelTitle(level), max_level: MAX_LEVEL };
 }
 
 function xpFor({ isWinner, isLeaver, kills = 0, assists = 0 }) {
@@ -102,4 +110,4 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   return { xp_earned: xpEarned, diamonds_earned: diamondsEarned, counted: true, xp: row.xp, level, block_games: blockGames, block_wins: blockWins };
 }
 
-module.exports = { RULES, xpForLevel, levelFromXp, levelProgress, xpFor, awardGameOutcome };
+module.exports = { RULES, MAX_LEVEL, LEVEL_TITLES, levelTitle, xpForLevel, levelFromXp, levelProgress, xpFor, awardGameOutcome };

@@ -279,7 +279,7 @@
       const id = li.dataset.uid; if (!id) return;
       const c = lvCache.get(id);
       if (!c) { need.push(id); return; }
-      const lv = li.querySelector('.m-lv'); if (lv) lv.textContent = String(c.level);
+      const lv = li.querySelector('.m-lv'); if (lv) { lv.textContent = String(c.level); lv.title = `LV ${c.level} · ${window.levelTitle ? window.levelTitle(c.level) : ''}`; }
       li.classList.toggle('t-gold', c.tier === 'gold'); li.classList.toggle('t-silver', c.tier === 'silver');
       li.dataset.lv = String(c.level); li.dataset.wins = String(c.wins || 0);
     });
@@ -308,7 +308,7 @@
     $('rgc-xp-bar').style.width = `${Math.round(prog * 100)}%`;
     $('rgc-xp-text').textContent = `${xp.toLocaleString('en-US')} XP`;
     const me = window.gxRoleMe?.();
-    $('rgc-me-sub').textContent = `${me?.owner ? '👑 Эзэн' : me?.staff ? '🛡 Админ' : me?.role === 'moderator' ? '⭐ Moderator' : 'Гишүүн'}${u.diamonds != null ? ` · 💎 ${u.unlimited_diamonds ? '∞' : Number(u.diamonds).toLocaleString('en-US')}` : ''}`;
+    $('rgc-me-sub').textContent = `${me?.owner ? '👑 Эзэн' : me?.staff ? '🛡 Админ' : me?.role === 'moderator' ? '⭐ Moderator' : 'Гишүүн'}${window.levelTitle ? ` · ${window.levelTitle(level)}` : ''}${u.diamonds != null ? ` · 💎 ${u.unlimited_diamonds ? '∞' : Number(u.diamonds).toLocaleString('en-US')}` : ''}`;
   }
 
   // 🏆 Ranked Room 1–5 — баннерт тэмдэг, тайлбарт Ranked/энгийн
