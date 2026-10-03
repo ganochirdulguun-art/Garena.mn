@@ -25,8 +25,8 @@ let n = 0; const ok = (name) => { n++; console.log('PASS ' + name); };
   const games = [{ token: 'tokA', host_user_id: 1 }, { token: 'tokB', host_user_id: 3 }];
   cc._lastAt.clear();
   let t = await cc.handle({ userId: 1, text: '!rank', db, games, rttOf: () => null });
-  assert.ok(t.includes('Host: 10 хожил / 4 хожигдол / 1 leaver · Tier 2-3'), t);
-  assert.ok(t.includes('Joiner: 0 хожил / 2 хожигдол / 0 leaver') && !t.includes('Other'), t);
+  assert.ok(t.includes('Host: Win-10 Loss-4 Leaver-1 Tier-2-3'), t);
+  assert.ok(t.includes('Joiner: Win-0 Loss-2 Leaver-0') && !t.includes('Other'), t);
   ok('!rank: хост + нэгдсэн тоглогч (бусад тоглоомынх орохгүй)');
 
   cc._lastAt.clear();
@@ -41,7 +41,7 @@ let n = 0; const ok = (name) => { n++; console.log('PASS ' + name); };
   assert.strictEqual(t, null);   // cooldown
   cc._lastAt.clear();
   t = await cc.handle({ userId: 3, text: '!rank other', db, games, rttOf: () => null });
-  assert.ok(t.includes('Other: 5 хожил / 5 хожигдол'), t);
+  assert.ok(t.includes('Other: Win-5 Loss-5'), t);
   t = await cc.handle({ userId: 9, text: '!rank nobody', db, games, rttOf: () => null });
   assert.ok(t.includes('олдсонгүй'), t);
   ok('LAN тоглоомгүй → заавар; cooldown; нэрээр хайх');

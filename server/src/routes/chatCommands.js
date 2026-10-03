@@ -19,7 +19,7 @@ function onCooldown(userId, now = Date.now()) {
 const n = (v) => Number(v) || 0;
 function rankText(rows) {
   if (!rows.length) return '📊 !rank — тоглогч олдсонгүй';
-  return '📊 ' + rows.map((u) => `${u.username}: ${n(u.wins)} хожил / ${n(u.losses)} хожигдол / ${n(u.leavers)} leaver${u.tierbot_tier ? ` · Tier ${u.tierbot_tier}` : ''}`).join('  |  ');
+  return '📊 ' + rows.map((u) => `${u.username}: Win-${n(u.wins)} Loss-${n(u.losses)} Leaver-${n(u.leavers)}${u.tierbot_tier ? ` Tier-${u.tierbot_tier}` : ''}`).join('  |  ');
 }
 function pingText(rows, rttOf) {
   if (!rows.length) return '📡 !ping — тоглогч олдсонгүй';
