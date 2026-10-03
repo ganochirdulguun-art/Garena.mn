@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8" />
+<title>Garena.mn — MapHack-ийн эсрэг постер</title>
+<style>
+  :root { --red: #e63946; --red2: #ff4d5e; --gold: #f5b301; --green: #3fbf5f; --bg: #0b0a10; --text: #f4f4f7; --muted: #b9b9c8; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #000; }
+  body { font-family: "Segoe UI", "Segoe UI Variable", Arial, sans-serif; color: var(--text); }
+  .poster { position: relative; overflow: hidden; background: var(--bg); width: 1080px; height: 1350px; padding: 56px 64px; display: flex; flex-direction: column; gap: 26px; justify-content: space-between; }
+  .bg { position: absolute; inset: 0; background: url('wc3-room.jpg') center/cover; filter: blur(4px) saturate(1.05) brightness(.32); transform: scale(1.08); }
+  .bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 18%, rgba(63,191,95,.22), transparent 55%), linear-gradient(180deg, rgba(11,10,16,.2) 0%, rgba(11,10,16,.8) 55%, #0b0a10 100%); }
+  .warn .bg::after { background: radial-gradient(ellipse at 50% 15%, rgba(230,57,70,.38), transparent 58%), linear-gradient(180deg, rgba(11,10,16,.2) 0%, rgba(11,10,16,.85) 55%, #0b0a10 100%); }
+  .z { position: relative; z-index: 1; }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand img { height: 58px; filter: drop-shadow(0 4px 16px rgba(230,57,70,.6)); }
+  .brand b { font-size: 38px; font-weight: 900; letter-spacing: -.5px; }
+  .brand b span { color: var(--red2); }
+  .tag { display: inline-flex; align-items: center; gap: 8px; padding: 7px 16px; border-radius: 999px; font-weight: 800; font-size: 20px; }
+  .tag.g { background: rgba(63,191,95,.16); border: 1px solid rgba(63,191,95,.55); color: #c9f5d4; }
+  .tag.r { background: rgba(230,57,70,.18); border: 1px solid rgba(230,57,70,.6); color: #ffd0d4; }
+  h1 { font-size: 74px; line-height: 1.03; font-weight: 900; letter-spacing: -1.5px; text-shadow: 0 6px 30px rgba(0,0,0,.6); }
+  h1 em { font-style: normal; color: var(--green); }
+  .warn h1 em { color: var(--red2); }
+  .sub { font-size: 27px; color: var(--muted); line-height: 1.38; font-weight: 500; }
+  .shield { position: absolute; right: 46px; top: 140px; font-size: 210px; opacity: .14; z-index: 0; filter: grayscale(.2); }
+  .layers { display: flex; flex-direction: column; gap: 14px; }
+  .layer { display: grid; grid-template-columns: 70px 1fr; gap: 18px; align-items: center; padding: 18px 22px; border-radius: 18px; background: rgba(18,18,28,.86); border: 1px solid rgba(255,255,255,.1); }
+  .layer .ic { width: 70px; height: 70px; border-radius: 18px; display: grid; place-items: center; font-size: 36px; background: linear-gradient(160deg, rgba(63,191,95,.35), rgba(63,191,95,.08)); border: 1px solid rgba(63,191,95,.4); }
+  .layer b { display: block; font-size: 28px; font-weight: 900; margin-bottom: 3px; }
+  .layer span { font-size: 21px; color: var(--muted); line-height: 1.36; }
+  .layer.r .ic { background: linear-gradient(160deg, rgba(230,57,70,.4), rgba(230,57,70,.08)); border-color: rgba(230,57,70,.5); }
+  .bar { display: flex; align-items: center; gap: 18px; padding: 20px 24px; border-radius: 18px; background: linear-gradient(90deg, rgba(63,191,95,.22), rgba(63,191,95,.06)); border: 1px solid rgba(63,191,95,.5); }
+  .bar b { font-size: 30px; font-weight: 900; }
+  .bar span { font-size: 21px; color: #d6f5de; }
+  .foot { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .url { font-size: 22px; color: #cfd2ff; font-weight: 600; }
+  .url b { color: #fff; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 18px 30px; border-radius: 16px; background: linear-gradient(#ff4d5e, #c81d2c); color: #fff; font-size: 28px; font-weight: 900; box-shadow: 0 12px 34px rgba(230,57,70,.5), inset 0 1px 0 rgba(255,255,255,.3); }
+  /* сануулга */
+  .stop { display: grid; grid-template-columns: 120px 1fr; gap: 26px; align-items: center; padding: 26px 30px; border-radius: 22px; background: linear-gradient(135deg, rgba(230,57,70,.30), rgba(120,20,25,.25)); border: 2px solid rgba(230,57,70,.7); box-shadow: 0 0 60px rgba(230,57,70,.25); }
+  .stop .big { font-size: 96px; text-align: center; line-height: 1; }
+  .stop b { display: block; font-size: 38px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+  .stop span { font-size: 23px; color: #ffd7da; line-height: 1.4; }
+  .rules { display: flex; flex-direction: column; gap: 12px; }
+  .rule { display: flex; gap: 16px; align-items: flex-start; padding: 16px 20px; border-radius: 16px; background: rgba(18,18,28,.86); border: 1px solid rgba(255,255,255,.1); font-size: 23px; line-height: 1.38; color: #e9e9f1; }
+  .rule i { font-style: normal; font-size: 30px; line-height: 1.1; }
+  .rule strong { color: #fff; }
+</style>
+</head>
+<body>
+
+<!-- ═════════ 1. ИТГЭЛ — «сэтгэл амар тогло» 1080×1350 ═════════ -->
+<section class="poster" id="safe">
+  <div class="bg"></div>
+  <div class="shield">🛡</div>
+  <div class="z brand"><img src="logo.png" alt=""><b>Garena<span>.mn</span></b></div>
+  <div class="z"><span class="tag g">🛡 Шударга тоглоомын хамгаалалт</span></div>
+  <h1 class="z">MapHack-тай хүнтэй<br>тоглох <em>стрессээ</em><br><em>март</em></h1>
+  <p class="z sub">Garena.mn дээр тоглолт бүр хамгаалалттай. Бүх газрын зургийг хууран харж тоглодог хүнтэй тааралдах айдасгүй, сэтгэл амар тогло.</p>
+  <div class="z layers">
+    <div class="layer"><span class="ic">🎮</span><div><b>Тоглолтын турш хяналт</b><span>Хамгаалалт тоглоом эхлэхээс өмнө ч, тоглолтын дундуур ч давтан ажиллана.</span></div></div>
+    <div class="layer"><span class="ic">🧬</span><div><b>Тоглоомын бүрэн бүтэн байдал</b><span>Warcraft III-ийн код өөрчлөгдсөн эсэхийг шалгана — файлын нэр солих, хакаа нуух нь тус болохгүй.</span></div></div>
+    <div class="layer"><span class="ic">👁</span><div><b>Хүн шалгаж шийднэ</b><span>Илэрсэн бүх зөрчил ADMIN, ЭЗЭН-д шууд очно. Нотолгоог хянаж байж шийдвэр гаргана — шударга тоглогчийг буруу бангаас хамгаална.</span></div></div>
+  </div>
+  <div class="z bar"><span style="font-size:44px">✅</span><div><b>Шударга тоглогчдод зориулсан платформ</b><br><span>Хак ашиглагчдад биш.</span></div></div>
+  <div class="z foot">
+    <span class="url">⬇ <b>garenamn-production.up.railway.app</b></span>
+    <span class="btn">Үнэгүй татах</span>
+  </div>
+</section>
+
+<!-- ═════════ 2. ХАТУУ САНУУЛГА 1080×1350 ═════════ -->
+<section class="poster warn" id="warning">
+  <div class="bg"></div>
+  <div class="z brand"><img src="logo.png" alt=""><b>Garena<span>.mn</span></b></div>
+  <div class="z"><span class="tag r">⚠ MapHack хэрэглэгчдэд</span></div>
+  <h1 class="z">Хакаа <em>унтраа.</em><br>Эсвэл <em>бан</em> ав.</h1>
+  <div class="z stop">
+    <div class="big">⛔</div>
+    <div><b>MapHack хатуу хориотой</b><span>Хориотой програм асаалттай бол тоглоом нээгдэхгүй. Тоглолтын дундуур асаасан ч илэрнэ.</span></div>
+  </div>
+  <div class="z rules">
+    <div class="rule"><i>📋</i><div>Илэрсэн <strong>бүх зөрчил бүртгэгдэнэ</strong> — хэн, хэзээ, ямар хэрэгсэл, аль Room-д.</div></div>
+    <div class="rule"><i>👁</i><div>Зөрчил <strong>ADMIN болон ЭЗЭН-д тэр даруй</strong> мэдэгдэнэ. Тэд нотолгоог шалгаж шийднэ.</div></div>
+    <div class="rule"><i>⛔</i><div>Нотлогдвол <strong>account бан</strong> авна — Room-д орох, тоглох, Ranked 💎, Level бүгд зогсоно.</div></div>
+    <div class="rule"><i>🧬</i><div>Нэр солих, хакаа нуух, тоглолтын дундуур асаах — <strong>тоглоомын код өөрчлөгдвөл илэрнэ.</strong></div></div>
+    <div class="rule"><i>🤝</i><div>Бан <strong>зөвхөн тухайн account-д</strong> — интернет кафед хамт тоглож байсан бусад хүн хохирохгүй.</div></div>
+  </div>
+  <div class="z foot">
+    <span class="url">Шударга тогло · <b>Garena.mn</b></span>
+  </div>
+</section>
+
+<script>const o=new URLSearchParams(location.search).get('only');if(o)document.querySelectorAll('section.poster').forEach(x=>{if(x.id!==o)x.remove()});</script>
+</body>
+</html>
