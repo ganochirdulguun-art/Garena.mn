@@ -176,6 +176,13 @@ contextBridge.exposeInMainWorld('api', {
   ipGameMyIp:     ()     => ipcRenderer.invoke('ipgame:myIp'),
   uploadBanner:   (bytes) => ipcRenderer.invoke('profile:uploadBanner', bytes),
   uploadChatImage: (bytes) => ipcRenderer.invoke('chat:uploadImage', bytes),   // чатын зураг (2026-10-03)
+  // Room Live (2026-10-03)
+  liveSources:        ()      => ipcRenderer.invoke('live:sources'),
+  liveSelectSource:   (id)    => ipcRenderer.invoke('live:selectSource', id),
+  liveOpenViewer:     (o)     => ipcRenderer.invoke('live:openViewer', o),
+  liveCloseViewer:    (sid)   => ipcRenderer.invoke('live:closeViewer', sid),
+  liveViewerClosed:   (sid)   => ipcRenderer.invoke('live:viewerClosed', sid),
+  onLiveViewerClosed: (cb)    => ipcRenderer.on('live:viewer-closed', (_e, d) => cb(d?.streamerId)),
   // Map-ын сан (2026-09-30)
   wc3Info:        ()     => ipcRenderer.invoke('maps:wc3Info'),
   mapsLocal:      (files) => ipcRenderer.invoke('maps:local', files),

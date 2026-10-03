@@ -864,6 +864,52 @@ ipcMain.handle('profile:uploadBanner', async (_e, bytes) => {
   } catch (err) { throw apiError(err); }
 });
 
+// ── Room Live (2026-10-03): дэлгэц сонгох + getDisplayMedia handler + үзэгчийн цонх ──
+// Renderer live:sources-оор жагсаалт (thumbnail) авч, live:selectSource-оор сонгоно → getDisplayMedia() дуудахад
+// доорх handler сонгосон эх сурвалж + Windows системийн дууг (loopback) өгнө. Тоглоомын замд хүрэхгүй.
+let _liveSourceId = null;
+const liveWindows = new Map();   // streamerId → BrowserWindow
+try {
+  const { desktopCapturer, session } = require('electron');
+  app.whenReady().then(() => {
+    try {
+      session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+        const id = _liveSourceId;
+        if (!id) return callback({});
+        desktopCapturer.getSources({ types: ['screen', 'window'] })
+          .then((srcs) => { const s = srcs.find((x) => x.id === id); if (!s) return callback({}); callback({ video: s, audio: 'loopback' }); })
+          .catch(() => callback({}));
+      }, { useSystemPicker: false });
+    } catch (e) { console.warn('[Live] display handler:', e.message); }
+  });
+  ipcMain.handle('live:sources', async () => {
+    const srcs = await desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: false });
+    return srcs
+      .filter((s) => !/Garena\.mn|— DM|Live — Garena/i.test(s.name || '') || s.id.startsWith('screen:'))
+      .map((s) => ({ id: s.id, name: s.name, kind: s.id.startsWith('screen:') ? 'screen' : 'window', thumbnail: s.thumbnail?.isEmpty?.() ? '' : s.thumbnail.toDataURL() }));
+  });
+  ipcMain.handle('live:selectSource', (_e, id) => { _liveSourceId = typeof id === 'string' && /^(screen|window):/.test(id) ? id : null; return !!_liveSourceId; });
+  ipcMain.handle('live:openViewer', (_e, { token, url, lkRoom, streamer, streamerId, max } = {}) => {
+    const sid = String(streamerId || '');
+    if (!token || !url || !sid) throw new Error('Live мэдээлэл дутуу');
+    const old = liveWindows.get(sid);
+    if (old && !old.isDestroyed()) { old.focus(); return true; }
+    const win = new BrowserWindow({
+      width: 1100, height: 680, minWidth: 640, minHeight: 400,
+      title: `● LIVE — ${String(streamer || '')}`,
+      webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false },
+      autoHideMenuBar: true, backgroundColor: '#0b0b12',
+    });
+    win.loadFile('src/renderer/live.html', { query: { token: String(token), url: String(url), room: String(lkRoom || ''), streamer: String(streamer || ''), streamerId: sid, max: String(max || 35) } });
+    hardenWindow(win);
+    win.on('closed', () => { liveWindows.delete(sid); try { mainWindow?.webContents.send('live:viewer-closed', { streamerId: sid }); } catch {} try { roomWindow?.webContents.send('live:viewer-closed', { streamerId: sid }); } catch {} for (const w of BrowserWindow.getAllWindows()) { try { w.webContents.send('live:viewer-closed', { streamerId: sid }); } catch {} } });
+    liveWindows.set(sid, win);
+    return true;
+  });
+  ipcMain.handle('live:closeViewer', (_e, streamerId) => { const w = liveWindows.get(String(streamerId)); if (w && !w.isDestroyed()) w.close(); return true; });
+  ipcMain.handle('live:viewerClosed', () => true);   // live.html → (closed event дээр renderer-үүдэд мэдэгдэнэ)
+} catch (e) { console.warn('[Live] init:', e.message); }
+
 // Чатын зураг (2026-10-03): renderer шахсан JPEG байтыг өгнө → POST /chat/image → { key, dup }
 ipcMain.handle('chat:uploadImage', async (_e, bytes) => {
   const buf = Buffer.from(bytes || []);

@@ -25,6 +25,7 @@ const warkeyRoutes        = require('./routes/warkey');
 const membershipRoutes    = require('./routes/membership');
 const botRoutes           = require('./routes/bot');
 const lanHostRoutes       = require('./routes/lanhost');
+const liveRoutes          = require('./routes/live');   // Room Live — дэлгэц дамжуулалт (LiveKit SFU токен/төлөв, 2026-10-03)
 const tierSync            = require('./services/tierSync');   // TierSystem → tier/rating автомат sync (D3)
 const geo                 = require('./services/geo');        // холболтын IP → улс (офлайн; ping тэмдгийн "хол зай")
 const { setIO } = roomRoutes;
@@ -220,6 +221,7 @@ clanRoutes.setIO(io);
 // Эзний самбар: онлайн хэрэглэгчдийн id
 app.set('onlineUserIds', () => new Set([...onlineUsers.values()].map((u) => String(u.userId))));
 require('./routes/roles').setIO(io);
+liveRoutes.setIO(io);   // Room Live мэдэгдэл (live:state / live:ended / live:kick)
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);
@@ -730,6 +732,7 @@ io.on('connection', (socket) => {
     // гардаг байв (аудит 2026-10-02) → зөвхөн гишүүдийн жагсаалтыг дахин өгөөд буцна
     if (String(socket.data.roomId || '') === String(roomId) && roomMembers[roomId]?.has(username)) {
       socket.emit('room:members', membersArray(roomId));
+      socket.emit('live:state', { lives: liveRoutes.livesInRoom(roomId) });
       return;
     }
 
@@ -971,6 +974,7 @@ io.on('connection', (socket) => {
     if (ready) roomReady[roomId].add(userId);
     else roomReady[roomId].delete(userId);
     io.to(String(roomId)).emit('room:members', membersArray(roomId));
+    socket.emit('live:state', { lives: liveRoutes.livesInRoom(roomId) });   // Room Live: хэн дамжуулж байна
   });
 
   // Тоглолт эхлэхэд статус 'in_game' болгох
@@ -1065,7 +1069,29 @@ io.on('connection', (socket) => {
   });
 
   // Өрөөнөөс гарах
+  // ── Room Live (2026-10-03): эхлүүлэх / зогсоох / үзэх / гарах — токеныг сервер олгоно, видео LiveKit SFU-ээр ──
+  socket.on('live:start', async (_p, ack) => {
+    const reply = (r) => { if (typeof ack === 'function') ack(r); };
+    try {
+      const rid = socket.data.roomId;
+      if (!rid) return reply({ ok: false, error: 'Эхлээд Room-д орно уу' });
+      if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
+      reply(await liveRoutes.start({ userId: socket.user.id, username: socket.user.username, roomId: rid, socketId: socket.id }));
+    } catch (e) { console.error('[Live] start', e.message); reply({ ok: false, error: 'Server error' }); }
+  });
+  socket.on('live:stop', (_p, ack) => { try { liveRoutes.stop(socket.user.id, 'stop'); } catch {} if (typeof ack === 'function') ack({ ok: true }); });
+  socket.on('live:watch', async ({ streamerId } = {}, ack) => {
+    const reply = (r) => { if (typeof ack === 'function') ack(r); };
+    try {
+      if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
+      const rid = socket.data.roomId;
+      reply(await liveRoutes.watch({ viewerId: socket.user.id, viewerName: socket.user.username, viewerRoomId: rid, streamerId, socketId: socket.id, games: rid ? lanHostRoutes.gamesIn(rid) : null }));
+    } catch (e) { console.error('[Live] watch', e.message); reply({ ok: false, error: 'Server error' }); }
+  });
+  socket.on('live:leave', ({ streamerId } = {}) => { try { liveRoutes.leave(socket.user.id, streamerId ?? null); } catch {} });
+
   socket.on('room:leave', ({ roomId } = {}) => {
+    try { liveRoutes.onRoomLeave(socket.user?.id, roomId || socket.data.roomId); } catch {}
     if (!roomId || evThrottled(socket, 'leave', 500)) return;
     const username = socket.user.username;
     const userId   = String(socket.user.id);
@@ -1100,6 +1126,7 @@ io.on('connection', (socket) => {
     const { roomId } = socket.data;
     const username = socket.user?.username || socket.data.username;
     const userId   = String(socket.user?.id || socket.data.userId || '');
+    try { if (userId) liveRoutes.onSocketDisconnect(userId, socket.id); } catch {}   // Room Live: энэ socket-ын Live зогсоно / үзэгч хасагдана
 
     // Socket mapping-уудыг шууд устгах — userSockets-ыг зөвхөн энэ socket
     // эзэмшиж байсан бол устгана (өөр цонхны socket idэвхтэй үлдэж болно)

@@ -295,6 +295,8 @@ router.post('/:id/lan-host/:token/join', authMW, async (req, res) => {
       );
     } catch (e) { console.warn('[LAN] join save:', e.message); }
   }
+  // Room Live: энэ тоглоомын хост/тоглогч Live хийж байвал нэгдсэн хүн түүнийг үзэх эрхгүй болно (2026-10-03)
+  try { require('./live').onLanJoin({ roomId, token, userId: req.user.id, games: gamesOf(roomId) }).catch(() => {}); } catch {}
   return res.json({ ok: true });
 });
 
