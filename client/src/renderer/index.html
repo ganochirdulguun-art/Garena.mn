@@ -497,7 +497,9 @@
           </div>
           <div id="lobby-chat-messages" class="lobby-chat-messages"></div>
           <div class="chat-input-row">
-            <input id="lobby-chat-input" type="text" maxlength="500" placeholder="Нийтэд мессеж бичих..." class="input" />
+            <input id="lobby-chat-input" type="text" maxlength="500" placeholder="Нийтэд мессеж бичих... (зураг: Ctrl+V)" class="input" />
+            <button type="button" id="btn-lobby-emoji" class="btn btn-icon-only chat-img-btn chat-emoji-btn" title="Emoji" aria-label="Emoji">😀</button>
+            <button type="button" id="btn-lobby-img" class="btn btn-icon-only chat-img-btn" title="Зураг илгээх (эсвэл Ctrl+V)" aria-label="Зураг илгээх">📷</button>
             <button type="button" id="btn-lobby-send" class="btn btn-primary btn-icon-only" title="Илгээх">
               <svg class="btn-icon-svg"><use href="#ico-send"/></svg>
             </button>
@@ -1256,7 +1258,9 @@
         </div>
         <div id="chat-messages" class="chat-messages"></div>
         <div class="chat-input-row">
-          <input id="chat-input" type="text" maxlength="500" placeholder="Мессеж бичих..." class="input" />
+          <input id="chat-input" type="text" maxlength="500" placeholder="Мессеж бичих... (зураг: Ctrl+V)" class="input" />
+          <button type="button" id="btn-room-emoji" class="btn btn-icon-only chat-img-btn chat-emoji-btn" title="Emoji" aria-label="Emoji">😀</button>
+          <button type="button" id="btn-room-img" class="btn btn-icon-only chat-img-btn" title="Зураг илгээх (эсвэл Ctrl+V)" aria-label="Зураг илгээх">📷</button>
           <button type="button" id="btn-send" class="btn btn-primary btn-icon-only" title="Илгээх">
             <svg class="btn-icon-svg"><use href="#ico-send"/></svg>
           </button>

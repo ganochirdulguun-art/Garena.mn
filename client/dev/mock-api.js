@@ -39,6 +39,7 @@
   const settings = { games: [{ id: 'w3', name: 'Warcraft III: The Frozen Throne', path: 'C:\\Program Files (x86)\\Warcraft III\\war3.exe' }, { id: 'imba', name: 'DotA IMBA', path: 'C:\\Games\\W3\\war3.exe' }] };
   const noop = () => {};
   const specific = {
+    uploadChatImage: async () => ({ key: 'a'.repeat(32), dup: false }),
     getUser: async () => (loggedIn ? user : null), refreshUser: async () => true, getToken: async () => 'preview',
     getRooms: async () => (q.get('nochan') ? rooms : q.get('demo') ? DEMO_CH : [...CHANNELS, ...CH_EXTRA, ...rooms]), getMyRoom: async () => ((q.get('ch') || q.get('kind') === 'channel') ? { id: 901, kind: 'channel', ranked: true, visible_cap: 200, game_mode: 'LAN', has_password: false, pinned_notice: '📢 Garena.mn нийтийн өрөөнд тавтай морил!\n🎮 Тоглох: «LAN тоглоом нээх» эсвэл доорх жагсаалтаас «Нэгдэх» → WC3 → Local Area Network.\n⭐ 200/200 дүүрэхэд Silver/Gold шууд орно.\n⚖️ Бүдүүлэг үг, спам, maphack хориотой.' } : { id: 11, game_mode: 'lod', ranked: true, has_password: false, clan_id: q.get('clanroom') ? 1 : null, clan_tag: 'MNL' }), getSettings: async () => settings,
     getFriends: async () => friends, getPendingRequests: async () => [{ id: 30, username: 'Khulan', avatar_url: '' }], getBlockedUsers: async () => [],

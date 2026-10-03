@@ -352,6 +352,7 @@ async function connectSocket() {
   socket.on('lobby:chat', (msg) => appendLobbyMessage(msg));
 
   // Лобби чатын түүх (нэвтрэхэд нэг удаа ирнэ)
+  socket.on('chat:error', ({ error } = {}) => { if (error) showToast(error, 'warning', 6000); });   // зургийн давхардал г.м.
   socket.on('lobby:history', (msgs) => {
     lobbyMessages.length = 0; // Хуучин мессежүүдийг цэвэрлэх
     const box = document.getElementById('lobby-chat-messages');
@@ -1912,7 +1913,7 @@ function chatAvatarEl(userId, username, isMe) {
   return img;
 }
 
-function appendMessage({ userId, username, text, time, replyTo, quiet, system }) {
+function appendMessage({ userId, username, text, time, replyTo, quiet, system, image }) {
   const box  = document.getElementById('chat-messages');
   if (system === true && (!userId || String(userId) === '0')) {   // системийн мэдэгдэл — тусдаа хэв маяг (дуурайлтаас хамгаална)
     const d = document.createElement('div');
@@ -1933,11 +1934,11 @@ function appendMessage({ userId, username, text, time, replyTo, quiet, system })
   div.dataset.userId = userId || '';
   const nameEl = isMe ? 'Та' : `<span class="clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
-  const body = parseMentions(escHtml(text), !isMe && !toMe && !quiet);
+  const body = chatBodyHTML(text, image, parseMentions(escHtml(text), !isMe && !toMe && !quiet));
   if (body.includes('<span class="mention mention-me mention-all">')) div.classList.add('mention-all-row');
   div.innerHTML = `
     <div class="msg-header"><span class="msg-author">${nameEl}</span><span class="msg-dot">·</span><span class="msg-time">${t}</span>${CHAT_REPLY_BTN}${deleteBtn}</div>
-    ${replyQuoteHTML(replyTo)}<div class="msg-bubble">${body}</div>
+    ${replyQuoteHTML(replyTo)}<div class="msg-bubble${image ? ' has-img' : ''}">${body}</div>
   `;
   div.querySelector('.msg-header')?.prepend(chatAvatarEl(userId, username, isMe));
   if (toMe && !quiet) playSound('notify');
@@ -2034,6 +2035,73 @@ function loadOlderRoomMessages() {
     box.scrollTop = box.scrollHeight - prevH + prevTop;
   });
 }
+
+// ── Чатын зураг (2026-10-03, эзэн): screenshot → Ctrl+V (эсвэл 📷 товч / drag-drop) — лобби ба Room чат, бүх хэрэглэгч ──
+// Клиент ≤1024px JPEG болгон шахаад серверт ачаална (сервер ачаалал бага), мессеж нь зургийн key-г л авч явна.
+// Ижил зургийг нэг чатад 24 цагт дахин илгээвэл сервер татгалзаж (chat:error) давхар зургийг автоматаар хасна.
+const CHAT_IMG_KEY_RE = /^[a-f0-9]{32}$/;
+function chatImgSrc(image) { return CHAT_IMG_KEY_RE.test(String(image || '')) ? `${SERVER}/chat/image/${image}` : null; }
+function chatBodyHTML(text, image, textHTML) {
+  const src = chatImgSrc(image);
+  if (!src) return textHTML;
+  const t = String(text || '').trim();
+  const cap = t && t !== '📷 Зураг' ? `<div class="msg-img-cap">${textHTML}</div>` : '';
+  return `${cap}<img class="msg-img chat-img" src="${escHtml(src)}" alt="зураг" loading="lazy" draggable="false">`;
+}
+// Зураг томруулж харах (дарахад) / устсан зураг → орлуулагч
+document.addEventListener('click', (e) => {
+  const img = e.target.closest('img.chat-img'); if (!img) return;
+  let lb = document.getElementById('chat-lightbox');
+  if (!lb) { lb = document.createElement('div'); lb.id = 'chat-lightbox'; lb.className = 'chat-lightbox hidden'; lb.innerHTML = '<img alt="зураг">'; document.body.appendChild(lb); lb.addEventListener('click', () => lb.classList.add('hidden')); document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') lb.classList.add('hidden'); }); }
+  lb.querySelector('img').src = img.src; lb.classList.remove('hidden');
+});
+document.addEventListener('error', (e) => {
+  const img = e.target; if (!(img instanceof HTMLImageElement) || !img.classList.contains('chat-img')) return;
+  const ph = document.createElement('span'); ph.className = 'msg-img-gone'; ph.textContent = '🖼 Зураг устсан (14 хоног хадгалагдана)'; img.replaceWith(ph);
+}, true);
+let chatImgBusy = false;
+async function sendChatImage(kind, file) {
+  if (!file || !String(file.type || '').startsWith('image/')) { showToast('Зөвхөн зураг илгээнэ', 'warning'); return; }
+  if (!socket || !socket.connected) { showToast('Чат холбогдоогүй байна', 'warning'); return; }
+  if (kind === 'room' && !currentRoom) return;
+  if (chatImgBusy) { showToast('Өмнөх зураг илгээгдэж байна…', 'info'); return; }
+  chatImgBusy = true;
+  try {
+    const dataUrl = await compressImageFile(file, 1024, 0.8);
+    const bin = atob(dataUrl.split(',')[1]); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const r = await window.api.uploadChatImage(bytes);
+    if (!r?.key) throw new Error('Зураг ачаалагдсангүй');
+    const input = document.getElementById(kind === 'room' ? 'chat-input' : 'lobby-chat-input');
+    const text = (input?.value || '').trim();
+    const replyTo = takeChatReply(kind);
+    if (kind === 'room') socket.emit('chat:message', { roomId: currentRoom.id, text, image: r.key, ...(replyTo ? { replyTo } : {}) });
+    else socket.emit('lobby:chat', { text, image: r.key, ...(replyTo ? { replyTo } : {}) });
+    if (input) input.value = '';
+  } catch (err) { showToast(err?.message || 'Зураг илгээж чадсангүй', 'error'); }
+  finally { chatImgBusy = false; }
+}
+function wireChatImageInput(kind, inputId, btnId, boxId) {
+  const input = document.getElementById(inputId), btn = document.getElementById(btnId), box = document.getElementById(boxId);
+  if (!input) return;
+  input.addEventListener('paste', (e) => {
+    const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith('image/'));
+    if (!item) return;
+    e.preventDefault(); const f = item.getAsFile(); if (f) sendChatImage(kind, f);
+  });
+  if (btn) {
+    const picker = document.createElement('input'); picker.type = 'file'; picker.accept = 'image/*'; picker.className = 'hidden';
+    document.body.appendChild(picker);
+    btn.addEventListener('click', () => picker.click());
+    picker.addEventListener('change', () => { const f = picker.files?.[0]; if (f) sendChatImage(kind, f); picker.value = ''; });
+  }
+  if (box) {
+    box.addEventListener('dragover', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); box.classList.add('drop-img'); } });
+    box.addEventListener('dragleave', () => box.classList.remove('drop-img'));
+    box.addEventListener('drop', (e) => { box.classList.remove('drop-img'); const f = e.dataTransfer?.files?.[0]; if (f && f.type.startsWith('image/')) { e.preventDefault(); sendChatImage(kind, f); } });
+  }
+}
+wireChatImageInput('room', 'chat-input', 'btn-room-img', 'chat-messages');
+wireChatImageInput('lobby', 'lobby-chat-input', 'btn-lobby-img', 'lobby-chat-messages');
 
 function sendMessage() {
   const input = document.getElementById('chat-input');
@@ -2247,15 +2315,15 @@ async function kickPlayer(targetId, targetName) {
 // ── Нийтийн лобби чат ────────────────────────────────────
 const lobbyMessages = []; // Лобби чатын мессежүүд санах ойд хадгалагдана
 
-function appendLobbyMessage({ userId, username, text, time, replyTo, system }, isHistory = false) {
+function appendLobbyMessage({ userId, username, text, time, replyTo, system, image }, isHistory = false) {
   // Санах ойд хадгалах
-  lobbyMessages.push({ userId, username, text, time, replyTo });
+  lobbyMessages.push({ userId, username, text, time, replyTo, ...(image ? { image } : {}) });
   // Хэт олон мессеж хуримтлагдахаас сэргийлэх (сүүлийн 200)
   if (lobbyMessages.length > 200) lobbyMessages.splice(0, lobbyMessages.length - 200);
 
   const box = document.getElementById('lobby-chat-messages');
   if (!box) return;
-  _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system }, isHistory);
+  _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system, image }, isHistory);
 
   if (username !== currentUser?.username && !isHistory) {
     const chatTab = document.getElementById('tab-chat');
@@ -2266,7 +2334,7 @@ function appendLobbyMessage({ userId, username, text, time, replyTo, system }, i
   }
 }
 
-function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system }, quiet = false) {
+function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system, image }, quiet = false) {
   // Системийн мэдэгдэл (сервер userId=0, system=true) — тусдаа хэв маяг; энгийн хэрэглэгч ижил нэрээр дуурайж чадахгүй
   if (system === true && (!userId || String(userId) === '0')) {
     const d = document.createElement('div');
@@ -2288,9 +2356,9 @@ function _appendLobbyMsgDOM(box, { userId, username, text, time, replyTo, system
   div.dataset.userId = userId || '';
   const nameEl = isMe ? '<span class="g-name">Та</span>' : `<span class="g-name clickable-name" data-user-id="${userId}">${escHtml(username)}</span>`;
   const deleteBtn = isMe ? '<button type="button" class="msg-delete g-x" title="Мессеж устгах" aria-label="Мессеж устгах"><svg class="btn-icon-svg"><use href="#ico-trash"/></svg></button>' : '';
-  const body = parseMentions(escHtml(text), !isMe && !quiet && !toMe);
+  const body = chatBodyHTML(text, image, parseMentions(escHtml(text), !isMe && !quiet && !toMe));
   if (body.includes('<span class="mention mention-me mention-all">')) div.classList.add('mention-all-row');
-  div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
+  div.innerHTML = `${replyQuoteHTML(replyTo)}<span class="g-time">[${t}]</span> ${nameEl}: <span class="msg-bubble g-text${image ? ' has-img' : ''}">${body}</span>${CHAT_REPLY_BTN}${deleteBtn}`;
   div.querySelector('.g-time')?.before(chatAvatarEl(userId, username, isMe));
   if (toMe && !quiet) playSound('notify');
   wireChatMsg(div, box, 'lobby', { username, text, time });
@@ -2652,6 +2720,41 @@ function renderEmojiCategory(picker, category, uid) {
   wireEmojiClicks(grid, uid);
 }
 
+// ── Emoji самбар — ЛОББИ / ROOM чат ба DM цонх (2026-10-03, эзэн: стандарт emoji сонголт) ──
+// DM popup-ын picker-тэй ижил (ангилал + хайлт), ямар ч input/textarea-д ажиллана. Курсорын байрлалд оруулна.
+function insertAtCursor(input, str) {
+  const start = input.selectionStart ?? input.value.length, end = input.selectionEnd ?? start;
+  input.value = input.value.substring(0, start) + str + input.value.substring(end);
+  input.focus(); const p = start + str.length; try { input.setSelectionRange(p, p); } catch {}
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function toggleChatEmoji(input, host, btn) {
+  if (!input || !host) return;
+  let picker = host.querySelector(':scope > .emoji-picker.chat-emoji');
+  if (picker) { picker.remove(); return; }
+  picker = document.createElement('div');
+  picker.className = 'emoji-picker chat-emoji';
+  const catIcons = { smileys: '😀', people: '👋', animals: '🐶', food: '🍕', activities: '⚽', objects: '💡', symbols: '❤️', flags: '🏳️' };
+  picker.innerHTML = `<div class="emoji-picker-header"><div class="emoji-categories">${Object.keys(EMOJI_DATA).map((cat, i) => `<button type="button" class="emoji-cat-btn ${i === 0 ? 'active' : ''}" data-cat="${cat}">${catIcons[cat]}</button>`).join('')}</div>
+    <input type="text" class="emoji-search" placeholder="Emoji хайх..." /></div><div class="emoji-grid"></div>`;
+  host.appendChild(picker);
+  const grid = picker.querySelector('.emoji-grid');
+  const fill = (list) => { grid.innerHTML = list.map((em) => `<button type="button" class="emoji-item">${em}</button>`).join(''); grid.querySelectorAll('.emoji-item').forEach((b) => { b.onclick = () => insertAtCursor(input, b.textContent); }); };
+  fill(EMOJI_DATA.smileys);
+  picker.querySelectorAll('.emoji-cat-btn').forEach((b) => { b.onclick = () => { picker.querySelectorAll('.emoji-cat-btn').forEach((x) => x.classList.remove('active')); b.classList.add('active'); picker.querySelector('.emoji-search').value = ''; fill(EMOJI_DATA[b.dataset.cat] || []); }; });
+  picker.querySelector('.emoji-search').addEventListener('input', (e) => { const q = e.target.value.trim(); fill(q ? Object.values(EMOJI_DATA).flat() : (EMOJI_DATA[picker.querySelector('.emoji-cat-btn.active')?.dataset.cat] || EMOJI_DATA.smileys)); });
+  const close = (e) => { if (!picker.contains(e.target) && e.target !== btn) { picker.remove(); document.removeEventListener('mousedown', close); } };
+  setTimeout(() => document.addEventListener('mousedown', close), 10);
+  document.addEventListener('keydown', function esc(e) { if (e.key === 'Escape') { picker.remove(); document.removeEventListener('keydown', esc); } });
+}
+function wireChatEmoji(btnId, inputId) {
+  const btn = document.getElementById(btnId), input = document.getElementById(inputId);
+  if (!btn || !input) return;
+  btn.addEventListener('click', () => toggleChatEmoji(input, btn.closest('.chat-input-row') || btn.parentElement, btn));
+}
+wireChatEmoji('btn-lobby-emoji', 'lobby-chat-input');
+wireChatEmoji('btn-room-emoji', 'chat-input');
+
 function wireEmojiClicks(grid, uid) {
   grid.querySelectorAll('.emoji-item').forEach(btn => {
     btn.onclick = () => {
@@ -2754,6 +2857,9 @@ function dmInviteToGame() {
   showToast('🎮 Тоглолтын урилга илгээлээ', 'success');
 }
 function toggleDMEmoji() {
+  // Бүрэн emoji самбар (ангилал + хайлт) — лобби/Room чаттай ижил (2026-10-03)
+  const host = el('ymdm-emoji')?.closest('.ymdm-minibar')?.parentElement;
+  if (host && el('dm-window-input')) { host.style.position = host.style.position || 'relative'; toggleChatEmoji(el('dm-window-input'), host, el('ymdm-emoji')); return; }
   const pop = el('ymdm-emoji-pop'); if (!pop) return;
   if (!pop.dataset.filled) {
     const emo = '😀 😂 😍 😎 😭 😡 👍 🙏 🔥 💀 🎮 ❤️ 😅 🤝 👌 🥳 😤 😬 🤔 💪 ⚡ 🏆 😴 🤣'.split(' ');

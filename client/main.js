@@ -864,6 +864,15 @@ ipcMain.handle('profile:uploadBanner', async (_e, bytes) => {
   } catch (err) { throw apiError(err); }
 });
 
+// Чатын зураг (2026-10-03): renderer шахсан JPEG байтыг өгнө → POST /chat/image → { key, dup }
+ipcMain.handle('chat:uploadImage', async (_e, bytes) => {
+  const buf = Buffer.from(bytes || []);
+  if (!buf.length || buf.length > 2 * 1024 * 1024) throw new Error('Зураг 2MB-с ихгүй байх ёстой');
+  try {
+    const { data } = await apiService.getClient().post('/chat/image', buf, { headers: { 'Content-Type': 'application/octet-stream' }, maxBodyLength: 3 * 1024 * 1024, timeout: 60000 });
+    return data;
+  } catch (err) { throw apiError(err); }
+});
 ipcMain.handle('settings:get', () => {
   const s = readSettings();
   return migrateSettings(s);

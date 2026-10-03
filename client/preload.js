@@ -175,6 +175,7 @@ contextBridge.exposeInMainWorld('api', {
   ipGameJoin:     (o)    => ipcRenderer.invoke('ipgame:join', o),
   ipGameMyIp:     ()     => ipcRenderer.invoke('ipgame:myIp'),
   uploadBanner:   (bytes) => ipcRenderer.invoke('profile:uploadBanner', bytes),
+  uploadChatImage: (bytes) => ipcRenderer.invoke('chat:uploadImage', bytes),   // чатын зураг (2026-10-03)
   // Map-ын сан (2026-09-30)
   wc3Info:        ()     => ipcRenderer.invoke('maps:wc3Info'),
   mapsLocal:      (files) => ipcRenderer.invoke('maps:local', files),

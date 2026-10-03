@@ -566,19 +566,19 @@ async function ensureReplyColumn() {
 // msg.time (ISO) → created_at болгож хадгална: in-memory болон DB-ийн time яг таарна
 // (устгал `time`-аар түлхүүрлэдэг тул reload хийсний дараа ч ажиллана).
 // replyTo = { username, text, time } (sanitizeReplyTo-оор цэвэрлэсэн) — reply_to JSONB багана байхгүй бол түүнгүйгээр хадгална
-async function saveLobbyMessage(userId, username, text, timeISO, replyTo = null) {
+async function saveLobbyMessage(userId, username, text, timeISO, replyTo = null, image = null) {
   if (!await dbOk()) return null;
   try {
-    if (replyTo) {
+    if (replyTo || image) {
       try {
         const r = await db.query(
-          `INSERT INTO lobby_messages (user_id, username, text, created_at, reply_to)
-           VALUES ($1, $2, $3, COALESCE($4::timestamptz, NOW()), $5::jsonb)
+          `INSERT INTO lobby_messages (user_id, username, text, created_at, reply_to, image)
+           VALUES ($1, $2, $3, COALESCE($4::timestamptz, NOW()), $5::jsonb, $6)
            RETURNING id, created_at`,
-          [userId || null, username, text, timeISO || null, JSON.stringify(replyTo)]
+          [userId || null, username, text, timeISO || null, replyTo ? JSON.stringify(replyTo) : null, image || null]
         );
         return r.rows[0];
-      } catch (e) { if (!/reply_to/.test(e.message)) throw e; }
+      } catch (e) { if (!/reply_to|image/.test(e.message)) throw e; }
     }
     const result = await db.query(
       `INSERT INTO lobby_messages (user_id, username, text, created_at)
@@ -613,6 +613,7 @@ async function getLobbyHistory(limit = 50) {
       text:     r.deleted ? '[Устгагдсан мессеж]' : r.text,
       time:     r.created_at instanceof Date ? r.created_at.toISOString() : new Date(r.created_at).toISOString(),
       ...(!r.deleted && sanitizeReplyTo(r.reply_to) ? { replyTo: sanitizeReplyTo(r.reply_to) } : {}),
+      ...(!r.deleted && r.image ? { image: r.image } : {}),
     }));
   } catch (e) {
     console.error('[getLobbyHistory]', e.message);

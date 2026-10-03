@@ -117,6 +117,7 @@ app.use('/integration', require('./routes/integration')); // GarenaSystem бот
 const meshRoutes = require('./routes/mesh');
 app.use('/mesh', meshRoutes.router);                     // Tailscale/Headscale mesh: preauth түлхүүр + клиентийн mesh IP тайлан (Ш2, 2026-09-27)
 app.use('/wishes', require('./routes/wishes').router);
+app.use('/chat', require('./routes/chatImages').router);   // чатын зураг (Ctrl+V screenshot) — POST /chat/image, GET /chat/image/:key (2026-10-03)
 app.use('/roles', require('./routes/roles').router);   // Moderator хүсэлт/цол (2026-10-02)   // хэрэглэгчдийн хүсэж буй тоглоомуудын санал (2026-10-01)
 app.use('/relay', require('./routes/relayStats'));     // relay capture → тоглолтын дүн + сүлжээний тайлан (Алхам 3) // MapHack илрэлт → сануулга/бан + эзэнд DM
 const radarRoutes = require('./routes/radar');           // 📡 Радар: relay capture → hero хөдөлгөөн/kill (replay); саатал: зөвхөн эзэн 0с, бусад 120с (live — Шат 2)
@@ -440,6 +441,18 @@ const onlineUsers = new Map();
 // холбогддог тул userId-гаар нэгтгэж, хамгийн идэвхтэй статусыг нь харуулна —
 // үгүй бол лоббид нэг хүн 2-3 удаа давхардаж харагдана
 const STATUS_PRIORITY = { in_game: 3, in_room: 2, online: 1 };
+// Чатын зураг (2026-10-03): image = chat_images.key (32 hex). Байхгүй / буруу / нэг scope-д 24 цагт давхардсан бол null,
+// илгээгчид chat:error-оор мэдэгдэнэ (эзэн: давхар зургийг автоматаар хасна — огт нийтлэхгүй).
+async function chatImageFor(socket, image, scope, roomId = null) {
+  if (image == null || image === '') return null;
+  const ci = require('./routes/chatImages');
+  const key = String(image);
+  const fail = (error) => { try { socket.emit('chat:error', { scope, error }); } catch {} return null; };
+  if (!ci.KEY_RE.test(key)) return fail('Зургийн түлхүүр буруу');
+  if (!await ci.exists(key)) return fail('Зураг олдсонгүй — дахин оруулна уу');
+  if (await ci.isDuplicate(scope, key, roomId)) return fail('Энэ зураг аль хэдийн илгээгдсэн байна — давхар зураг автоматаар хасагдлаа');
+  return key;
+}
 // @everyone (2026-10-01): зөвхөн эзэн/админ бүгдийг mention хийнэ. Бусдынх «@​everyone» болж саармагжина
 // (клиент танихгүй, дуу гарахгүй) — DB/түүхэнд ч саармаг хэлбэрээр хадгалагдана.
 async function everyoneGate(socket, text) {
@@ -652,23 +665,27 @@ io.on('connection', (socket) => {
   });
 
   // Нийтийн лобби чат (бүх хэрэглэгчид харна)
-  socket.on('lobby:chat', async ({ text, replyTo } = {}) => {
-    if (typeof text !== 'string' || !text.trim()) return;
+  socket.on('lobby:chat', async ({ text, replyTo, image } = {}) => {
+    const img = await chatImageFor(socket, image, 'lobby');   // зураг (key) — давхардал/байхгүй бол null + клиентэд мэдэгдэнэ
+    if (image && !img) return;
+    if (typeof text !== 'string') text = '';
+    if (!text.trim() && !img) return;
     if (checkRateLimit(socket)) return;
     const reply = await resolveReply(socialRoutes.sanitizeReplyTo(replyTo), null);
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
-      text: await everyoneGate(socket, text.trim().slice(0, 500)),
+      text: await everyoneGate(socket, (text.trim() || (img ? '📷 Зураг' : '')).slice(0, 500)),   // хуучин клиент текстийг л харна
       time: new Date().toISOString(),
       ...(reply ? { replyTo: reply } : {}),
+      ...(img ? { image: img } : {}),
     };
     // In-memory кэшэд хадгалах (хурдан history-д)
     lobbyHistory.push(msg);
     if (lobbyHistory.length > LOBBY_HISTORY_MAX) lobbyHistory.shift();
     io.emit('lobby:chat', msg);
     // DB-д БАЙНГА хадгалах (сервер restart-д ч түүх үлдэнэ) — time=created_at таарна
-    socialRoutes.saveLobbyMessage(msg.userId, msg.username, msg.text, msg.time, reply)
+    socialRoutes.saveLobbyMessage(msg.userId, msg.username, msg.text, msg.time, reply, msg.image || null)
       .catch(e => console.error('[Lobby] save:', e.message));
   });
 
@@ -792,19 +809,24 @@ io.on('connection', (socket) => {
   });
 
   // Өрөөний чат мессеж
-  socket.on('chat:message', async ({ roomId, text, replyTo } = {}) => {
-    if (typeof text !== 'string' || !text.trim() || !roomId) return;
+  socket.on('chat:message', async ({ roomId, text, replyTo, image } = {}) => {
+    if (!roomId) return;
+    if (typeof text !== 'string') text = '';
+    if (!text.trim() && !image) return;
     if (checkRateLimit(socket)) return;
     if (!await ensureSocketRoomState(socket, roomId)) return;
     if (!await ensureRoomMembership(socket, roomId)) return;
+    const img = await chatImageFor(socket, image, 'room', roomId);
+    if (image && !img) return;
     touchRoomActivity(roomId, socket.user.id);
     const reply = await resolveReply(socialRoutes.sanitizeReplyTo(replyTo), String(roomId));
     const msg = {
       userId: socket.user.id,
       username: socket.user.username,
-      text: await everyoneGate(socket, text.trim().slice(0, 500)),
+      text: await everyoneGate(socket, (text.trim() || (img ? '📷 Зураг' : '')).slice(0, 500)),
       time: new Date().toISOString(),
       ...(reply ? { replyTo: reply } : {}),
+      ...(img ? { image: img } : {}),
     };
     // Өрөөний чат түүхэнд хадгалах (max 100)
     if (!roomMessages[roomId]) roomMessages[roomId] = [];
@@ -1160,7 +1182,7 @@ function roomHasActiveMembers(roomId) {
 }
 
 // Устгагдсан өрөөний хуучин чат (30 хоног+) — 24 цаг тутам
-const roomChatCleanup = setInterval(() => { require('./routes/roomChat').cleanupOrphans(); }, 6 * 60 * 60 * 1000);
+const roomChatCleanup = setInterval(() => { require('./routes/roomChat').cleanupOrphans(); require('./routes/chatImages').cleanup(); }, 6 * 60 * 60 * 1000);
 if (typeof roomChatCleanup.unref === 'function') roomChatCleanup.unref();
 // Процесс 24ц-аас өмнө дахин асдаг (deploy) тул асснаас 5 мин дараа нэг удаа ажиллуулна
 const roomChatCleanupOnce = setTimeout(() => { try { require('./routes/roomChat').cleanupOrphans(); } catch {} }, 5 * 60 * 1000);

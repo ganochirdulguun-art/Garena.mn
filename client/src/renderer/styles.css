@@ -4502,3 +4502,21 @@ body:not(.light) .dm-users-list .dm-status-dot.offline::before { content: '✕';
     linear-gradient(180deg, rgba(6, 8, 20, 0.08), rgba(6, 8, 20, 0.22)),
     radial-gradient(circle at 50% 2%, rgba(216, 35, 42, 0.08), transparent 34%);
 }
+
+/* Чатын зураг — лобби/Room (2026-10-03) */
+.chat-img-btn { font-size: 16px; line-height: 1; padding: 0 8px; }
+.msg-bubble.has-img { padding: 6px; }
+.msg-img.chat-img { max-width: 280px; max-height: 220px; width: auto; height: auto; border-radius: 8px; display: block; cursor: zoom-in; margin-top: 2px; background: rgba(0,0,0,.08); }
+.g-text.has-img { display: inline-block; vertical-align: top; }
+.g-text.has-img .msg-img.chat-img { max-width: 220px; max-height: 180px; }
+.msg-img-cap { margin-bottom: 4px; }
+.msg-img-gone { font-size: 12px; color: var(--text-muted, #9ca3af); font-style: italic; }
+.chat-messages.drop-img, .lobby-chat-messages.drop-img { outline: 2px dashed var(--accent, #e63946); outline-offset: -4px; }
+.chat-lightbox { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,.85); display: flex; align-items: center; justify-content: center; cursor: zoom-out; }
+.chat-lightbox.hidden { display: none; }
+.chat-lightbox img { max-width: 94vw; max-height: 94vh; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,.6); }
+
+/* Emoji самбар — лобби/Room чат ба DM цонх (2026-10-03) */
+.chat-input-row .emoji-picker.chat-emoji { bottom: calc(100% + 6px); left: 8px; right: auto; width: 340px; max-width: calc(100% - 16px); height: 300px; z-index: 40; }
+.emoji-picker.chat-emoji { position: absolute; bottom: 100%; left: 8px; width: 340px; max-width: calc(100% - 16px); height: 300px; z-index: 40; }
+.chat-emoji-btn { font-size: 16px; }

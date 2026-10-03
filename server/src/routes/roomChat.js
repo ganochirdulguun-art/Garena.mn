@@ -41,6 +41,7 @@ const toMsg = (r) => ({
   time:     r.created_at instanceof Date ? r.created_at.toISOString() : new Date(r.created_at).toISOString(),
   ...(r.system ? { system: true } : {}),
   ...(!r.deleted && sanitizeReplyTo(r.reply_to) ? { replyTo: sanitizeReplyTo(r.reply_to) } : {}),
+  ...(!r.deleted && r.image ? { image: r.image } : {}),
 });
 
 // msg.time (ISO) → created_at — in-memory/клиентийн time-тай яг таарна (устгал time-аар)
@@ -48,10 +49,10 @@ async function save(roomId, msg) {
   if (!db || !Number.isInteger(Number(roomId))) return;
   try {
     await db.query(
-      `INSERT INTO room_messages (room_id, user_id, username, text, reply_to, system, created_at)
-       VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7::timestamptz, NOW()))`,
+      `INSERT INTO room_messages (room_id, user_id, username, text, reply_to, system, created_at, image)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6, COALESCE($7::timestamptz, NOW()), $8)`,
       [Number(roomId), msg.userId ? Number(msg.userId) || null : null, String(msg.username || '').slice(0, 64), String(msg.text || ''),
-       msg.replyTo ? JSON.stringify(msg.replyTo) : null, !!msg.system, msg.time || null]
+       msg.replyTo ? JSON.stringify(msg.replyTo) : null, !!msg.system, msg.time || null, msg.image || null]
     );
   } catch (e) { console.error('[roomChat] save:', e.message); }
 }

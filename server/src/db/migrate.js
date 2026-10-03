@@ -252,6 +252,7 @@ async function runMigrations(db) {
   await require('../routes/channels').ensureTables(); // нийтийн Room 1–20 (rooms.kind='channel' + trigger)
   await require('../routes/roles').ensureTables(); // Moderator цол + хүсэлт
   await require('../routes/roomChat').ensureTables(); // өрөөний чатын байнгын түүх
+  await require('../routes/chatImages').ensureTables(); // чатын зураг (chat_images + lobby/room_messages.image)
   await require('../services/results').ensureTables(); // game_results.game_token (нэг токен = нэг дүн)
 }
 
