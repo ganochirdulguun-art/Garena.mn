@@ -183,6 +183,8 @@ contextBridge.exposeInMainWorld('api', {
   liveCloseViewer:    (sid)   => ipcRenderer.invoke('live:closeViewer', sid),
   liveViewerClosed:   (sid)   => ipcRenderer.invoke('live:viewerClosed', sid),
   onLiveViewerClosed: (cb)    => ipcRenderer.on('live:viewer-closed', (_e, d) => cb(d?.streamerId)),
+  liveViewerError:    (o)     => ipcRenderer.invoke('live:viewerError', o),          // үзэгчийн цонх → серверийн лог (2026-10-04)
+  onLiveViewerError:  (cb)    => ipcRenderer.on('live:viewer-error', (_e, d) => cb(d || {})),
   // Map-ын сан (2026-09-30)
   wc3Info:        ()     => ipcRenderer.invoke('maps:wc3Info'),
   mapsLocal:      (files) => ipcRenderer.invoke('maps:local', files),

@@ -56,7 +56,7 @@ const games = new Map([['tokA', { host_user_id: 10 }]]);   // Room 901-д 10 х�
   r = await live.watch({ viewerId: 33, viewerName: 'd', viewerRoomId: 901, streamerId: 11, socketId: 'x', games }); assert.equal(r.ok, false); assert.equal(r.code, 'FULL'); ok('Платформын нийт үзэгчийн хязгаар (3)');
 
   // Socket салах / Room-оос гарах
-  sent.length = 0; live.onSocketDisconnect(10, 's10');
+  sent.length = 0; live.onSocketDisconnect(10, 's10', 0);
   assert.equal(live.liveOf(10), null); assert.equal(sent.filter((x) => x.ev === 'live:ended').length, 2); ok('Streamer socket салбал Live зогсож үзэгчдэд live:ended');
   live.onSocketDisconnect(11, 'other-socket'); assert.ok(live.liveOf(11)); ok('Өөр socket салахад Live зогсохгүй');
   live.onRoomLeave(11, 901); assert.equal(live.liveOf(11), null); ok('Room-оос гарвал Live зогсоно');
@@ -71,6 +71,15 @@ const games = new Map([['tokA', { host_user_id: 10 }]]);   // Room 901-д 10 х�
   r = await live.start({ userId: 41, username: 'Priv', roomId: 901, socketId: 's41' }); assert.equal(r.ok, true);
   r = await live.watch({ viewerId: 52, viewerName: 'Lobby2', viewerRoomId: null, streamerId: 41, socketId: 's52', games: null, gamesOf: () => games }); assert.equal(r.ok, false); ok('Хувийн Live-ийг Room-гүй хүн үзэхгүй');
   live.stop(40); live.stop(41);
+
+  // Socket түр тасрах → grace → live:resume (2026-10-04: Чехээс холбогдсон streamer-ийн Live 26с-д зогссон)
+  r = await live.start({ userId: 60, username: 'Flaky', roomId: 901, socketId: 's60' }); const lk60 = r.lkRoom;
+  live.onSocketDisconnect(60, 's60', 80); assert.ok(live.liveOf(60)); ok('Streamer socket тасрахад Live шууд зогсохгүй (grace)');
+  assert.equal(live.resume({ userId: 60, lkRoom: 'wrong', socketId: 's60b' }).ok, false); ok('resume: өөр lkRoom → татгалзана');
+  assert.equal(live.resume({ userId: 60, lkRoom: lk60, socketId: 's60b' }).ok, true);
+  await new Promise((res) => setTimeout(res, 150)); assert.ok(live.liveOf(60)); assert.equal(live.liveOf(60).socketId, 's60b'); ok('resume → grace дууссан ч Live үргэлжилнэ, шинэ socket холбогдоно');
+  live.onSocketDisconnect(60, 's60b', 60); await new Promise((res) => setTimeout(res, 120)); assert.equal(live.liveOf(60), null); ok('resume хийгээгүй бол grace-ийн дараа зогсоно');
+  assert.equal(live.resume({ userId: 60, lkRoom: lk60, socketId: 'x' }).ok, false); ok('зогссон Live-ийг resume хийхгүй');
   assert.deepEqual(live.stats(), { enabled: true, lives: 0, viewers: 0, max_streams: 2, max_viewers: 2, max_viewers_total: 3 }); ok('stats()');
   console.log(`\n=== live: ${pass} PASS ===`); process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

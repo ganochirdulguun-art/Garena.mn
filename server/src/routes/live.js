@@ -17,6 +17,8 @@ const CFG = {
   MAX_VIEWERS: n(process.env.LIVE_MAX_VIEWERS, 35),
   MAX_VIEWERS_TOTAL: n(process.env.LIVE_MAX_VIEWERS_TOTAL, 35),
   MAX_STREAMS: n(process.env.LIVE_MAX_STREAMS, 3),
+  // Streamer-ийн socket түр тасрахад (гадаадаас холбогдсон, Wi-Fi) Live-ийг шууд зогсоохгүй — клиент live:resume-ээр сэргээнэ (2026-10-04)
+  RESUME_GRACE_MS: process.env.LIVE_RESUME_GRACE_MS != null ? Math.max(0, parseInt(process.env.LIVE_RESUME_GRACE_MS, 10) || 0) : 25000,
   // Эзний сонголт: 720p 30fps 2 Mbps (~35 үзэгч / 100 Mbps)
   ENCODING: { width: 1280, height: 720, fps: 30, maxBitrate: 2_000_000, codec: 'h264' },
 };
@@ -79,6 +81,7 @@ async function start({ userId, username, roomId, socketId, isPublic = false, roo
 function stop(userId, reason = 'stop') {
   const id = String(userId);
   const l = lives.get(id); if (!l) return null;
+  if (l.graceTimer) { clearTimeout(l.graceTimer); l.graceTimer = null; }
   lives.delete(id);
   for (const [vid] of l.viewers) { try { _io?.to(`user:${vid}`).emit('live:ended', { streamerId: id, reason }); } catch {} }
   broadcastRoom(l.roomId);
@@ -140,12 +143,34 @@ function leave(viewerId, streamerId = null) {
   return changed.length;
 }
 
-/** Socket салахад: тэр socket-оор эхлүүлсэн Live зогсоно; тэр socket-оор үзэж байсан бол гарна. */
-function onSocketDisconnect(userId, socketId) {
+/** Socket салахад: тэр socket-оор эхлүүлсэн Live RESUME_GRACE_MS хүлээгээд зогсоно (клиент дахин холбогдоод live:resume илгээвэл үргэлжилнэ);
+ *  тэр socket-оор үзэж байсан бол гарна. */
+function onSocketDisconnect(userId, socketId, graceMs = CFG.RESUME_GRACE_MS) {
   const id = String(userId);
   const l = lives.get(id);
-  if (l && l.socketId === socketId) stop(id, 'disconnect');
+  if (l && l.socketId === socketId) {
+    if (!graceMs) stop(id, 'disconnect');
+    else {
+      l.socketId = null;
+      if (l.graceTimer) clearTimeout(l.graceTimer);
+      l.graceTimer = setTimeout(() => { if (lives.get(id) === l && !l.socketId) stop(id, 'disconnect'); }, graceMs);
+      if (l.graceTimer.unref) l.graceTimer.unref();
+      console.log(`[Live] ${l.username} (#${id}) socket тасарлаа — ${Math.round(graceMs / 1000)}с сэргээхийг хүлээнэ`);
+    }
+  }
   for (const x of lives.values()) { const v = x.viewers.get(id); if (v && v.socketId === socketId) { x.viewers.delete(id); broadcastRoom(x.roomId); } }
+}
+
+/** Streamer-ийн клиент дахин холбогдсон → Live үргэлжилнэ (lkRoom таарах ёстой). */
+function resume({ userId, lkRoom, socketId }) {
+  const id = String(userId);
+  const l = lives.get(id);
+  if (!l || !lkRoom || l.lkRoom !== String(lkRoom)) return { ok: false, error: 'Live дууссан байна' };
+  if (l.graceTimer) { clearTimeout(l.graceTimer); l.graceTimer = null; }
+  l.socketId = socketId;
+  console.log(`[Live] ${l.username} (#${id}) дахин холбогдож Live үргэлжиллээ`);
+  broadcastRoom(l.roomId);
+  return { ok: true, state: publicState(l) };
 }
 
 /** Room-оос гарахад: Live зогсоно, тэр Room-ын Live-үүдээс үзэгч хасагдана. */
@@ -170,4 +195,4 @@ async function onLanJoin({ roomId, token, userId, games }) {
 
 function stats() { return { enabled: enabled(), lives: lives.size, viewers: totalViewers(), max_streams: CFG.MAX_STREAMS, max_viewers: CFG.MAX_VIEWERS, max_viewers_total: CFG.MAX_VIEWERS_TOTAL }; }
 
-module.exports = { CFG, enabled, setIO, start, stop, watch, leave, liveOf, livesInRoom, publicLives, broadcastPublic, onSocketDisconnect, onRoomLeave, onLanJoin, inSameLanGame, stats, _lives: lives };
+module.exports = { CFG, enabled, setIO, start, stop, resume, watch, leave, liveOf, livesInRoom, publicLives, broadcastPublic, onSocketDisconnect, onRoomLeave, onLanJoin, inSameLanGame, stats, _lives: lives };

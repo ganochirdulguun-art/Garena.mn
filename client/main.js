@@ -908,6 +908,12 @@ try {
   });
   ipcMain.handle('live:closeViewer', (_e, streamerId) => { const w = liveWindows.get(String(streamerId)); if (w && !w.isDestroyed()) w.close(); return true; });
   ipcMain.handle('live:viewerClosed', () => true);   // live.html → (closed event дээр renderer-үүдэд мэдэгдэнэ)
+  // Үзэгчийн цонхны алдаа → үндсэн цонх серверт live:error-оор бүртгэнэ (2026-10-04)
+  ipcMain.handle('live:viewerError', (_e, o = {}) => {
+    const d = { stage: String(o.stage || '').slice(0, 16), name: String(o.name || '').slice(0, 40), message: String(o.message || '').slice(0, 300), streamerId: String(o.streamerId || '').slice(0, 20) };
+    try { mainWindow?.webContents.send('live:viewer-error', d); } catch {}
+    return true;
+  });
 } catch (e) { console.warn('[Live] init:', e.message); }
 
 // Чатын зураг (2026-10-03): renderer шахсан JPEG байтыг өгнө → POST /chat/image → { key, dup }

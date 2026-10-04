@@ -16,6 +16,7 @@
   const setMsg = (text, spin = false) => { const m = $('msg'); if (!text) { m.classList.add('hidden'); return; } m.classList.remove('hidden'); m.querySelector('.spin').style.display = spin ? '' : 'none'; $('msg-text').innerHTML = text; };
   const setViewers = (nNow) => { $('v-now').textContent = String(Math.max(0, nNow)); $('viewers').classList.toggle('full', nNow >= max); };
 
+  const reportErr = (stage, e) => { try { window.api?.liveViewerError?.({ stage, name: e?.name || '', message: String(e?.message || e || ''), streamerId }); } catch {} };
   const close = () => { try { room?.disconnect(); } catch {} try { window.api?.liveViewerClosed?.(streamerId); } catch {} window.close(); };
   $('btn-close').addEventListener('click', close);
   $('btn-full').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); });
@@ -86,6 +87,11 @@
       recount();
       const hasVideo = [...room.remoteParticipants.values()].some((p) => p.videoTrackPublications.size);
       setMsg(hasVideo ? '' : 'Streamer-ийн дэлгэцийг хүлээж байна…', true);
-    } catch (e) { setMsg(`<b>Холбогдож чадсангүй</b>${String(e?.message || e).slice(0, 120)}`); }
+      // 20 секундэд дүрс ирэхгүй бол серверт мэдээлнэ (оношлох)
+      setTimeout(() => { if (!video.srcObject) reportErr('no-video', { message: `20s no video, participants=${room.numParticipants}` }); }, 20000);
+    } catch (e) {
+      reportErr('connect', e);
+      setMsg(`<b>Холбогдож чадсангүй</b>${String(e?.message || e).slice(0, 120)}<br><small>Цонхоо хаагаад дахин «Үзэх» дарна уу</small>`);
+    }
   })();
 })();

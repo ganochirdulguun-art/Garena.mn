@@ -1110,7 +1110,8 @@ io.on('connection', (socket) => {
     try {
       const rid = socket.data.roomId;
       if (!rid) return reply({ ok: false, error: 'Эхлээд Room-д орно уу' });
-      if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
+      // Чатын спам хязгаараас ТУСДАА (чатад хурдан бичиж байгаад LIVE дарахад «Түр хүлээнэ үү» гэж татгалздаг байв, 2026-10-04)
+      if (evThrottled(socket, 'live', 800)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
       const isPublic = !!(p && p.public);
       let roomName = '';
       try { const r = await dbForMigration.query('SELECT name FROM rooms WHERE id = $1', [rid]); roomName = r.rows[0]?.name || ''; } catch {}
@@ -1120,13 +1121,31 @@ io.on('connection', (socket) => {
       reply(res);
     } catch (e) { console.error('[Live] start', e.message); reply({ ok: false, error: 'Server error' }); }
   });
-  socket.on('live:stop', (_p, ack) => { try { liveRoutes.stop(socket.user.id, 'stop'); } catch {} if (typeof ack === 'function') ack({ ok: true }); });
+  const LIVE_STOP_REASONS = new Set(['user', 'source-ended', 'start-failed', 'lk-disconnected', 'resume-failed', 'unload', 'room-left']);
+  socket.on('live:stop', (p, ack) => {
+    const reason = LIVE_STOP_REASONS.has(p && p.reason) ? p.reason : 'stop';
+    try { liveRoutes.stop(socket.user.id, reason); } catch {}
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+  // Клиент дахин холбогдсон: Live-ээ үргэлжлүүлнэ (socket түр тасрахад зогсохгүй)
+  socket.on('live:resume', ({ lkRoom } = {}, ack) => {
+    const r = (() => { try { return liveRoutes.resume({ userId: socket.user.id, lkRoom, socketId: socket.id }); } catch (e) { return { ok: false, error: e.message }; } })();
+    if (typeof ack === 'function') ack(r);
+  });
+  // Клиентийн Live алдаа (дэлгэц авах / LiveKit холболт / үзэгчийн цонх) — оношлоход
+  socket.on('live:error', (p = {}) => {
+    if (evThrottled(socket, 'live-err', 1500)) return;
+    const s = (v, n) => String(v ?? '').replace(/[\r\n]+/g, ' ').slice(0, n);
+    console.warn(`[Live] АЛДАА ${socket.user?.username} (#${socket.user?.id}) v${socket.data.appVersion || '?'} stage=${s(p.stage, 24)} src=${s(p.kind, 10)} ${s(p.name, 40)}: ${s(p.message, 220)}`);
+  });
   socket.on('live:watch', async ({ streamerId } = {}, ack) => {
     const reply = (r) => { if (typeof ack === 'function') ack(r); };
     try {
-      if (checkRateLimit(socket)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
+      if (evThrottled(socket, 'live-watch', 500)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
       const rid = socket.data.roomId;
-      reply(await liveRoutes.watch({ viewerId: socket.user.id, viewerName: socket.user.username, viewerRoomId: rid, streamerId, socketId: socket.id, games: rid ? lanHostRoutes.gamesIn(rid) : null, gamesOf: (r) => lanHostRoutes.gamesIn(r) }));
+      const r = await liveRoutes.watch({ viewerId: socket.user.id, viewerName: socket.user.username, viewerRoomId: rid, streamerId, socketId: socket.id, games: rid ? lanHostRoutes.gamesIn(rid) : null, gamesOf: (x) => lanHostRoutes.gamesIn(x) });
+      console.log(`[Live] үзэх: ${socket.user.username} (#${socket.user.id}, room ${rid || '—'}) → #${streamerId}: ${r.ok ? 'OK' : `ТАТГАЛЗАВ (${r.error})`}`);
+      reply(r);
     } catch (e) { console.error('[Live] watch', e.message); reply({ ok: false, error: 'Server error' }); }
   });
   socket.on('live:leave', ({ streamerId } = {}) => { try { liveRoutes.leave(socket.user.id, streamerId ?? null); } catch {} });

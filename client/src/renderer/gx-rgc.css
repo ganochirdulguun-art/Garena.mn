@@ -310,6 +310,11 @@ body.rgc .rgc-mhead { grid-template-columns: 22px minmax(0, 1fr) 30px; }
 .live-src img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; }
 .live-src:hover { border-color: #e63946; background: #26262f; }
 .live-src span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-picker-tip { margin: 10px 16px 0; padding: 8px 12px; border-radius: 8px; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.3); color: #fde68a; font-size: 12.5px; }
+.live-src { position: relative; }
+.live-src.rec { outline: 2px solid #e63946; outline-offset: 1px; }
+.live-rec { position: absolute; top: 6px; left: 6px; z-index: 1; padding: 1px 7px; border-radius: 5px; background: #e63946; color: #fff; font: 700 10.5px/16px var(--gx-font, sans-serif); font-style: normal; }
+#gx-live-roombar { margin: 6px 8px; }
 .live-picker-f { padding: 10px 16px 14px; border-top: 1px solid rgba(255,255,255,.1); font-size: 12.5px; color: #c9c9d6; }
 .live-picker-f input { margin-right: 6px; }
 .rgc-actions .btn-live { color: #fff !important; background: linear-gradient(#2e2e3c, #1d1d26) !important; border-color: rgba(255,255,255,.18) !important; }
