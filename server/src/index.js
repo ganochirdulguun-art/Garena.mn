@@ -129,6 +129,7 @@ app.use('/membership', membershipRoutes.router);   // гишүүнчлэл, нэ
 app.use('/diamonds', membershipRoutes.diamondsRouter); // Diamond 💎 / XP / шилжүүлэг / худалдан авалт
 app.post('/qpay/webhook', membershipRoutes.qpayWebhook); // QPay dashboard → payment.paid
 app.use('/bot', botRoutes.botRouter);           // hostbot/bridge.js (x-bot-key)
+app.use('/public', require('./routes/publicStats').router);   // нийтийн нэгтгэсэн тоо (FB туслах бот «хэдэн хүн онлайн?»), 2026-10-04
 
 // Танилцуулга landing page (WarKey + Platform, татах товч, админ самбар руу орох).
 app.get('/', (req, res) => {
@@ -255,6 +256,7 @@ tierSync.start();
 membershipRoutes.setIO(io);
 // Admin router-т лоббийн онлайн жагсаалт авагч дамжуулах (onlineUsersList hoisted)
 adminRoutes.setPresence(onlineUsersList);
+require('./routes/publicStats').setSources({ presence: onlineUsersList, rooms: lanHostRoutes.roomTotals, version: async () => (await latestSetupUrl()).ver });
 
 // XSS хамгаалалт: escape-ыг client render үед хийдэг (escHtml) —
 // энд давхар escape хийвэл хэрэглэгчид "&lt;" гэх мэт зүйл харагдана

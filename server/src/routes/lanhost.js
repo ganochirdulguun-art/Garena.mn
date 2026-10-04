@@ -334,4 +334,7 @@ function gameCounts(roomId) {
   return { open, started };
 }
 
-module.exports = { router, setIO, gameCounts, gamesIn, activeTokens, activeHostIds, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
+// Нийтийн статистик (/public/stats): Room тус бүрийн нээлттэй/явж буй тоглоомын тоо
+function roomTotals() { const out = new Map(); for (const id of roomGames.keys()) { const c = gameCounts(id); if (c) out.set(String(id), c); } return out; }
+
+module.exports = { router, setIO, gameCounts, roomTotals, gamesIn, activeTokens, activeHostIds, removeUserGames, clearRoom, relayConfigured, findGameByToken, _relays: RELAYS, _checkRelays: checkRelays, currentRelay, captureFor, _shardFor: shardFor };
