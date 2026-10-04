@@ -76,6 +76,7 @@ contextBridge.exposeInMainWorld('api', {
   startLanJoin:    (opts)      => ipcRenderer.invoke('relay:startLanJoin', opts),
   updateLanJoin:   (opts)      => ipcRenderer.invoke('relay:updateLanJoin', opts),
   stopLanJoin:     ()          => ipcRenderer.invoke('relay:stopLanJoin'),
+  hideLanJoin:     ()          => ipcRenderer.invoke('relay:hideLanJoin'),   // эхэлсэн тоглоомыг WC3 LAN жагсаалтаас арилгах
   onLanGameInfo:   (cb)        => ipcRenderer.on('lan:gameinfo', (_, d) => cb(d)),
   onLanStarted:    (cb)        => ipcRenderer.on('lan:started', (_, d) => cb(d)),
   getWc3Name:      ()          => ipcRenderer.invoke('wc3:name'),

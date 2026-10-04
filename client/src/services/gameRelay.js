@@ -89,6 +89,23 @@ const WC3_PORT = 6112;
 const W3_HEADER = 0xF7;
 const W3_SEARCHGAME = 0x2F;
 const W3_GAMEINFO = 0x30;
+const W3_DECREATEGAME = 0x33;
+
+// GAMEINFO: F7 30 len(2) product(4) version(4) hostCounter(4) … — WC3 LAN жагсаалт тоглоомыг hostCounter-оор таньдаг
+function _hostCounter(pkt) { return pkt && pkt.length >= 16 ? pkt.readUInt32LE(12) : null; }
+// WC3-ийн LAN жагсаалтаас тоглоомыг арилгана (W3GS_DECREATEGAME). Үүнгүйгээр тоглоом дуусаад WC3-аас гаралгүй шинэ
+// тоглоом үүсгэхэд хуучин нь «2/10» сүүдэр болж үлддэг байв (эзэн 2026-10-04). Цацдаг socket/хаягаар 3 удаа илгээнэ.
+function _decreate(state, hc, times = 3) {
+  if (!state || hc == null || !state.udp) return;
+  const b = Buffer.alloc(8);
+  b[0] = W3_HEADER; b[1] = W3_DECREATEGAME; b.writeUInt16LE(8, 2); b.writeUInt32LE(hc >>> 0, 4);
+  const dests = state.dests || [{ ip: '127.0.0.1', port: WC3_PORT }];
+  const udp = state.udp;
+  for (let i = 0; i < times; i++) {
+    setTimeout(() => { for (const d of dests) { try { udp.send(b, 0, b.length, d.port, d.ip); } catch {} } }, i * 250);
+  }
+  bblog(`DECREATEGAME hostCounter=${hc} → WC3 LAN жагсаалтаас арилгав`);
+}
 
 // Түгээмэл WC3 хувилбарууд (Frozen Throne + Reign of Chaos)
 const SEARCH_VERSIONS = [
@@ -315,6 +332,7 @@ function _gameInfoInject(state) {
     state.udp = sock;
     try { sock.setBroadcast(true); } catch {}
     sock.on('message', (msg, rinfo) => {
+      if (state.hidden) return;   // эхэлсэн тоглоом — LAN жагсаалтад зарлахгүй
       if (msg.length >= 2 && msg[0] === W3_HEADER && msg[1] === W3_SEARCHGAME) {
         try { sock.send(state.packet, 0, state.packet.length, rinfo.port, rinfo.address); } catch {}
         if (!state.sgLogged) { state.sgLogged = true; bblog(`SEARCHGAME ← ${rinfo.address}:${rinfo.port} → GAMEINFO хариуллаа`); }
@@ -323,8 +341,10 @@ function _gameInfoInject(state) {
     const dests = bcast
       ? [{ ip: bcast, port: WC3_PORT }, { ip: '255.255.255.255', port: WC3_PORT }]
       : [{ ip: '127.0.0.1', port: WC3_PORT }];
+    state.dests = dests;
     const tick = () => {
       if (!state.running) return;
+      if (state.hidden) { state.timer = setTimeout(tick, 1500); return; }
       const b = state.packet;
       for (const d of dests) {
         try { sock.send(b, 0, b.length, d.port, d.ip); } catch (e) { if (sentCount < 3) bblog('send алдаа: ' + e.message); }
@@ -422,6 +442,8 @@ function updateBotBridge({ gameInfoB64 }) {
   const pkt = Buffer.from(String(gameInfoB64), 'base64');
   if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) return false;
   pkt.writeUInt16LE(_bot.localPort, pkt.length - 2);
+  const oldHc = _hostCounter(_bot.packet), newHc = _hostCounter(pkt);
+  if (oldHc != null && oldHc !== newHc) _decreate(_bot, oldHc);   // шинэ тоглоом → хуучныг WC3-аас арилгана
   _bot.packet = pkt;
   return true;
 }
@@ -432,7 +454,8 @@ function stopBotBridge() {
   _bot = null;
   s.running = false;
   clearTimeout(s.timer);
-  try { s.udp?.close(); } catch {}
+  _decreate(s, _hostCounter(s.packet));
+  { const u = s.udp; setTimeout(() => { try { u?.close(); } catch {} }, 900); }   // DECREATEGAME илгээгдэх хүртэл
   try { s.server?.close(); } catch {}
   s.conns.forEach((c) => { try { c.destroy(); } catch {} });
   console.log('[BotBridge] Зогслоо');
@@ -589,7 +612,18 @@ function updateLanJoin({ gameInfoB64 }) {
   const pkt = Buffer.from(String(gameInfoB64), 'base64');
   if (pkt.length < 24 || pkt[0] !== W3_HEADER || pkt[1] !== W3_GAMEINFO) return false;
   pkt.writeUInt16LE(_lanJoin.localPort, pkt.length - 2);
+  const oldHc = _hostCounter(_lanJoin.packet), newHc = _hostCounter(pkt);
+  if (oldHc != null && oldHc !== newHc) _decreate(_lanJoin, oldHc);   // хост шинэ тоглоом үүсгэсэн → хуучин «сүүдэр»-ийг арилгана
   _lanJoin.packet = pkt;
+  _lanJoin.hidden = false;
+  return true;
+}
+
+// Тоглоом эхэлсэн: WC3 LAN жагсаалтаас арилгаж зарлахаа түр зогсооно. TCP прокси (тоглож буй холболт) хэвээр.
+function hideLanJoin() {
+  if (!_lanJoin || _lanJoin.hidden) return false;
+  _lanJoin.hidden = true;
+  _decreate(_lanJoin, _hostCounter(_lanJoin.packet));
   return true;
 }
 
@@ -599,7 +633,8 @@ function stopLanJoin() {
   s.running = false;
   clearTimeout(s.timer);
   clearInterval(s.latTimer);
-  try { s.udp?.close(); } catch {}
+  if (!s.hidden) _decreate(s, _hostCounter(s.packet));   // WC3 LAN жагсаалтаас арилгана (сүүдэр үлдээхгүй)
+  { const u = s.udp; setTimeout(() => { try { u?.close(); } catch {} }, 900); }
   try { s.server?.close(); } catch {}
   s.conns.forEach((c) => { try { c.destroy(); } catch {} });
   bblog('LAN join зогслоо');
@@ -828,7 +863,8 @@ module.exports = {
   startHost, stopHost, addHostPlayerIp,
   startFinder, stopFinder,
   startLanHost, stopLanHost,
-  startLanJoin, updateLanJoin, stopLanJoin,
+  startLanJoin, updateLanJoin, hideLanJoin, stopLanJoin,
+  _test: { hostCounter: _hostCounter, decreate: _decreate },
   stopAll, isRunning,
   _createHostCapture: createHostCapture,   // тест
 };

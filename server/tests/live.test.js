@@ -47,6 +47,12 @@ const games = new Map([['tokA', { host_user_id: 10 }]]);   // Room 901-д 10 х�
   assert.equal(live.livesInRoom(901)[0].viewers, 1); assert.equal(sent.some((x) => x.room === 'user:23' && x.ev === 'live:kick'), true); ok('Үзэж байгаад streamer-ийн тоглоомд нэгдвэл live:kick, үзэгч хасагдана');
   live.leave(20, 10); assert.equal(live.livesInRoom(901)[0].viewers, 0); ok('leave → үзэгч 0');
 
+  // lanhost.gamesIn() массив буцаана (index.js live:watch) — индексийг токен гэж андуурахгүй
+  players.push({ token: 'tokArr', user_id: 77 });
+  assert.equal(await live.inSameLanGame([{ token: 'tokArr', host_user_id: 76 }], 76, 77), true);
+  assert.equal(await live.inSameLanGame([{ token: 'tokArr', host_user_id: 76 }], 76, 78), false);
+  ok('inSameLanGame: массив (gamesIn) хэлбэрээр ч тоглогчийг таньна');
+
   // Нийт хязгаар + зэрэг Live
   r = await live.start({ userId: 11, username: 'S2', roomId: 901, socketId: 's11' }); assert.equal(r.ok, true);
   r = await live.start({ userId: 12, username: 'S3', roomId: 901, socketId: 's12' }); assert.equal(r.ok, false); ok('Зэрэг Live-ийн хязгаар (2)');

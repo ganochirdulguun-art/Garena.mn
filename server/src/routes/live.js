@@ -96,10 +96,12 @@ async function inSameLanGame(games, a, b) {
   const mine = { [A]: new Set(), [B]: new Set() };
   if (games && typeof games.forEach === 'function') {
     games.forEach((g, tok) => {
-      tokens.push(String(tok));
+      // Map(token → g) эсвэл массив (lanhost.gamesIn) — массивын индексийг токен гэж андуурдаг байв (2026-10-04)
+      const t = String(g?.token ?? tok);
+      tokens.push(t);
       const h = String(g?.host_user_id ?? '');
-      if (h === A) mine[A].add(String(tok));
-      if (h === B) mine[B].add(String(tok));
+      if (h === A) mine[A].add(t);
+      if (h === B) mine[B].add(t);
     });
   }
   if (tokens.length && db) {

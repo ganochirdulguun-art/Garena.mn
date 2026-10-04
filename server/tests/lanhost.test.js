@@ -71,9 +71,19 @@ async function main() {
   r = await post('/rooms/2/lan-host/announce', A, { game_token: 'x', gameinfo_b64: '9zAAAAA=' });
   chk('room2-д зарлах эрхгүй → 403', r.status === 403);
 
+  // 3б) Нэг хост WC3-аас гаралгүй ШИНЭ тоглоом үүсгэвэл хуучин нь (сүүдэр) арилна (эзэн 2026-10-04)
+  j = await (await post('/rooms/1/lan-host/begin', A, {})).json();
+  const gtok2 = j.game_token;
+  emits.length = 0;
+  r = await post('/rooms/1/lan-host/announce', A, { game_token: gtok2, gameinfo_b64: '9zAAAAA=', host_wc3_name: 'HostA' });
+  chk('шинэ тоглоом announce: 200', r.status === 200);
+  chk('хуучин тоглоом room:lan_lobby_gone (сүүдэр арилна)', emits.some((e) => e.ev === 'room:lan_lobby_gone' && e.room === '1' && e.payload.game_token === gtok));
+  j = await (await fetch(base + '/rooms/1/lan-host', { headers: { Authorization: 'Bearer ' + token(A) } })).json();
+  chk('өрөөнд зөвхөн шинэ тоглоом үлдэнэ', Array.isArray(j.games) && j.games.length === 1 && j.games[0].game_token === gtok2);
+
   // 4) delete → room:lan_lobby_gone (room1)
   emits.length = 0;
-  r = await del('/rooms/1/lan-host/' + gtok, A);
+  r = await del('/rooms/1/lan-host/' + gtok2, A);
   chk('delete: 200', r.status === 200);
   chk('room:lan_lobby_gone room1-д', emits.some((e) => e.ev === 'room:lan_lobby_gone' && e.room === '1'));
 

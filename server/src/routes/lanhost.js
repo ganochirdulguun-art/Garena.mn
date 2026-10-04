@@ -222,6 +222,11 @@ router.post('/:id/lan-host/announce', authMW, async (req, res) => {
   else if (meshOff) delete g.direct;
   g.host_username = req.user.username || req.user.name || '';
   g.host_wc3_name = sanitizeWc3Name(host_wc3_name);
+  // Нэг хост нэг Room-д нэг л тоглоом (WC3 нэг л тоглоом хостолно): WC3-аас гаралгүй шинэ тоглоом үүсгэвэл хуучин
+  // тоглоомыг (дууссан «2/10» сүүдэр) жагсаалтаас хасна → joiner-уудын прокси зогсож WC3-аас нь ч арилна (эзэн 2026-10-04)
+  for (const [otok, og] of [...m.entries()]) {
+    if (otok !== g.token && String(og.host_user_id) === String(req.user.id)) { m.delete(otok); emitRoom(roomId, 'room:lan_lobby_gone', { game_token: otok }); }
+  }
   m.set(g.token, g);
   // Токен↔өрөө/хостыг DB-д ч хадгална: relay-ийн дүн (Алхам 3) сервер restart-ын дараа ч өрөөгөө олно
   if (db) {

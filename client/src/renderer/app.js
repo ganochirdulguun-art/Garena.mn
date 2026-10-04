@@ -6019,7 +6019,9 @@ init();
       const prev = games.get(g.game_token);
       games.set(g.game_token, g);
       if (String(g.host_user_id) === String(currentUser?.id)) { renderGames(); return; }   // өөрийн тоглоом
-      if (joinedToken === g.game_token && g.gameinfo_b64) window.api.updateLanJoin?.({ gameInfoB64: g.gameinfo_b64 }).catch(() => {});
+      // Эхэлсэн тоглоомыг WC3 LAN жагсаалтаас арилгана (дууссаны дараа «2/10» сүүдэр үлдэхгүй); шинэ лобби → дахин зарлана
+      if (joinedToken === g.game_token && g.started_at) window.api.hideLanJoin?.().catch(() => {});
+      else if (joinedToken === g.game_token && g.gameinfo_b64) window.api.updateLanJoin?.({ gameInfoB64: g.gameinfo_b64 }).catch(() => {});
       // GAMEINFO 5с тутам шинэчлэгддэг тул зөвхөн ШИНЭ тоглоом / эхэлсэн үед л чатад мэдэгдэнэ (давхар спам үгүй)
       else if (!prev) appendSysMsg(`🎮 «${g.host_wc3_name || g.host_username}» LAN тоглоом нээлээ — "Нэгдэх" дарж WC3-даа харна.`);
       if (g.started_at && !prev?.started_at) appendSysMsg(`▶ «${g.host_wc3_name || g.host_username}»-ийн тоглоом эхэллээ.`);

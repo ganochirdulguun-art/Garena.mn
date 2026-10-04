@@ -1366,6 +1366,7 @@ ipcMain.handle('relay:stopLanHost', () => { gameRelayService.stopLanHost(); retu
 ipcMain.handle('relay:startLanJoin', (_, opts) => gameRelayService.startLanJoin(opts || {}));
 ipcMain.handle('relay:updateLanJoin', (_, opts) => gameRelayService.updateLanJoin(opts || {}));
 ipcMain.handle('relay:stopLanJoin', () => { gameRelayService.stopLanJoin(); return true; });
+ipcMain.handle('relay:hideLanJoin', () => gameRelayService.hideLanJoin());
 
 // WC3-ийн LAN нэр — registry HKCU\Software\Blizzard Entertainment\Warcraft III\String\userlocal.
 // GHost++ зөвхөн autohost_owner-тэй ижил нэртэй тоглогчийн !start-ыг зөвшөөрдөг, дүн ч энэ нэрээр ирдэг тул
