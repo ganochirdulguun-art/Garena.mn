@@ -114,7 +114,7 @@
     const join = e.target.closest('[data-join]');
     if (join) {
       join.disabled = true; const rid = join.dataset.join; remove(join.dataset.ev);
-      try { await window.api.joinRoom(rid, null); const rooms = await window.api.getRooms(); const room = rooms.find((r) => String(r.id) === String(rid)); if (room) enterRoom(room.id, room.name, room.game_type, false, room.host_id); else showToast('Өрөө олдсонгүй', 'warning'); }
+      try { if (typeof confirmRoomSwitch === 'function' && !(await confirmRoomSwitch(rid, ''))) { join.disabled = false; return; } await window.api.joinRoom(rid, null); const rooms = await window.api.getRooms(); const room = rooms.find((r) => String(r.id) === String(rid)); if (room) enterRoom(room.id, room.name, room.game_type, false, room.host_id); else showToast('Өрөө олдсонгүй', 'warning'); }
       catch (err) { showToast(`Нэгдэхэд алдаа: ${err.message}`, 'error'); }
       return;
     }

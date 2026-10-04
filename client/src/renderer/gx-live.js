@@ -67,7 +67,7 @@ const gxLiveAck = (sock, ev, data, ms = 10000) => new Promise((res) => {
   const $ = (id) => document.getElementById(id);
   const toast = (m, t = 'info', d = 4000) => { try { showToast(m, t, d); } catch { console.log(m); } };
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ENC = { width: 1280, height: 720, fps: 30, maxBitrate: 2_000_000, codec: 'h264' };   // сервертэй ижил (эзний сонголт)
+  const ENC = { width: 1280, height: 720, fps: 30, maxBitrate: 2_000_000, codec: 'vp8' };   // сервертэй ижил; VP8 — H264 (OpenH264) дэлгэцийг 320×180 болгодог байв
   let lives = new Map();        // streamerId → { userId, username, viewers, max }
   let my = null;                // { room, stream, tracks[], lkRoom } — миний Live
   let starting = false;
@@ -116,7 +116,7 @@ const gxLiveAck = (sock, ev, data, ms = 10000) => new Promise((res) => {
 
   async function confirmStop() {
     let yes = true;
-    try { yes = typeof showConfirm === 'function' ? await showConfirm('Live зогсоох', 'Live дамжуулалтаа зогсоох уу? Үзэж буй хүмүүсийн цонх хаагдана.') : window.confirm('Live зогсоох уу?'); } catch {}
+    try { yes = typeof showConfirm === 'function' ? await showConfirm('Та итгэлтэй байна уу?', 'Live дамжуулалтаа зогсоох уу? Үзэж буй хүмүүсийн цонх хаагдана.', { ok: 'Тийм', cancel: 'Үгүй' }) : window.confirm('Live зогсоох уу?'); } catch {}
     if (yes && my) stopLive('user');
   }
 
@@ -285,5 +285,5 @@ const gxLiveAck = (sock, ev, data, ms = 10000) => new Promise((res) => {
   }
 
   // Preview / туршилт: window.gxLive._demo({ lives:[...] })
-  window.gxLive = { start: startLive, stop: stopLive, watch: watchLive, _demo: (s) => { lives = new Map((s.lives || []).map((l) => [String(l.userId), l])); if (s.mine) my = { room: { disconnect() {} }, tracks: [], lkRoom: 'demo' }; paint(); }, _pick: pickSource };
+  window.gxLive = { get isLive() { return !!my; }, start: startLive, stop: stopLive, watch: watchLive, _demo: (s) => { lives = new Map((s.lives || []).map((l) => [String(l.userId), l])); if (s.mine) my = { room: { disconnect() {} }, tracks: [], lkRoom: 'demo' }; paint(); }, _pick: pickSource };
 })();

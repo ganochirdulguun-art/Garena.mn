@@ -65,10 +65,10 @@
     </div>
     <nav class="rgc-nav">
       <button type="button" data-rgc="menu" title="Үндсэн цэс (лобби) руу буцах — өрөөнөөс гарахгүй">MENU</button>
-      <button type="button" data-rgc="forum" title="Garena.mn Discord сервер">FORUM</button>
+      <button type="button" data-rgc="forum" title="Garena.mn Discord сервер — мэдээ, тусламж, тэмцээн">FORUM</button>
       <button type="button" data-rgc="start" class="start" id="rgc-start" title="">START<small id="rgc-start-sub"></small></button>
-      <button type="button" data-rgc="ladder" title="Тоглогчдын жагсаалт (Ranking)">LADDER</button>
-      <button type="button" data-rgc="shop" title="Silver / Gold гишүүнчлэл">SHOP</button>
+      <button type="button" data-rgc="ladder" title="Тоглогчдын эрэмбэ (Ranking) — хожил, Tier">LADDER</button>
+      <button type="button" data-rgc="shop" title="Silver / Gold гишүүнчлэл (заавал биш нэмэлт) — Diamond 💎">SHOP</button>
       <button type="button" data-rgc="live" id="btn-live" class="btn-live" title="Дэлгэцээ Room-ын гишүүдэд шууд дамжуулах (720p · 30fps). Нэг LAN тоглоомд байгаа хүн үзэхгүй."><span class="live-dot"></span>LIVE</button>
     </nav>`;
   gxr.parentNode.insertBefore(root, gxr);
@@ -198,26 +198,39 @@
   document.addEventListener('garena:lan-games', () => renderGames());
 
   // ── [НЭГДЭХ] товч (RGC-ийн SIGN шиг): сонгосон тоглоомд нэгдэх / өөрийнхөө тоглоомыг зогсоох / LAN нээх / Moderator хүсэлт ──
+  // [act, товчны текст, идэвхгүй эсэх, тайлбар (title)] — товч бүр юу хийдгийг хулгана аваачихад харуулна (эзэн 2026-10-04)
   function signState() {
-    if (!isWc3) return ['none', 'УДАХГҮЙ', true];   // CS/Q3/RA2 — тоглоомын холболт удахгүй
+    if (!isWc3) return ['none', 'УДАХГҮЙ', true, 'Энэ тоглоомын онлайн холболт удахгүй нээгдэнэ'];   // CS/Q3/RA2
     const lan = window.gxLan; const myId = String((typeof currentUser !== 'undefined' && currentUser?.id) || '');
     const x = selected && lan?.games.get(selected);
     const me = window.gxRoleMe?.();
-    if (x && String(x.host_user_id) === myId) return ['stop', 'ЗОГСООХ', false];
-    if (x && !x.started_at) return lan.joined === selected ? ['join', '✓ НЭГДСЭН', false] : ['join', 'НЭГДЭХ', false];
-    if (lan?.hosting) return ['stop', 'ЗОГСООХ', false];
-    if (typeof currentRoom !== 'undefined' && currentRoom?.canHostChannel) return ['host', 'LAN НЭЭХ', false];
-    if (me?.pending) return ['none', 'ХҮСЭЛТ ХҮЛЭЭГДЭЖ БАЙНА', true];
-    return ['modreq', 'MODERATOR ХҮСЭЛТ', false];
+    const STOP_TIP = 'Таны нээсэн LAN тоглоомыг хаана — нэгдсэн тоглогчид тасарна (баталгаажуулна)';
+    if (x && String(x.host_user_id) === myId) return ['stop', 'ЗОГСООХ', false, STOP_TIP];
+    if (x && !x.started_at) return lan.joined === selected
+      ? ['join', '✓ НЭГДСЭН', false, 'WC3 → Local Area Network дотор энэ тоглоом харагдана — сонгоод Join Game дар']
+      : ['join', 'НЭГДЭХ', false, 'Сонгосон тоглоомд нэгдэнэ: WC3 нээгдэж, Local Area Network дотор тоглоом гарч ирнэ'];
+    if (lan?.hosting) {
+      const mine = [...(lan.games?.values?.() || [])].some((g) => String(g.host_user_id) === myId);
+      return mine ? ['stop', 'ЗОГСООХ', false, STOP_TIP]
+        : ['stop', '⏳ WC3-д CREATE GAME', false, 'Хост нээгдсэн — WC3 → Local Area Network → Create Game хийж тоглоомоо үүсгэ. Тоглоом үүсмэгц OPEN GAMES-д гарна. Энэ товчийг дарвал хост зогсоно (баталгаажуулна)'];
+    }
+    if (typeof currentRoom !== 'undefined' && currentRoom?.canHostChannel) return ['host', 'LAN НЭЭХ', false, 'WC3 нээгдэнэ → Local Area Network → Create Game хий. Өрөөнийхөн OPEN GAMES-ээс нэгдэнэ. Анхаар: Room-оос гарвал тоглоом хаагдана'];
+    if (me?.pending) return ['none', 'ХҮСЭЛТ ХҮЛЭЭГДЭЖ БАЙНА', true, 'Moderator хүсэлтийг эзэн/админ шийдэхийг хүлээж байна'];
+    return ['modreq', 'MODERATOR ХҮСЭЛТ', false, 'Нийтийн Room-д LAN тоглоом нээх эрх (Moderator) хүсэх'];
   }
   function syncSign() {
-    const [act, label, dis] = signState(); const b = $('rgc-sign');
-    b.textContent = label; b.disabled = dis; b.dataset.act = act;
+    const [act, label, dis, tip] = signState(); const b = $('rgc-sign');
+    b.textContent = label; b.disabled = dis; b.dataset.act = act; b.title = tip || '';
   }
   async function signAction() {
     const [act] = signState();
     if (act === 'join' && selected) window.gxLan?.join(selected);
-    else if (act === 'stop') $('btn-lan-stop')?.click();
+    else if (act === 'stop') {
+      // Андуурч дарахад тоглоом шууд хаагдаж тоглогчид тасардаг байв → баталгаажуулна
+      let ok = true;
+      try { ok = await showConfirm('Та итгэлтэй байна уу?', 'Таны нээсэн LAN тоглоом хаагдаж, нэгдсэн тоглогчид тасарна.', { ok: 'Тийм', cancel: 'Үгүй' }); } catch {}
+      if (ok) $('btn-lan-stop')?.click();
+    }
     else if (act === 'host') $('btn-lan-host')?.click();
     else if (act === 'modreq' && window.gxRequestModerator) { await window.gxRequestModerator(); renderMod(); }
     setTimeout(renderGames, 400);
@@ -327,7 +340,7 @@
   function tick() {
     paintMe();
     const gs = $('gxr-start'); const sub = $('rgc-start-sub');
-    if (gs && sub) { const t = isWc3 ? (gs.querySelector('span')?.textContent || '') : 'Удахгүй'; sub.textContent = t; $('rgc-start').title = t; $('rgc-start').classList.toggle('dim', gs.disabled); }
+    if (gs && sub) { const t = isWc3 ? (gs.querySelector('span')?.textContent || '') : 'Удахгүй'; sub.textContent = t; $('rgc-start').title = `${t ? t + ' — ' : ''}WC3-ийг нээнэ. OPEN GAMES-ээс тоглоом сонгосон бол түүнд нэгдэнэ`; $('rgc-start').classList.toggle('dim', gs.disabled); }
     const rt = $('room-title')?.textContent; if (rt) { $('rgc-title').textContent = rt; $('rgc-tree-name').textContent = rt; }
     document.querySelectorAll('#rgc-started [data-st]').forEach((b) => { b.textContent = `[${mmss(Date.now() - Number(b.dataset.st))}]`; });
     syncSign();

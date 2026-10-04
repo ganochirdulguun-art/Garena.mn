@@ -20,7 +20,9 @@ const CFG = {
   // Streamer-ийн socket түр тасрахад (гадаадаас холбогдсон, Wi-Fi) Live-ийг шууд зогсоохгүй — клиент live:resume-ээр сэргээнэ (2026-10-04)
   RESUME_GRACE_MS: process.env.LIVE_RESUME_GRACE_MS != null ? Math.max(0, parseInt(process.env.LIVE_RESUME_GRACE_MS, 10) || 0) : 25000,
   // Эзний сонголт: 720p 30fps 2 Mbps (~35 үзэгч / 100 Mbps)
-  ENCODING: { width: 1280, height: 720, fps: 30, maxBitrate: 2_000_000, codec: 'h264' },
+  // Кодек VP8 (2026-10-04): Electron-ий OpenH264 дэлгэцийн контентыг 320×180 ~15kbps хүртэл буулгаж үзэгчид бараг юу ч
+  // харагддаггүй байв (Датаком дээр хэмжсэн: видео пакет 300B-аас бага). VP8 (libvpx) эхний секундээс 1280×720.
+  ENCODING: { width: 1280, height: 720, fps: 30, maxBitrate: 2_000_000, codec: /^(h264|vp8|vp9|av1)$/.test(process.env.LIVE_CODEC || '') ? process.env.LIVE_CODEC : 'vp8' },
 };
 function enabled() { return !!(CFG.url && CFG.key && CFG.secret); }
 

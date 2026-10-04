@@ -210,14 +210,13 @@
       channelJoin(pick);
     };
     // Өрөө солихын өмнө: LAN тоглолт/relay идэвхтэй бол анхааруулна — нэг товшилтоор явагдаж буй тоглолт тасардаг байв (аудит 2026-10-02)
-    async function switchGuard(targetId) {
-      const cur = myRoomId(); if (!cur || cur === String(targetId)) return true;
-      let busy = false; try { busy = !!(await window.api.isRelayRunning?.()); } catch {}
-      if (!busy) return true;
-      return !!(await showConfirm('⚠ Тоглолт явагдаж байна', 'Өөр Room руу шилжвэл одоогийн LAN тоглолтын холболт ТАСАРНА (хост бол бүх тоглогч сална).\n\nҮргэлжлүүлэх үү?'));
+    async function switchGuard(targetId, name) {
+      // app.js confirmRoomSwitch: үргэлж «Та итгэлтэй байна уу?» (Тийм/Үгүй) + хост/LIVE/LAN анхааруулга (эзэн 2026-10-04)
+      if (typeof confirmRoomSwitch === 'function') return confirmRoomSwitch(targetId, name);
+      return true;
     }
     async function channelJoin(r) {
-      if (!await switchGuard(r.id)) return;
+      if (!await switchGuard(r.id, r.name)) return;
       try { await window.api.joinRoom(String(r.id), null); enterRoom(String(r.id), r.name, r.game_type, false, ''); }
       catch (err) {
         const m = errMsg(err);

@@ -1545,7 +1545,27 @@ function ipcErr(e) {
 // ── Өрөөнд нэгдэх ────────────────────────────────────────
 let _pendingJoin = null;
 
+// Room-оос Room руу шилжихэд үргэлж «Та итгэлтэй байна уу?» (Тийм / Үгүй) — эзэн 2026-10-04.
+// Хост / LIVE / LAN тоглолт явагдаж байвал юу алдагдахыг нэмж хэлнэ (өмнө нь хост шилжихэд тоглогчид нь тасардаг байв).
+// Нэг шилжилтэд олон газар дуудагддаг (сервер join → enterRoom) тул 15 сек дотор ижил өрөөнд дахин асуухгүй.
+let _switchOkFor = null;
+async function confirmRoomSwitch(id, name) {
+  try {
+    const cur = window.gxRoom?.roomId;
+    if (!cur || String(cur) === String(id)) return true;
+    if (_switchOkFor && _switchOkFor.id === String(id) && Date.now() - _switchOkFor.at < 15000) return true;
+    const w = [];
+    const warn = window.gxRoom.leaveWarning?.();
+    if (warn) w.push(warn);
+    else { try { if (await window.api.isRelayRunning?.()) w.push('Одоогийн LAN тоглолтын холболт тасарна.'); } catch {} }
+    const ok = await showConfirm('Та итгэлтэй байна уу?', `«${name || 'Өөр Room'}» руу шилжвэл одоогийн Room-оос гарна.${w.length ? ' ' + w.join(' ') : ''}`, { ok: 'Тийм', cancel: 'Үгүй' });
+    if (ok) _switchOkFor = { id: String(id), at: Date.now() };
+    return !!ok;
+  } catch { return true; }
+}
+
 async function joinRoom(id, name, gameType, hasPassword, hostId) {
+  if (!(await confirmRoomSwitch(id, name))) return;
   if (hasPassword) {
     _pendingJoin = { id, name, gameType, hostId };
     document.getElementById('join-password').value = '';
@@ -1593,7 +1613,8 @@ document.getElementById('join-password').addEventListener('keydown', e => {
 
 // ── Өрөөнд орох ──────────────────────────────────────────
 // Үндсэн цонхноос дуудагдана → шинэ цонх нээнэ
-function enterRoom(id, name, gameType, isHost, hostId, status) {
+async function enterRoom(id, name, gameType, isHost, hostId, status) {
+  if (!(await confirmRoomSwitch(id, name))) return;
   const resolvedHostId = hostId ? String(hostId) : String(currentUser?.id);
   const cached = roomsCache[id] || {};
   window.api.openRoomWindow({
@@ -1825,6 +1846,13 @@ function _enterRoomUI(id, name, gameType, isHost, hostId, status, maxPlayers = 1
 // ── Өрөөний товчнууд ──────────────────────────────────────
 document.getElementById('btn-leave-room').onclick = async () => {
   if (!currentRoom) return;
+  // Хост / LIVE үед гарахаас өмнө анхааруулна (тоглогчид тасрахыг мэдэхгүй гардаг байв, эзэн 2026-10-04)
+  try {
+    const w = [];
+    if (window.gxLan?.hosting) w.push('Таны нээсэн LAN тоглоом хаагдаж, нэгдсэн тоглогчид ТАСАРНА.');
+    if (window.gxLive?.isLive) w.push('Таны LIVE дамжуулалт зогсоно.');
+    if (w.length && !(await showConfirm('Та итгэлтэй байна уу?', `Room-оос гарвал: ${w.join(' ')}`, { ok: 'Тийм', cancel: 'Үгүй' }))) return;
+  } catch {}
   _hostRelayStarted = false;
   try { await window.api.stopRelay(); } catch {}
   if (socket && currentUser) {
@@ -3051,6 +3079,7 @@ function showRoomInvite(fromUsername, roomId, roomName) {
   document.getElementById('invite-accept-btn').onclick = async () => {
     toast.remove();
     try {
+      if (!(await confirmRoomSwitch(roomId, ''))) return;
       await window.api.joinRoom(roomId, null);
       // Өрөөний мэдээллийг авах шаардлагатай — энгийн байдлаар redirect
       const rooms = await window.api.getRooms();
@@ -4313,7 +4342,7 @@ function showToast(message, type = 'info', duration = 3000) {
 }
 
 // ── Confirm modal ─────────────────────────────────────────
-function showConfirm(title, message) {
+function showConfirm(title, message, opts = {}) {
   return new Promise(resolve => {
     const modal = document.getElementById('confirm-modal');
     const titleEl = document.getElementById('confirm-title');
@@ -4327,6 +4356,8 @@ function showConfirm(title, message) {
 
     titleEl.textContent   = title;
     messageEl.textContent = message;
+    okBtn.textContent     = opts.ok || 'Тийм';       // товчны текстийг дуудагч сольж болно (жишээ: Тийм / Үгүй)
+    cancelBtn.textContent = opts.cancel || 'Цуцлах';
     modal.classList.remove('hidden');
     modal.style.display = 'flex';
 

@@ -22,7 +22,7 @@ const games = new Map([['tokA', { host_user_id: 10 }]]);   // Room 901-д 10 х�
 (async () => {
   assert.equal(live.enabled(), true); ok('ENV байвал идэвхтэй');
   let r = await live.start({ userId: 10, username: 'Streamer', roomId: 901, socketId: 's10' });
-  assert.equal(r.ok, true); assert.match(r.token, /^eyJ/); assert.equal(r.url, 'ws://127.0.0.1:7880'); assert.equal(r.encoding.width, 1280); assert.equal(r.encoding.fps, 30); assert.equal(r.encoding.maxBitrate, 2_000_000);
+  assert.equal(r.ok, true); assert.match(r.token, /^eyJ/); assert.equal(r.url, 'ws://127.0.0.1:7880'); assert.equal(r.encoding.width, 1280); assert.equal(r.encoding.fps, 30); assert.equal(r.encoding.maxBitrate, 2_000_000); assert.equal(r.encoding.codec, 'vp8');
   ok('Live эхэлнэ → JWT токен, 720p30 2Mbps тохиргоо');
   const payload = JSON.parse(Buffer.from(r.token.split('.')[1], 'base64url').toString());
   assert.equal(payload.video.canPublish, true); assert.equal(payload.video.canSubscribe, false); assert.equal(payload.video.room, r.lkRoom); assert.equal(payload.sub, 'u10');

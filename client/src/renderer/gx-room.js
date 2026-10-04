@@ -15,13 +15,15 @@
     document.documentElement.classList.add('gx-embedded');
     const post = (type, extra) => { try { window.parent.postMessage({ gx: true, type, roomId: q.get('roomId'), ...(extra || {}) }, '*'); } catch {} };
     // «Лобби» товчийг gx-roomui.js үүсгэнэ (GameRanger X-ийн lobby толгой)
+    // Хост / Live төлөв → үндсэн цонх: өөр Room руу шилжихээс өмнө «тоглоом хаагдана» гэж анхааруулна (эзэн 2026-10-04)
+    setInterval(() => { try { post('state', { hosting: !!window.gxLan?.hosting, live: !!window.gxLive?.isLive }); } catch {} }, 1500);
     return;
   }
 
   // ── B. Үндсэн цонх ──
   if (q.get('mode')) return;
   const $ = (id) => document.getElementById(id);
-  let frame = null, frameRoomId = null;
+  let frame = null, frameRoomId = null, frameState = {};
 
   function ensureTab() {
     let tab = $('tab-roomview');
@@ -51,12 +53,13 @@
   }
   function closeFrame() {
     if (frame) { try { frame.remove(); } catch {} }
-    frame = null; frameRoomId = null;
+    frame = null; frameRoomId = null; frameState = {};
     document.body.classList.remove('gx-in-room');
   }
   window.api?.onRoomEmbed?.((params) => openRoom(params));
   window.addEventListener('message', (e) => {
     const d = e.data; if (!d || !d.gx || !frame || e.source !== frame.contentWindow) return;
+    if (d.type === 'state') { frameState = { hosting: !!d.hosting, live: !!d.live }; return; }
     if (d.type === 'closed') { closeFrame(); showTab('lobby'); try { loadRooms(); } catch {} }
     else if (d.type === 'back') { showTab('lobby'); }
     // RGC маягийн доод цэс (FORUM / LADDER / SHOP) → үндсэн цонхны таб (зөвхөн зөвшөөрөгдсөн)
@@ -77,5 +80,13 @@
   // Өрөөний таб идэвхтэй үед агуулгын padding-гүй (бүтэн талбай)
   const _st = showTab;
   showTab = function (name) { _st(name); document.body.classList.toggle('gx-roomview-on', name === 'roomview'); };
-  window.gxRoom = { openRoom, closeFrame, get roomId() { return frameRoomId; } };
+  // Одоогийн Room-оос гарвал юу алдагдахыг тайлбарласан текст (хост / Live биш бол null)
+  function leaveWarning() {
+    if (!frame) return null;
+    const w = [];
+    if (frameState.hosting) w.push('Таны нээсэн LAN тоглоом хаагдаж, нэгдсэн тоглогчид ТАСАРНА.');
+    if (frameState.live) w.push('Таны LIVE дамжуулалт зогсоно.');
+    return w.length ? w.join(' ') : null;
+  }
+  window.gxRoom = { openRoom, closeFrame, leaveWarning, get roomId() { return frameRoomId; } };
 })();
