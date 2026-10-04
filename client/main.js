@@ -1578,7 +1578,18 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   // 2 дахь цонхны LAN жагсаалт үүрд хоосон харагддаг. Байгаа WC3-ийг ашиглаж exit хяналтыг залгана.
   if ((await isWar3Running()) === true) { watchWar3Exit(); startMaphackWatch(); return true; }
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
-  const proc = spawn(game.path, [], { detached: false, stdio: 'ignore' });
+  // spawn нь «Run as administrator» / антивирус / хамгаалалттай хавтас үед 'error' event биш ШУУД EPERM/EACCES шиддэг
+  // (2026-10-04: LoDMaSTAAAA-д «spawn EPERM» toast гарч WC3 нээгдээгүй) → Windows ShellExecute (UAC асууна)-ээр нээнэ.
+  let proc;
+  try { proc = spawn(game.path, [], { detached: false, stdio: 'ignore' }); }
+  catch (e) {
+    console.error('[Game] spawn алдаа (sync):', e.code, e.message);
+    const err = await shell.openPath(game.path).catch((x) => String(x?.message || x));
+    if (err) throw new Error(`Warcraft III нээгдсэнгүй (${e.code || 'алдаа'}). war3.exe / Frozen Throne.exe дээр баруун товч → Properties → Compatibility → «Run this program as an administrator»-ийг арилгаад, антивирус хориглоогүй эсэхийг шалгана уу.`);
+    try { watchWar3Exit(); } catch {}
+    startMaphackWatch();
+    return true;
+  }
   _gameProc = proc;
   // «Run as administrator» тохиргоотой exe → spawn EACCES 'error' (exit ирэхгүй). Listener-гүй бол main процесст
   // uncaught exception цонх гардаг байв (аудит 2026-10-02) → ShellExecute (UAC)-ээр нээж, war3.exe-ийн гаралтыг хянана.
