@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+<meta charset="UTF-8" />
+<title>Garena.mn — Шинэчлэлт постер (Party · LIVE)</title>
+<style>
+  :root { --red: #e63946; --red2: #ff4d5e; --gold: #f5b301; --bg: #0b0a10; --text: #f4f4f7; --muted: #b9b9c8; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #000; }
+  body { font-family: "Segoe UI", "Segoe UI Variable", Arial, sans-serif; color: var(--text); }
+  .poster { position: relative; overflow: hidden; background: var(--bg); }
+  .bg { position: absolute; inset: 0; background: url('wc3-room.jpg') center/cover; filter: blur(3px) saturate(1.1) brightness(.42); transform: scale(1.06); }
+  .bg::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(230,57,70,.35), transparent 60%), linear-gradient(180deg, rgba(11,10,16,.25) 0%, rgba(11,10,16,.75) 55%, #0b0a10 100%); }
+  .z { position: relative; z-index: 1; }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand img { height: 66px; filter: drop-shadow(0 4px 16px rgba(230,57,70,.6)); }
+  .brand b { font-size: 46px; font-weight: 900; letter-spacing: -.5px; }
+  .brand b span { color: var(--red2); }
+  .tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(230,57,70,.18); border: 1px solid rgba(230,57,70,.55); color: #ffd0d4; font-weight: 700; font-size: 20px; }
+  h1 { font-size: 78px; line-height: 1.02; font-weight: 900; letter-spacing: -1.5px; text-shadow: 0 6px 30px rgba(0,0,0,.6); }
+  h1 em { font-style: normal; color: var(--red2); }
+  .sub { font-size: 28px; color: var(--muted); line-height: 1.35; font-weight: 500; }
+  .shot { border-radius: 16px; overflow: hidden; border: 2px solid rgba(255,255,255,.14); box-shadow: 0 30px 80px rgba(0,0,0,.7), 0 0 0 8px rgba(230,57,70,.12); }
+  .shot img { display: block; width: 100%; }
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 10px; padding: 12px 18px; border-radius: 14px; background: rgba(20,20,30,.82); border: 1px solid rgba(255,255,255,.12); font-size: 23px; font-weight: 700; }
+  .chip i { font-style: normal; font-size: 26px; }
+  .live { display: inline-flex; align-items: center; gap: 7px; padding: 2px 10px; border-radius: 7px; background: var(--red); color: #fff; font-weight: 900; font-size: 18px; letter-spacing: .5px; }
+  .live::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+  .cta { display: flex; align-items: center; gap: 22px; }
+  .btn { display: inline-flex; align-items: center; gap: 12px; padding: 22px 38px; border-radius: 16px; background: linear-gradient(#ff4d5e, #c81d2c); color: #fff; font-size: 34px; font-weight: 900; letter-spacing: .5px; box-shadow: 0 12px 34px rgba(230,57,70,.55), inset 0 1px 0 rgba(255,255,255,.3); }
+  .gift { font-size: 25px; font-weight: 800; color: #ffe08a; line-height: 1.25; }
+  .gift small { display: block; font-size: 19px; color: var(--muted); font-weight: 600; }
+  .url { font-size: 21px; color: #cfd2ff; font-weight: 600; letter-spacing: .1px; }
+  .url b { color: #fff; }
+  .foot { font-size: 19px; color: #8d8da3; }
+
+  
+  #upd { width: 1080px; height: 1350px; padding: 56px 62px; display: flex; flex-direction: column; gap: 26px; }
+  #upd h1 { font-size: 84px; }
+  .ugrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ucard { padding: 22px 24px; border-radius: 18px; background: rgba(18,18,28,.88); border: 1px solid rgba(255,255,255,.1); display: flex; flex-direction: column; gap: 8px; }
+  .ucard .ic { font-size: 42px; line-height: 1; }
+  .ucard b { font-size: 29px; font-weight: 900; }
+  .ucard span { font-size: 21px; color: var(--muted); line-height: 1.35; }
+  .ucard.hot { border-color: rgba(230,57,70,.65); background: linear-gradient(160deg, rgba(230,57,70,.24), rgba(18,18,28,.92) 60%); }
+  .ucard.new::after { content: 'ШИНЭ'; align-self: flex-start; order: -1; font-size: 15px; font-weight: 900; letter-spacing: 1px; padding: 3px 10px; border-radius: 6px; background: var(--gold); color: #2b1d00; }
+  .stats { display: flex; gap: 14px; }
+  .stat { flex: 1; padding: 16px 18px; border-radius: 16px; background: rgba(18,18,28,.8); border: 1px solid rgba(255,255,255,.1); }
+  .stat b { display: block; font-size: 40px; font-weight: 900; color: #fff; }
+  .stat span { font-size: 19px; color: var(--muted); }
+</style>
+</head>
+<body>
+<section class="poster" id="upd">
+  <div class="bg"></div>
+  <div class="z brand"><img src="logo.png" alt=""><b>Garena<span>.mn</span></b></div>
+  <div class="z"><span class="tag">🆕 Шинэчлэлт — шинэ боломжууд</span></div>
+  <h1 class="z">Найзуудтайгаа<br><em>баг</em> бол.</h1>
+  <p class="z sub">Party, LIVE дамжуулалт, бодит чадварын урамшуулал — Warcraft III-ийн Монголын гэр улам сайжирлаа.</p>
+  <div class="z ugrid">
+    <div class="ucard hot new"><div class="ic">🎉</div><b>Party</b><span>5 хүртэл найз нэг баг, тусдаа чат. Хэн аль Room-д байгааг харж нэг товчоор очно.</span></div>
+    <div class="ucard"><div class="ic">🔴</div><b>LIVE</b><span>Тоглолтоо Room-доо 720p-ээр шууд цацна — бусад нь нэг товшоод үзнэ.</span></div>
+    <div class="ucard new"><div class="ic">⚔️</div><b>Бодит чадвар</b><span>K/D/A сайн бол нэмэлт XP ба +1 💎 бонус. 1v1 хожил бүр +1 💎.</span></div>
+    <div class="ucard"><div class="ic">🌍</div><b>Гадаадаас ч тогло</b><span>VPN хэрэггүй — Солонгос, Чехээс ч найзуудтайгаа тоглож байна.</span></div>
+  </div>
+  <div class="z stats">
+    <div class="stat"><b>580+</b><span>бүртгэлтэй тоглогч</span></div>
+    <div class="stat"><b>3–7ms</b><span>Монголоос ping</span></div>
+    <div class="stat"><b>100%</b><span>үнэгүй</span></div>
+  </div>
+  <div class="z cta" style="margin-top:auto">
+    <span class="btn">⬇ Үнэгүй татах</span>
+    <div class="gift">🎁 Бүртгүүлээд +50 💎<small>Windows · Discord эсвэл имэйл</small></div>
+  </div>
+  <div class="z url">🌐 <b>garenamn-production.up.railway.app</b></div>
+</section>
+</body>
+</html>
