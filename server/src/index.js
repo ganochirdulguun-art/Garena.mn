@@ -246,7 +246,13 @@ clanRoutes.setIO(io);
 app.set('onlineUserIds', () => new Set([...onlineUsers.values()].map((u) => String(u.userId))));
 require('./routes/roles').setIO(io);
 liveRoutes.setIO(io);
-require('./routes/acCases').setIO(io);   // хакны хэргийн мэдэгдэл (staff:notify type 'anticheat')   // Room Live мэдэгдэл (live:state / live:ended / live:kick)
+require('./routes/acCases').setIO(io);
+// Party (2026-10-08): гишүүдийн онлайн төлөв, одоогийн Room
+require('./routes/party').setup({
+  io,
+  isOnline: (uid) => [...onlineUsers.values()].some((u) => String(u.userId) === String(uid)),
+  roomOf: (uid) => { for (const s of io.sockets.sockets.values()) if (String(s.user?.id) === String(uid) && s.data?.roomId) return { id: String(s.data.roomId) }; return null; },
+});   // хакны хэргийн мэдэгдэл (staff:notify type 'anticheat')   // Room Live мэдэгдэл (live:state / live:ended / live:kick)
 // Бот хостын event-үүд (room:bot_*)
 botRoutes.setIO(io);
 lanHostRoutes.setIO(io);
@@ -692,6 +698,7 @@ io.on('connection', (socket) => {
     if (userId) {
       userSockets.set(userId, socket.id);
       socket.join(`user:${userId}`);
+      try { require('./routes/party').onRegister(socket, userId); } catch {}   // дахин холбогдоход party хэвээр
     }
     io.emit('lobby:online_users', onlineUsersList());
     // Лобби чатын сүүлийн 50 мессеж илгээх
@@ -1149,6 +1156,23 @@ io.on('connection', (socket) => {
     } catch (e) { console.error('[Live] watch', e.message); reply({ ok: false, error: 'Server error' }); }
   });
   socket.on('live:leave', ({ streamerId } = {}) => { try { liveRoutes.leave(socket.user.id, streamerId ?? null); } catch {} });
+
+  // ── Party (2026-10-08, эзэн: чат + урих) — routes/party.js ──
+  const party = require('./routes/party');
+  const onParty = (ev, fn, ms = 250) => socket.on(ev, (p, ack) => {
+    const reply = (r) => { if (typeof ack === 'function') ack(r); };
+    if (!socket.user?.id) return reply({ ok: false, error: 'Нэвтэрнэ үү' });
+    if (evThrottled(socket, ev, ms)) return reply({ ok: false, error: 'Түр хүлээнэ үү' });
+    try { reply(fn(p && typeof p === 'object' ? p : {})); } catch (e) { console.error('[Party]', ev, e.message); reply({ ok: false, error: 'Server error' }); }
+  });
+  onParty('party:state', () => ({ ok: true, state: party.stateFor(socket.user.id) }), 100);
+  onParty('party:invite', (p) => party.invite({ fromId: socket.user.id, fromName: socket.user.username, toId: p.userId }), 600);
+  onParty('party:accept', (p) => party.accept({ userId: socket.user.id, username: socket.user.username, inviteId: p.inviteId }));
+  onParty('party:decline', (p) => party.decline({ userId: socket.user.id, username: socket.user.username, inviteId: p.inviteId }));
+  onParty('party:leave', () => party.leave({ userId: socket.user.id }));
+  onParty('party:kick', (p) => party.kick({ leaderId: socket.user.id, targetId: p.userId }));
+  onParty('party:promote', (p) => party.promote({ leaderId: socket.user.id, targetId: p.userId }));
+  onParty('party:msg', (p) => party.message({ userId: socket.user.id, username: socket.user.username, text: p.text }), 400);
 
   socket.on('room:leave', ({ roomId } = {}) => {
     try { liveRoutes.onRoomLeave(socket.user?.id, roomId || socket.data.roomId); } catch {}

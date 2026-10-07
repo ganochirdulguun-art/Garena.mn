@@ -98,6 +98,8 @@
       ? `<div class="gx-notif-i static ac"><span class="gx-notif-av">${esc(e.icon || '🚨')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${e.sub ? `${esc(e.sub)} · ` : ''}${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-ac-open="${esc(e.caseId)}" data-ev="${e.id}">${esc(e.btn || 'Шалгах')}</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
       : e.type === 'clan'
       ? `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(e.icon || '🛡')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${e.sub ? `${esc(e.sub)} · ` : ''}${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-clan="${esc(e.clanId)}">${esc(e.btn || 'Нээх')}</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
+      : e.type === 'party'
+      ? `<div class="gx-notif-i static"><span class="gx-notif-av">🎉</span><span class="gx-notif-t"><b>${esc(e.fromName)}</b><small>таныг Party-д урьж байна (${esc(e.size)}/${esc(e.max)}) · ${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-party-acc="${esc(e.inviteId)}" data-ev="${e.id}">Нэгдэх</button><button type="button" class="btn btn-sm" data-party-dec="${esc(e.inviteId)}" data-ev="${e.id}">✕</button></span></div>`
       : e.type === 'invite'
       ? `<div class="gx-notif-i static"><span class="gx-notif-av">🎮</span><span class="gx-notif-t"><b>${esc(e.fromUsername)}</b><small>«${esc(e.roomName)}» өрөөнд урив · ${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-primary btn-sm" data-join="${esc(e.roomId)}" data-ev="${e.id}">Нэгдэх</button><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`
       : `<div class="gx-notif-i static"><span class="gx-notif-av">${esc(e.icon || 'ℹ️')}</span><span class="gx-notif-t"><b>${esc(e.text)}</b><small>${ago(e.time)}</small></span><span class="gx-notif-act"><button type="button" class="btn btn-sm" data-rm="${e.id}">✕</button></span></div>`).join(''),
@@ -127,6 +129,13 @@
         if (acc) { try { window.gxClans?.loadMine?.(); } catch {} }
       } catch (err) { showToast(err?.message || 'Алдаа гарлаа', 'error'); }
       await refreshInvites(); return;
+    }
+    const pa = e.target.closest('[data-party-acc], [data-party-dec]');
+    if (pa) {
+      pa.disabled = true; remove(pa.dataset.ev);
+      if (pa.hasAttribute('data-party-acc')) { try { $('gx-drawer-close')?.click(); await window.gxParty?.accept(pa.dataset.partyAcc); } catch {} }
+      else { try { await window.gxParty?.decline(pa.dataset.partyDec); } catch {} }
+      return;
     }
     const aco = e.target.closest('[data-ac-open]');
     if (aco) { remove(aco.dataset.ev); try { $('gx-drawer-close')?.click(); window.gxAC?.openCase(aco.dataset.acOpen); } catch {} return; }

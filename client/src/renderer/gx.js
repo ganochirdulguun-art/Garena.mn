@@ -59,6 +59,8 @@
   function closeDrawer() {
     drawer?.classList.remove('open'); drawer?.setAttribute('aria-hidden', 'true');
     document.querySelectorAll('.gx-rail-i').forEach((b) => b.classList.remove('on'));
+    try { window.gxParty?.setOpen(false); } catch {}
+    $('gx-drawer-body')?.querySelector('.gxp-host')?.remove();
     if (panel && panelHome && panel.parentElement !== panelHome) panelHome.appendChild(panel);
     drawerKind = null;
   }
@@ -69,10 +71,16 @@
     document.querySelectorAll('.gx-rail-i').forEach((b) => b.classList.toggle('on', b.dataset.drawer === kind));
     const titles = { friends: 'Найзууд', online: 'Онлайн тоглогчид', party: 'Party' };
     $('gx-drawer-title').textContent = titles[kind] || '';
-    const soon = kind === 'party';
-    $('gx-drawer-soon')?.classList.toggle('hidden', !soon);
-    $('gx-drawer-body')?.classList.toggle('hidden', soon);
-    if (!soon && panel) {
+    // Party (2026-10-08): «удахгүй» биш — gx-party.js самбар
+    $('gx-drawer-soon')?.classList.add('hidden');
+    $('gx-drawer-body')?.classList.remove('hidden');
+    $('gx-drawer-body')?.querySelector('.gxp-host')?.remove();
+    try { window.gxParty?.setOpen(false); } catch {}
+    if (kind === 'party') {
+      if (panel && panelHome && panel.parentElement !== panelHome) panelHome.appendChild(panel);
+      const h = document.createElement('div'); h.className = 'gxp-host'; $('gx-drawer-body').appendChild(h);
+      try { window.gxParty?.setOpen(true); window.gxParty?.mount(h); } catch {}
+    } else if (panel) {
       $('gx-drawer-body').appendChild(panel);
       document.querySelector(`.dm-tab[data-dm-tab="${kind === 'online' ? 'online' : 'friends'}"]`)?.click();
       if (typeof loadSocialData === 'function') { try { loadSocialData(); } catch {} }
@@ -80,6 +88,7 @@
     drawer.classList.add('open'); drawer.setAttribute('aria-hidden', 'false');
   }
   document.querySelectorAll('.gx-rail-i').forEach((b) => b.addEventListener('click', () => openDrawer(b.dataset.drawer)));
+  window.gxOpenDrawer = (kind) => { if (drawerKind !== kind) openDrawer(kind); };
   $('gx-drawer-close')?.addEventListener('click', closeDrawer);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drawerKind) closeDrawer(); });
   // Найзын хүсэлтийн тоо → баруун самбарын badge

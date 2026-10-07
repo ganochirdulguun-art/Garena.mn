@@ -80,8 +80,7 @@
       const uid = String(el.dataset.userId || '');
       if (!uid || uid === String((typeof currentUser !== 'undefined' && currentUser?.id) || '')) return;
       const staff = !!(me?.global_staff ?? me?.staff);   // цол өгөх хэсэг — зөвхөн эзэн/глобал админ (Room-ын ADMIN биш)
-      const clans = myClans || [];
-      if (!staff && !clans.length) { managedClans().catch(() => {}); return; }   // энгийн хэрэглэгч → браузерийн цэс хэвээр
+      // Party-д урих бүх хэрэглэгчид (2026-10-08) → цэс үргэлж гарна
       e.preventDefault(); e.stopPropagation();
       if (!box) { box = document.createElement('div'); box.id = 'gxu-ctx'; box.className = 'gx-ctx hidden'; document.body.appendChild(box); box.addEventListener('click', onPick); }
       box.innerHTML = '<div class="gxu-h">Ачааллаж байна…</div>';
@@ -97,7 +96,8 @@
         staff && u.can_set_admin ? (u.role === 'admin' ? item('unset', '🛡 ADMIN цол хураах', 'danger') : item('admin', '🛡 ADMIN цол өгөх', 'accent')) : '',
         staff && u.can_set_mod && u.role !== 'admin' ? (u.role === 'moderator' ? item('unset', '⭐ Moderator хураах', 'danger') : item('moderator', '⭐ Moderator өгөх', 'accent')) : '',
         staff && !u.can_set_admin && !u.can_set_mod ? '<div class="gxu-h gxo-muted">Энэ хэрэглэгчийн цолыг өөрчлөх эрхгүй</div>' : '',
-        clanItems.length ? `${staff ? '<hr>' : ''}${clanItems.join('')}` : '',
+        `${staff ? '<hr>' : ''}${item('party-invite', '🎉 Party-д урих', 'accent')}`,
+        clanItems.length ? `<hr>${clanItems.join('')}` : '',
         me?.owner && u.role !== 'owner' ? `<hr>${item('ban-toggle', '<span class="gxu-ban-lbl">⛔ Бан хийх…</span>', 'danger')}` : '',
         '<hr>', item('profile', '👤 Профайл харах'),
       ].join('');
@@ -114,6 +114,7 @@
       hide();
       const act = b.dataset.gxu, uid = b.dataset.uid, name = b.dataset.name;
       if (act === 'profile') { try { openUserProfile(uid); } catch {} return; }
+      if (act === 'party-invite') { try { await window.gxPartyInvite?.(uid, name); } catch (err) { toast(errMsg(err), 'error'); } return; }
       if (act === 'ban-toggle') { try { await window.gxAC?.banToggle(uid, name); } catch (err) { toast(errMsg(err), 'error'); } return; }
       if (act === 'clan-invite') {
         try { const r = await api('post', `/clans/${b.dataset.clan}/invite`, { user_id: uid }); toast(`🛡 ${r.username || name}-г «${r.clan_name || b.dataset.clanName}» кланд урилаа`, 'success'); }
