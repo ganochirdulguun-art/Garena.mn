@@ -4251,7 +4251,7 @@ function showGameResult(data) {
       <ul class="gxw-list">
         <li><b>🌐 Нийтийн Room-ууд</b><span>WC3 Room 1–20 (200 хүн), CS 1.6 / Quake III / Red Alert 2 Room 1–5 — нэг товшилтоор орно.</span></li>
         <li><b>🎮 Шинэ өрөөний цонх</b><span>OPEN / STARTED GAMES, гишүүдийн туг · Tier · Level, том чат, доод цэс MENU · START · LADDER · SHOP.</span></li>
-        <li><b>🏆 Ranked — WC3 Room 1–5</b><span>1v1-ээс дээш бүх тоглолтын дүн автоматаар, хожил бүр +2 💎.</span></li>
+        <li><b>🏆 Ranked — WC3 Room 1–5</b><span>Бүх тоглолтын дүн автоматаар: хожил бүр +2 💎 (1v1: +1 💎), K/D/A ≥ 3 бол +1 💎.</span></li>
         <li><b>🛡 Moderator эрх</b><span>Room дотор «Moderator эрх хүсэх» → өөрөө LAN тоглоом нээж бусдыг тоглуулна.</span></li>
         <li><b>💬 Чатын түүх</b><span>Өрөөнөөс гараад буцаж ороход байхгүй үеийнхээ чатыг уншина.</span></li>
         <li><b>⚡ Монгол дотор relay + автомат шинэчлэлт</b><span>УБ сервер — бага ping; апп нээхэд шинэчлэлт өөрөө орно.</span></li>
@@ -5758,7 +5758,7 @@ init();
     const blockText = el('diamond-block-text');
     if (blockText) {
       blockText.textContent = bg === 0
-        ? 'Ranked блок (10 тоглолт): ≥5 хожвол +30 💎 · хожил бүр +2 💎'
+        ? 'Ranked блок (10 тоглолт): ≥5 хожвол +30 💎 · хожил бүр +2 💎 (1v1: +1 💎)'
         : `Ranked блок: ${bw} хожил / ${bg} тоглолт · ${need === 0 ? '+30 💎 баталгаажсан ✓' : `+30 💎-д ${need} хожил дутуу`} · ${left} тоглолт үлдлээ`;
     }
     const bar = el('diamond-block-bar');
@@ -6258,7 +6258,7 @@ init();
   });
 
   // ─── Гүйлгээний түүх ───
-  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт', ranked_win: 'Ranked хожил', welcome: 'Шинэ хэрэглэгчийн урамшуулал', playtime: 'Тоглосон цаг (1ц = 2💎)' };
+  const TYPE_TEXT = { block_bonus: '10 тоглолтын бонус', membership: 'Гишүүнчлэл', purchase: 'QPay багц', transfer_in: 'Хүлээн авсан', transfer_out: 'Шилжүүлсэн', admin_grant: 'Админ олголт', ranked_win: 'Ranked хожил', kda_bonus: 'K/D/A бонус', welcome: 'Шинэ хэрэглэгчийн урамшуулал', playtime: 'Тоглосон цаг (1ц = 2💎)' };
   async function openHistory() {
     const m = el('diamond-history-modal');
     if (!m) return;

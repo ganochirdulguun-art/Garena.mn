@@ -23,6 +23,7 @@ async function recordGameResult({
   // Алхам 3: ranked өрөө (💎 зөвхөн энд), relay-ийн хүчинтэй байдлын дүгнэлт, сүлжээний тайлан
   ranked = false, rankedValid = true, rankedReason = null, netReport = null,
   gameToken = null,   // relay-ийн тоглолтын токен — нэг токен = нэг дүн (idempotent)
+  winnerSource = null,   // 'w3mmd' | 'leave' | … — 1v1-д гарснаар ялсан бол 💎 үгүй (аудит #14, эзэн 2026-10-08)
 }) {
   if (!db) throw new Error('db unavailable');
   if (![1, 2].includes(Number(winnerTeam))) throw new Error('winner_team 1 эсвэл 2 байх ёстой');
@@ -153,6 +154,10 @@ async function recordGameResult({
     );
     const result = rr.rows[0];
     const awards = [];
+    // 1v1 = баг тус бүрт яг 1 тоглогч (бүртгэлгүй тоглогчийг ч тооцно)
+    const teamCount = (t) => resolved.filter((x) => Number(x.team) === t).length;
+    const oneVsOne = teamCount(1) === 1 && teamCount(2) === 1;
+    const leaveWin = String(winnerSource || '') === 'leave';
     for (const p of resolved) {
       const isWinner = p.team === Number(winnerTeam) && !p.is_leaver;
       let award = { xp_earned: 0, diamonds_earned: 0 };
@@ -164,8 +169,8 @@ async function recordGameResult({
           await client.query(`UPDATE users SET ${col} = COALESCE(${col}, 0) + 1 WHERE id = $1`, [p.user_id]);
         }
         award = await awardGameOutcome(client, {
-          userId: p.user_id, isWinner, isLeaver: p.is_leaver, kills: p.kills, assists: p.assists,
-          durationMinutes, ref: `game:${result.id}`, ranked: rankedOk,
+          userId: p.user_id, isWinner, isLeaver: p.is_leaver, kills: p.kills, assists: p.assists, deaths: p.deaths,
+          durationMinutes, ref: `game:${result.id}`, ranked: rankedOk, oneVsOne, leaveWin,
         });
         await client.query(
           `INSERT INTO game_players (game_result_id, user_id, team, is_winner, kills, deaths, assists, hero, left_at_sec, is_leaver, xp_earned, diamonds_earned, wc3_name, creep_kills, creep_denies, neutral_kills, gold, wards)

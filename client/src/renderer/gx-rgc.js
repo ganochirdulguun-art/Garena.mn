@@ -30,7 +30,7 @@
         <img class="rgc-logo" src="logo.png" alt="" />
         <div class="rgc-btitle"><b id="rgc-title">${esc(q.get('roomName') || 'Room')}</b><span id="rgc-bsub">Garena.mn · ${esc(gameLabel)} · Нийтийн өрөө</span></div>
         <span id="rgc-privacy-slot"></span>
-        <span class="rgc-rk" title="Ranked Room: хүчинтэй хожил бүр +2 💎 (1v1-ээс дээш, ≥12 мин, ялагчтай)">🏆 RANKED</span>
+        <span class="rgc-rk" title="Ranked Room: хүчинтэй хожил бүр +2 💎 (1v1: +1 💎), K/D/A ≥ 3 бол +1 💎 (≥12 мин, ялагчтай)">🏆 RANKED</span>
         <span class="rgc-fill"></span>
         <div class="rgc-actions" id="rgc-actions"></div>
       </div>

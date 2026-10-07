@@ -136,6 +136,7 @@ router.post('/game-stats', async (req, res) => {
     const saved = await recordGameResult({
       roomId: game.room_id, winnerTeam, durationMinutes: Math.round(Number(b.game_time_sec || 0) / 60),
       players, source: 'relay', ranked, rankedValid: validity.valid, rankedReason: validity.reason, netReport: net, gameToken: token,
+      winnerSource: b.winner_source || null,
     });
     console.log(`[Relay] ${saved.duplicate ? 'давхардал' : 'бүртгэв'} room=${game.room_id} ranked=${ranked} valid=${saved.ranked_valid} ${saved.reason || ''}`);
     return res.json({

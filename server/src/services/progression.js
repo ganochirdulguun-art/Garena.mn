@@ -1,15 +1,25 @@
 // ── XP / Level / Diamond 💎 — тоглолтын дүнгээс олгох дүрэм ──
 // Хэрэглэгчийн шийдвэр (2026-08-22): 10 тоглолт тутамд ≥5 хожвол +30 💎.
-// XP: хожил +40, хожигдол +10, leaver −30 (0-оос доош орохгүй), kill +1 / assist +0.5 (нийт +30 хүртэл).
+// XP: хожил +40, хожигдол +10, leaver −30 (0-оос доош орохгүй), kill +1.5 / assist +0.75 / үхэл −0.5 (нийт 0..+40).
+// Эзний шийдвэр (2026-10-08): 1v1 — хожил +10 XP +1💎, хожигдол +3 XP, K/D/A нэмэлтгүй; гарснаар (leave) ялсан 1v1-д 💎 ба
+// 10 тоглолтын бонусын хожил тоологдохгүй (хоёр найз ээлжлэн гарч 💎 фермлэх, аудит #14). Багийн тоглолтод бодит чадвар:
+// K/D/A ((kill+assist)/үхэл) ≥ 3.0 ба kill+assist ≥ 5 бол Ranked-д +1💎.
 // Level n-д хүрэх XP = 100 · n^1.5 (L5 ≈ 1,118; L10 ≈ 3,162; L20 ≈ 8,944).
 
 const RULES = {
   XP_WIN: 40,
   XP_LOSS: 10,
   XP_LEAVER: -30,
-  XP_PER_KILL: 1,
-  XP_PER_ASSIST: 0.5,
-  XP_KDA_CAP: 30,
+  XP_PER_KILL: 1.5,
+  XP_PER_ASSIST: 0.75,
+  XP_PER_DEATH: -0.5,
+  XP_KDA_CAP: 40,
+  XP_1V1_WIN: 10,
+  XP_1V1_LOSS: 3,
+  RANKED_DIAMONDS_PER_WIN_1V1: 1,
+  KDA_BONUS_RATIO: 3,
+  KDA_BONUS_MIN_KA: 5,
+  KDA_BONUS_DIAMONDS: 1,
   MIN_GAME_MINUTES: 8,          // үүнээс богино тоглолт = remake, XP/блок тоологдохгүй
   BLOCK_SIZE: 10,
   BLOCK_MIN_WINS: 5,
@@ -43,15 +53,24 @@ function levelProgress(xp) {
   return { level, xp, next_level_xp: next, progress: maxed ? 1 : Math.max(0, Math.min(1, (xp - cur) / Math.max(1, next - cur))), title: levelTitle(level), max_level: MAX_LEVEL };
 }
 
-function xpFor({ isWinner, isLeaver, kills = 0, assists = 0 }) {
+function xpFor({ isWinner, isLeaver, kills = 0, assists = 0, deaths = 0, oneVsOne = false }) {
   if (isLeaver) return RULES.XP_LEAVER;
+  if (oneVsOne) return isWinner ? RULES.XP_1V1_WIN : RULES.XP_1V1_LOSS;   // 1v1: K/D/A нэмэлтгүй
   const base = isWinner ? RULES.XP_WIN : RULES.XP_LOSS;
-  // kills/assists сөрөг байж болзошгүй (хост/replay-с ирсэн итгэлгүй өгөгдөл) —
+  // kills/assists/deaths сөрөг байж болзошгүй (хост/replay-с ирсэн итгэлгүй өгөгдөл) —
   // KDA бонусыг 0..CAP мужид барина. Ингэснээр сөрөг тоо XP-г хасахгүй.
   const k = Math.max(0, Number(kills) || 0);
   const a = Math.max(0, Number(assists) || 0);
-  const kda = Math.max(0, Math.min(RULES.XP_KDA_CAP, Math.round(k * RULES.XP_PER_KILL + a * RULES.XP_PER_ASSIST)));
+  const d = Math.max(0, Number(deaths) || 0);
+  const kda = Math.max(0, Math.min(RULES.XP_KDA_CAP, Math.round(k * RULES.XP_PER_KILL + a * RULES.XP_PER_ASSIST + d * RULES.XP_PER_DEATH)));
   return base + kda;
+}
+
+// Багийн тоглолтын бодит чадварын 💎 бонус: (kill+assist)/max(1,үхэл) ≥ 3 ба kill+assist ≥ 5
+function kdaBonusEarned({ kills = 0, assists = 0, deaths = 0 }) {
+  const ka = Math.max(0, Number(kills) || 0) + Math.max(0, Number(assists) || 0);
+  const d = Math.max(0, Number(deaths) || 0);
+  return ka >= RULES.KDA_BONUS_MIN_KA && ka / Math.max(1, d) >= RULES.KDA_BONUS_RATIO;
 }
 
 /**
@@ -59,13 +78,15 @@ function xpFor({ isWinner, isLeaver, kills = 0, assists = 0 }) {
  * client = pg client/pool. counted=false бол (remake) зөвхөн бичлэг үлдээнэ.
  * Буцаана: { xp_earned, diamonds_earned, level, xp, block_games, block_wins }
  */
-async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, kills = 0, assists = 0, durationMinutes = 0, ref = null, ranked = false }) {
+async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, kills = 0, assists = 0, deaths = 0, durationMinutes = 0, ref = null, ranked = false, oneVsOne = false, leaveWin = false }) {
   const counted = Number(durationMinutes || 0) >= RULES.MIN_GAME_MINUTES;
   if (!counted) {
     const r = await client.query('SELECT xp, level, block_games, block_wins FROM users WHERE id = $1', [userId]);
     return { xp_earned: 0, diamonds_earned: 0, counted: false, ...(r.rows[0] || {}) };
   }
-  const xpEarned = xpFor({ isWinner, isLeaver, kills, assists });
+  const xpEarned = xpFor({ isWinner, isLeaver, kills, assists, deaths, oneVsOne });
+  // 1v1-д гарснаар (leave) ялсан бол 💎 / блокын хожил тоологдохгүй (фермлэлт)
+  const countsAsRankedWin = ranked && isWinner && !isLeaver && !(oneVsOne && leaveWin);
   // XP + блокын тоолуур (leaver хожил биш)
   // Блокын тоолуур зөвхөн ranked тоглолтод ($4=1) — энгийн өрөө 💎 олборлохгүй
   const upd = await client.query(
@@ -75,7 +96,7 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
            block_wins  = COALESCE(block_wins, 0) + $2
      WHERE id = $3
      RETURNING xp, block_games, block_wins, diamonds`,
-    [xpEarned, ranked && isWinner && !isLeaver ? 1 : 0, userId, ranked ? 1 : 0]
+    [xpEarned, countsAsRankedWin ? 1 : 0, userId, ranked ? 1 : 0]
   );
   const row = upd.rows[0];
   if (!row) return { xp_earned: 0, diamonds_earned: 0, counted: false };
@@ -83,13 +104,23 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   let diamondsEarned = 0;
   let blockGames = row.block_games;
   let blockWins = row.block_wins;
-  // Ranked хожил = 2💎 (дэвтэрт 'ranked_win')
-  if (ranked && isWinner && !isLeaver && RULES.RANKED_DIAMONDS_PER_WIN > 0) {
-    diamondsEarned += RULES.RANKED_DIAMONDS_PER_WIN;
-    await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [RULES.RANKED_DIAMONDS_PER_WIN, userId]);
+  // Ranked хожил = 2💎 (1v1 бол 1💎) (дэвтэрт 'ranked_win')
+  const winDiamonds = oneVsOne ? RULES.RANKED_DIAMONDS_PER_WIN_1V1 : RULES.RANKED_DIAMONDS_PER_WIN;
+  if (countsAsRankedWin && winDiamonds > 0) {
+    diamondsEarned += winDiamonds;
+    await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [winDiamonds, userId]);
     await client.query(
       `INSERT INTO diamond_transactions (user_id, amount, type, ref, note) VALUES ($1, $2, 'ranked_win', $3, $4)`,
-      [userId, RULES.RANKED_DIAMONDS_PER_WIN, ref, 'Ranked хожил']
+      [userId, winDiamonds, ref, oneVsOne ? 'Ranked 1v1 хожил' : 'Ranked хожил']
+    );
+  }
+  // Багийн Ranked тоглолтод бодит чадварын бонус (K/D/A ≥ 3) — хожсон/хожигдсоноос үл хамаарна
+  if (ranked && !oneVsOne && !isLeaver && RULES.KDA_BONUS_DIAMONDS > 0 && kdaBonusEarned({ kills, assists, deaths })) {
+    diamondsEarned += RULES.KDA_BONUS_DIAMONDS;
+    await client.query('UPDATE users SET diamonds = COALESCE(diamonds, 0) + $1 WHERE id = $2', [RULES.KDA_BONUS_DIAMONDS, userId]);
+    await client.query(
+      `INSERT INTO diamond_transactions (user_id, amount, type, ref, note) VALUES ($1, $2, 'kda_bonus', $3, $4)`,
+      [userId, RULES.KDA_BONUS_DIAMONDS, ref, `K/D/A бонус (${Math.max(0, Number(kills) || 0)}/${Math.max(0, Number(deaths) || 0)}/${Math.max(0, Number(assists) || 0)})`]
     );
   }
   if (ranked && blockGames >= RULES.BLOCK_SIZE) {
@@ -110,4 +141,4 @@ async function awardGameOutcome(client, { userId, isWinner, isLeaver = false, ki
   return { xp_earned: xpEarned, diamonds_earned: diamondsEarned, counted: true, xp: row.xp, level, block_games: blockGames, block_wins: blockWins };
 }
 
-module.exports = { RULES, MAX_LEVEL, LEVEL_TITLES, levelTitle, xpForLevel, levelFromXp, levelProgress, xpFor, awardGameOutcome };
+module.exports = { RULES, MAX_LEVEL, LEVEL_TITLES, levelTitle, xpForLevel, levelFromXp, levelProgress, xpFor, kdaBonusEarned, awardGameOutcome };
