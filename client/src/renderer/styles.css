@@ -1365,6 +1365,11 @@ body.light .room-grid-row {
 }
 .maphack-card .mh-note { font-size: 0.8rem; color: var(--text2); margin-bottom: 20px; }
 .maphack-card .btn { min-width: 140px; }
+/* Хамгаалалт шалгаж чадаагүй (WC3 elevated) — бараан дэвсгэр дээр тод, алхмууд зүүн тийш (2026-10-08) */
+#ac-blind-overlay .maphack-card h2 { color: #fbbf24 !important; }
+#ac-blind-overlay .maphack-card .mh-tool { color: #cbd5e1 !important; }
+#ac-blind-overlay .maphack-card .mh-warn { color: #e5e7eb !important; text-align: left; }
+#ac-blind-overlay .maphack-card b { color: #fff; }
 
 /* ── DM цонх — Yahoo Messenger маягийн бүтэц ── */
 .ymdm {

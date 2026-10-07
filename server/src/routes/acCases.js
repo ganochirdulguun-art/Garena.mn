@@ -15,7 +15,7 @@ const router = express.Router();
 let _io = null;
 function setIO(io) { _io = io; }
 
-const KINDS = ['process', 'module', 'memory', 'fogclick', 'report'];
+const KINDS = ['process', 'module', 'memory', 'fogclick', 'report', 'unverified'];
 const KIND_LABEL = { process: 'Хориотой програм', module: 'WC3-д сэжигтэй DLL', memory: 'Game.dll санах ой өөрчлөгдсөн', fogclick: 'FOGCLICK (replay)', report: 'Тоглогчийн гомдол' };
 
 async function dbOk() { if (!db) return false; try { await db.query('SELECT 1'); return true; } catch { return false; } }

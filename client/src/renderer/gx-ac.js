@@ -36,6 +36,7 @@
         <table class="ac-diff"><tr><th>RVA</th><th>урт</th><th>файл</th><th>санах ой</th></tr>${rows}</table>
         <small>Maphack нь Game.dll-ийн кодыг засдаг. Хэрэв ихэнх тоглогчид ижил өөрчлөлт гарвал гэмгүй (жишээ нь цонхны засвар) байж магадгүй — «Хэрэгсэхгүй + цаашид үл тоох».</small></div>`;
     }
+    if (c.kind === 'unverified') return `<div class="ac-det">⚠ WC3 <b>администраторын эрхээр</b> (эсвэл өөр програмаас) ажилласан тул MapHack-ийн шалгалт хийгдэх боломжгүй байв. Энэ нь зөрчил биш — тоглогчид засах заавар харагдсан. Олон удаа давтагдвал тоглогчоос WC3-аа Garena.mn-ээс нээхийг хүс.${d.reason ? ` <small>(${esc(d.reason)})</small>` : ''}</div>`;
     if (c.kind === 'process') return `<div class="ac-det">Хориотой програм ажиллаж байсан: <code>${esc(c.tool)}</code>${d.warnings ? ` · нийт ${esc(d.warnings)} удаа` : ''}. WC3 нээгдээгүй.</div>`;
     return `<div class="ac-det"><code>${esc(JSON.stringify(d).slice(0, 400))}</code></div>`;
   }

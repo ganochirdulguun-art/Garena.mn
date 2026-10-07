@@ -88,7 +88,7 @@ router.post('/report', authMW, async (req, res) => {
   arr.push(now); _rate.set(String(req.user.id), arr); if (_rate.size > 5000) _rate.delete(_rate.keys().next().value);
   const tool = String(req.body?.tool || 'unknown').slice(0, 64);
   const kind = String(req.body?.kind || 'process');
-  if (kind === 'module' || kind === 'memory') {
+  if (kind === 'module' || kind === 'memory' || kind === 'unverified') {   // unverified = WC3 elevated, шалгах боломжгүй (2026-10-08)
     const c = await require('./acCases').openCase({ userId: req.user.id, kind, tool, detail: req.body?.detail, severity: req.body?.severity === 'high' ? 'high' : 'review' });
     return res.json({ ok: !!c, case_id: c?.id || null });
   }

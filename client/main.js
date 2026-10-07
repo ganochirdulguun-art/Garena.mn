@@ -1476,7 +1476,7 @@ async function reportMaphack(tool) {
 // 45с-ийн дараа эхэлж 3 мин тутам; ижил үр дүнг нэг WC3 сессэд нэг л удаа тайлагнана. Шийтгэл өгөхгүй — серверт
 // «хэрэг» нээгдэж ЭЗЭН/ADMIN шалгана. Тоглоомд хүрэхгүй, main процессыг блоклохгүй (тусдаа 32-бит PowerShell).
 const integrity = require('./src/services/integrity');
-let _icTimer = null, _icFirst = null, _icBusy = false, _icSent = new Set();
+let _icTimer = null, _icFirst = null, _icBusy = false, _icSent = new Set(), _icBlindShown = false;
 function wc3DirFromSettings() {
   try { const s = migrateSettings(readSettings()); const g = (s.games || []).find((x) => /war3|warcraft|frozen/i.test(`${x.name} ${x.path}`)); return g ? path.dirname(g.path) : ''; } catch { return ''; }
 }
@@ -1491,7 +1491,15 @@ async function runIntegrityCheck() {
       _icSent.add(key);
       try { return await apiService.request('post', '/anticheat/report', { kind, tool, detail, severity }); } catch { return null; }
     };
-    const { blocked, unknown } = integrity.classifyModules(r.modules, _maphackList, wc3DirFromSettings());
+    // WC3 администраторын эрхээр (эсвэл өөр програмаас elevated) ажиллавал Windows уншихыг хориглоно → шалгалт «сохор».
+    // Эзний шийдвэр (2026-10-08, A): тоглогчид шалтгаан + засах аргыг харуулж, ADMIN-д «шалгалт ажиллаагүй» гэж мэдэгдэнэ.
+    const blindReason = [r.modules_error, r.game && r.game.error].filter(Boolean).find((x) => /denied|access/i.test(String(x)));
+    if (blindReason) {
+      const sentNow = await send('unverified', 'WC3 администраторын эрхтэй — шалгах боломжгүй', { reason: String(blindReason).slice(0, 120), sig: 'unverified' }, 'review');
+      if (sentNow !== null || !_icBlindShown) { _icBlindShown = true; broadcastToWindows('game:integrity-blind', { reason: String(blindReason).slice(0, 120) }); }
+      return;
+    }
+    const { blocked, unknown } = integrity.classifyModules(r.modules, _maphackList, wc3DirFromSettings(), r.mod_info || {});
     if (blocked.length) {
       await send('module', blocked[0], { modules: blocked, sig: blocked.map((x) => x.toLowerCase()).sort().join(',') }, 'high');
       broadcastToWindows('game:maphack', { tool: blocked[0], review: true, midgame: true });
@@ -1508,7 +1516,7 @@ async function runIntegrityCheck() {
 }
 function startIntegrityWatch() {
   if (_icTimer || _icFirst) return;
-  _icSent = new Set();
+  _icSent = new Set(); _icBlindShown = false;
   _icFirst = setTimeout(() => { _icFirst = null; runIntegrityCheck(); _icTimer = setInterval(runIntegrityCheck, 3 * 60 * 1000); _icTimer.unref?.(); }, 45 * 1000);
   _icFirst.unref?.();
 }

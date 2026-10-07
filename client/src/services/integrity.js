@@ -34,6 +34,18 @@ public static class GmnIntegrity {
         if (string.Equals(m.ModuleName, "game.dll", StringComparison.OrdinalIgnoreCase)) game = m;
       }
       sb.Append("]");
+      // mod_info: product/description/company of non-Windows modules (recognize benign wrappers like ReShade d3d8to9 by content, not name)
+      string win = (Environment.GetEnvironmentVariable("WINDIR") ?? "C:\\Windows").ToLowerInvariant();
+      sb.Append(",\"mod_info\":{");
+      int k = 0;
+      foreach (ProcessModule m in p.Modules) {
+        string fn = m.FileName ?? ""; if (fn.ToLowerInvariant().StartsWith(win)) continue;
+        string inf = "";
+        try { FileVersionInfo v = m.FileVersionInfo; inf = (v.ProductName ?? "") + " | " + (v.FileDescription ?? "") + " | " + (v.CompanyName ?? ""); } catch { }
+        if (k++ > 0) sb.Append(",");
+        sb.Append("\"").Append(Esc(fn)).Append("\":\"").Append(Esc(inf)).Append("\"");
+      }
+      sb.Append("}");
     } catch (Exception e) { sb.Append("],\"modules_error\":\"").Append(Esc(e.Message)).Append("\""); }
     if (game != null) {
       try { sb.Append(",\"game\":").Append(CheckGame(p, game)); }
@@ -112,7 +124,7 @@ Add-Type -TypeDefinition $code -Language CSharp
 
 let _scriptPath = null;
 function scriptPath(dir) {
-  const p = path.join(dir, 'gmn-integrity-v1.ps1');
+  const p = path.join(dir, 'gmn-integrity-v2.ps1');
   if (_scriptPath === p && fs.existsSync(p)) return p;
   fs.writeFileSync(p, PS.replace(/\r?\n/g, '\r\n'), 'ascii');
   _scriptPath = p; return p;
@@ -139,13 +151,14 @@ function probe(dir) {
 }
 
 // ── DLL-ийн жагсаалтыг үнэлэх ──
-const WC3_LEGIT = /^(game|storm|mss32|ijl15|smackw32|binkw32|war3|frozen throne|warcraft iii)\.(dll|exe)$/i;
+// blizzard.ax — Blizzard-ийн өөрийн DirectShow (cinematic) шүүлтүүр; «танигдаагүй DLL» гэж андуурч хэрэг нээгдсэн (911, 2026-10-04)
+const WC3_LEGIT = /^((game|storm|mss32|ijl15|smackw32|binkw32|war3|frozen throne|warcraft iii)\.(dll|exe)|blizzard\.ax)$/i;
 const MILES_EXT = /\.(asi|m3d|flt|mix)$/i;
 // Overlay, драйвер, бичлэг, дэлгэцийн засвар — гэмгүй гэж тооцох нэрс
-const BENIGN = /(discord|graphics-hook|gameoverlayrenderer|rtsshooks|rtss|nvspcap|nvd3dum|nvwgf|nvldumd|nvumdshim|nvapi|nvoglv|nvinit|igd|igc|ig\d|igxe|atidxx|aticfx|atiu|atiogl|amdxx|amdenc|amdihk|amdvlk|bdcam|fraps|warkey|garena|obs|medal|overwolf|xsplit|mirillis|action_x86|nahimic|sonic|a3d|asus|logi|razer|steelseries|corsair|msi|afterburner|reshade|dxwrapper|d3d8to9|dgvoodoo|ddraw|wined3d|opengl32|libglesv2|libegl|mumble|teamspeak|ts3|vivox|overlay|hook32)/i;
+const BENIGN = /(crosire|dege|discord|graphics-hook|gameoverlayrenderer|rtsshooks|rtss|nvspcap|nvd3dum|nvwgf|nvldumd|nvumdshim|nvapi|nvoglv|nvinit|igd|igc|ig\d|igxe|atidxx|aticfx|atiu|atiogl|amdxx|amdenc|amdihk|amdvlk|bdcam|fraps|warkey|garena|obs|medal|overwolf|xsplit|mirillis|action_x86|nahimic|sonic|a3d|asus|logi|razer|steelseries|corsair|msi|afterburner|reshade|dxwrapper|d3d8to9|dgvoodoo|ddraw|wined3d|opengl32|libglesv2|libegl|mumble|teamspeak|ts3|vivox|overlay|hook32)/i;
 
 /** modules[] → { blocked: [нэр] (хориотой нэр таарсан), unknown: [зам] (системийн бус, танигдаагүй) } */
-function classifyModules(mods, blocklist, wc3Dir) {
+function classifyModules(mods, blocklist, wc3Dir, info = {}) {
   const W = String(process.env.WINDIR || 'C:\\Windows').toLowerCase();
   const PF = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.ProgramW6432].filter(Boolean).map((x) => x.toLowerCase());
   const dir = String(wc3Dir || '').toLowerCase();
@@ -156,6 +169,9 @@ function classifyModules(mods, blocklist, wc3Dir) {
     if (lf.startsWith(W + '\\')) continue;
     if (WC3_LEGIT.test(base) || MILES_EXT.test(base)) continue;
     if (BENIGN.test(base)) continue;
+    const inf = String((info || {})[full] || '');
+    if (inf && (blocklist || []).some((sig) => sig && inf.toLowerCase().includes(sig))) { blocked.push(path.win32.basename(full)); continue; }
+    if (inf && BENIGN.test(inf)) continue;   // бүтээгдэхүүний нэрээр (ReShade / d3d8to9 / dgVoodoo …) — 2026-10-04
     if (PF.some((p) => lf.startsWith(p + '\\')) && !(dir && lf.startsWith(dir + '\\'))) continue;   // Program Files-ийн бусад програм (WC3 хавтсаас бусад)
     unknown.push(full);
   }

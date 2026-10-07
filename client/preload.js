@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('api', {
   onGameResult: (cb) => { ipcRenderer.removeAllListeners('game:result'); ipcRenderer.on('game:result', (_, data) => cb(data)); },
   onGameExited: (cb) => { ipcRenderer.removeAllListeners('game:exited'); ipcRenderer.on('game:exited', () => cb()); },
   onMaphack:    (cb) => { ipcRenderer.removeAllListeners('game:maphack'); ipcRenderer.on('game:maphack', (_, d) => cb(d)); },
+  onIntegrityBlind: (cb) => { ipcRenderer.removeAllListeners('game:integrity-blind'); ipcRenderer.on('game:integrity-blind', (_, d) => cb(d || {})); },
   killGame:     ()   => ipcRenderer.invoke('game:kill'),
   setReplayMembers: (members) => ipcRenderer.invoke('replay:setMembers', members),
 
