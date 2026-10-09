@@ -162,7 +162,8 @@ async function afterUnverified(id, userId, roomId) {
   const d = parseDetail(row.detail);
   const hits = Number(row.hits) || 1;
   if (Date.now() - (Number(d.warned_at) || 0) > WARN_EVERY_MS) await sendWarn(id, userId, hits, d);
-  if (ESCALATE_AT.includes(hits)) {
+  // 3-аас дээш давтсан ч «high» биш бол (хуучин хэргүүд: Ganaa 23 удаа) шууд эскалаци; цаашид 6, 10, 20, 30… дээр дахин мэдэгдэнэ
+  if ((hits >= 3 && row.severity !== 'high') || ESCALATE_AT.includes(hits) || (hits > 10 && hits % 10 === 0)) {
     if (row.severity !== 'high') await db.query(`UPDATE anticheat_cases SET severity = 'high' WHERE id = $1`, [id]);
     const u = (await db.query('SELECT username FROM users WHERE id = $1', [userId])).rows[0] || {};
     notify({ case_id: id, user_id: userId, username: u.username || `#${userId}`, kind: 'unverified', kind_label: KIND_LABEL.unverified, tool: `${hits} удаа — анхааруулгыг үл тоосон`, severity: 'high', room_id: roomId }, roomId);
