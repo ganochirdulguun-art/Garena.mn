@@ -48,6 +48,15 @@ async function ensureTables() {
         kind VARCHAR(16) NOT NULL, sig VARCHAR(2000) NOT NULL, note VARCHAR(300), created_by INTEGER, created_at TIMESTAMPTZ DEFAULT NOW(),
         PRIMARY KEY (kind, sig)
       );
+      -- WC3 сессийн мэдээлэл (2026-10-10, эзэн): elevated WC3 = зөрчил биш, мэдээлэл л; Game.dll файлын хэш — олонхоос ялгаатайг олох
+      CREATE TABLE IF NOT EXISTS anticheat_wc3_info (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        verified BOOLEAN NOT NULL DEFAULT TRUE, unverified_hits INTEGER NOT NULL DEFAULT 0, sessions INTEGER NOT NULL DEFAULT 0,
+        cause VARCHAR(200), diag JSONB, game_sha VARCHAR(64), game_size BIGINT, game_ver VARCHAR(40), game_path VARCHAR(300),
+        first_at TIMESTAMPTZ DEFAULT NOW(), last_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      UPDATE anticheat_cases SET status = 'dismissed', decided_at = NOW(), decision_note = 'Эзний шийдвэр 2026-10-10: administrator эрхтэй WC3 зөрчил биш — мэдээлэл болгон хадгална'
+        WHERE kind = 'unverified' AND status IN ('new','nominated');
     `);
   } catch (e) { console.error('[acCases] ensureTables:', e.message); }
 }
@@ -88,7 +97,26 @@ function userRoom(userId) {
   try { for (const s of _io?.sockets?.sockets?.values?.() || []) if (String(s.user?.id) === String(userId) && s.data?.roomId) { const n = Number(s.data.roomId); if (Number.isInteger(n)) return n; } } catch {}
   return null;
 }
+// WC3 сессийн мэдээлэл (хэрэг биш): unverified = elevated тул шалгагдаагүй; wc3info = шалгагдсан сесс. Game.dll хэш/хувилбар upsert.
+async function recordWc3Info(userId, kind, detail = {}) {
+  if (!userId || !await dbOk()) return null;
+  const gf = (detail && detail.game_file) || {};
+  const unv = kind === 'unverified';
+  try {
+    await db.query(`INSERT INTO anticheat_wc3_info (user_id, verified, unverified_hits, sessions, cause, diag, game_sha, game_size, game_ver, game_path, last_at)
+        VALUES ($1, $2, $3, 1, $4, $5::jsonb, $6, $7, $8, $9, NOW())
+        ON CONFLICT (user_id) DO UPDATE SET verified = EXCLUDED.verified, unverified_hits = anticheat_wc3_info.unverified_hits + $3,
+          sessions = anticheat_wc3_info.sessions + 1, cause = COALESCE(EXCLUDED.cause, anticheat_wc3_info.cause), diag = COALESCE(EXCLUDED.diag, anticheat_wc3_info.diag),
+          game_sha = COALESCE(EXCLUDED.game_sha, anticheat_wc3_info.game_sha), game_size = COALESCE(EXCLUDED.game_size, anticheat_wc3_info.game_size),
+          game_ver = COALESCE(EXCLUDED.game_ver, anticheat_wc3_info.game_ver), game_path = COALESCE(EXCLUDED.game_path, anticheat_wc3_info.game_path), last_at = NOW()`,
+      [userId, !unv, unv ? 1 : 0, unv ? clip(detail.cause, 200) || null : null, unv && detail.diag ? JSON.stringify(cleanDetail(detail.diag)) : null,
+       gf.sha256 ? clip(gf.sha256, 64) : null, gf.size != null && Number(gf.size) > 0 ? Number(gf.size) : null, gf.version ? clip(gf.version, 40) : null, gf.path ? clip(gf.path, 300) : null]);
+    return { info: true };
+  } catch (e) { console.warn('[acCases] wc3info:', e.message); return null; }
+}
+
 async function openCase({ userId, kind, tool, detail, roomId = null, severity = 'review' }) {   // eslint-disable-line
+  if (kind === 'unverified' || kind === 'wc3info') return recordWc3Info(userId, kind, detail);   // хэрэг биш (эзэн 2026-10-10)
   if (!userId || !KINDS.includes(kind) || !await dbOk()) return null;
   if (roomId == null) roomId = userRoom(userId);
   // Үл тоох жагсаалт (эзэн/глобал ADMIN тэмдэглэсэн гэмгүй өөрчлөлт/DLL)
@@ -125,61 +153,10 @@ async function openCase({ userId, kind, tool, detail, roomId = null, severity = 
       notify({ case_id: id, user_id: userId, username: u.username || `#${userId}`, kind, kind_label: KIND_LABEL[kind], tool: t, severity, room_id: roomId }, roomId);
       console.log(`[AntiCheat] хэрэг #${id}: ${u.username || userId} — ${KIND_LABEL[kind]} «${t}» (${severity})`);
     }
-    if (kind === 'unverified') { try { await afterUnverified(id, userId, roomId); } catch (e) { console.warn('[acCases] анхааруулга:', e.message); } }
     return { id, fresh };
   } catch (e) { console.error('[acCases] openCase:', e.message); return null; }
 }
 
-// ── «Шалгагдаагүй WC3» (elevated) — тоглогчид анхааруулга, давтвал ADMIN-д эскалаци (эзэн 2026-10-09) ──
-//  Шийтгэл автоматаар өгөхгүй (эзний дүрэм) — анхааруулга + hits 3/6/10 дээр хэргийг «high» болгож ADMIN-д дахин мэдэгдэнэ.
-const WARN_EVERY_MS = 12 * 3600e3;
-const ESCALATE_AT = [3, 6, 10];
-const _warnedAt = new Map();   // userId → ts (олон socket-оос давхар DM илгээхгүй)
-function warnText(hits, cause) {
-  return [
-    '⚠ Garena.mn — хамгаалалтын анхааруулга',
-    `Таны Warcraft III администраторын эрхээр (эсвэл өөр програмаас) ажиллаж байгаа тул MapHack-ийн шалгалт таныг шалгаж чадсангүй${hits > 1 ? ` (${hits} удаа)` : ''}.${cause ? ` Шалтгаан: ${cause}.` : ''} Энэ нь зөрчил биш, гэхдээ шалгагдаагүй тоглолтыг ADMIN-ууд хянадаг.`,
-    'Засах: 1) WC3-аа хаа. 2) war3.exe ба Frozen Throne.exe дээр баруун товч → Properties → Compatibility → «Run this program as an administrator»-ийг арилга. 3) WC3-ийг зөвхөн Garena.mn-ийн START / LAN НЭЭХ товчоор нээ (loader, өөр програмаар биш).',
-    'Засахгүй үргэлжлүүлбэл ADMIN шалгаж account тань бан авч болно. Асуулт байвал ADMIN-д хандана уу.',
-  ].join('\n\n');
-}
-const parseDetail = (v) => { try { return (typeof v === 'string' ? JSON.parse(v) : v) || {}; } catch { return {}; } };
-async function sendWarn(id, userId, hits, d) {
-  if (!_dm) return false;
-  const now = Date.now();
-  if (now - (_warnedAt.get(String(userId)) || 0) < 60e3) return false;
-  _warnedAt.set(String(userId), now);
-  const ok = await _dm(userId, warnText(hits, d.cause));
-  if (ok === false) return false;
-  d.warned_at = now; d.warn_count = (Number(d.warn_count) || 0) + 1;
-  await db.query('UPDATE anticheat_cases SET detail = $2::jsonb WHERE id = $1', [id, JSON.stringify(d)]);
-  console.log(`[AntiCheat] анхааруулга → user #${userId} (хэрэг #${id}, ${hits} удаа, ${d.warn_count}-р)`);
-  return true;
-}
-async function afterUnverified(id, userId, roomId) {
-  const row = (await db.query('SELECT hits, detail, severity FROM anticheat_cases WHERE id = $1', [id])).rows[0];
-  if (!row) return;
-  const d = parseDetail(row.detail);
-  const hits = Number(row.hits) || 1;
-  if (Date.now() - (Number(d.warned_at) || 0) > WARN_EVERY_MS) await sendWarn(id, userId, hits, d);
-  // 3-аас дээш давтсан ч «high» биш бол (хуучин хэргүүд: Ganaa 23 удаа) шууд эскалаци; цаашид 6, 10, 20, 30… дээр дахин мэдэгдэнэ
-  if ((hits >= 3 && row.severity !== 'high') || ESCALATE_AT.includes(hits) || (hits > 10 && hits % 10 === 0)) {
-    if (row.severity !== 'high') await db.query(`UPDATE anticheat_cases SET severity = 'high' WHERE id = $1`, [id]);
-    const u = (await db.query('SELECT username FROM users WHERE id = $1', [userId])).rows[0] || {};
-    notify({ case_id: id, user_id: userId, username: u.username || `#${userId}`, kind: 'unverified', kind_label: KIND_LABEL.unverified, tool: `${hits} удаа — анхааруулгыг үл тоосон`, severity: 'high', room_id: roomId }, roomId);
-    console.log(`[AntiCheat] эскалаци — ${u.username || userId}: шалгагдаагүй WC3 ${hits} удаа`);
-  }
-}
-/** Хэрэглэгч холбогдоход: нээлттэй «unverified» хэрэгтэй бол 24 цагт нэг удаа дахин сануулна (хуучин хэргүүдэд ч). */
-async function warnPendingOnConnect(userId) {
-  if (!_dm || !userId || !await dbOk()) return;
-  const rows = (await db.query(`SELECT id, hits, detail FROM anticheat_cases WHERE user_id = $1 AND kind = 'unverified' AND status IN ('new','nominated') AND last_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`, [userId])).rows;
-  for (const row of rows) {
-    const d = parseDetail(row.detail);
-    if (Date.now() - (Number(d.warned_at) || 0) < 24 * 3600e3) continue;
-    await sendWarn(row.id, userId, Number(row.hits) || 1, d);
-  }
-}
 
 /** Бан: users.banned + цол хураах + socket салгах. Зөвхөн эзэн дуудна.
  *  ЗӨВХӨН ТУХАЙН ACCOUNT (эзэн 2026-10-04): IP / компьютер / сүлжээгээр бандахгүй — интернет кафед нэг хүн бан авахад
@@ -306,4 +283,13 @@ router.get('/users/:uid/status', authMW, staffOrRoomAdmin, async (req, res) => {
   } catch { return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { router, ensureTables, setIO, setSystemDM, openCase, banUser, warnPendingOnConnect, warnText, KINDS, KIND_LABEL, _scopeOf: scopeOf, _warnedAt };
+// Эзэн/глобал ADMIN: WC3 сессийн мэдээлэл — хэн шалгагдсан/шалгагдаагүй, Game.dll хувилбар/хэшийн тархалт (олонхоос ялгаатай = сэжигтэй)
+router.get('/wc3info', authMW, need((sc) => sc === 'all'), async (req, res) => {
+  if (!await dbOk()) return res.status(503).json({ error: 'db unavailable' });
+  const rows = (await db.query('SELECT w.*, u.username FROM anticheat_wc3_info w JOIN users u ON u.id = w.user_id ORDER BY w.last_at DESC LIMIT 300')).rows;
+  const hashes = {};
+  for (const r of rows) if (r.game_sha) hashes[r.game_sha] = (hashes[r.game_sha] || 0) + 1;
+  res.json({ rows, hashes, total: rows.length });
+});
+
+module.exports = { router, ensureTables, setIO, setSystemDM, openCase, recordWc3Info, banUser, KINDS, KIND_LABEL, _scopeOf: scopeOf };

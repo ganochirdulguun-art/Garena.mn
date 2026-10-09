@@ -708,7 +708,6 @@ io.on('connection', (socket) => {
       userSockets.set(userId, socket.id);
       socket.join(`user:${userId}`);
       try { require('./routes/party').onRegister(socket, userId); } catch {}   // дахин холбогдоход party хэвээр
-      try { require('./routes/acCases').warnPendingOnConnect(userId).catch(() => {}); } catch {}   // шалгагдаагүй WC3 — сануулга
     }
     io.emit('lobby:online_users', onlineUsersList());
     // Лобби чатын сүүлийн 50 мессеж илгээх

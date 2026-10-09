@@ -861,3 +861,6 @@ body.gx .rank-badge { background: var(--gx-surface-3) !important; color: var(--g
 .gxp input, .gxp .btn { min-width: 0 !important; }
 .gxp-form input { width: auto; }
 .gxp-m > .btn, .gxp-ou > .btn, .gxp-form > .btn { flex: none; }
+/* WC3 мэдээллийн таб (gx-ac.js renderWc3, 2026-10-10): шалгагдаагүй = мэдээлэл, олонхоос өөр Game.dll = анхаарах */
+.ac-case.ac-odd { border-left: 4px solid #f59e0b; }
+.ac-sev.info { background: rgba(245,179,1,.15); color: #b45309; }

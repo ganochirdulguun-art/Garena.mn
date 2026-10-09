@@ -52,6 +52,11 @@ public static class GmnIntegrity {
       catch (Exception e) { sb.Append(",\"game\":{\"error\":\"").Append(Esc(e.Message)).Append("\"}"); }
     }
     try { sb.Append(",\"diag\":").Append(Diag(p)); } catch (Exception e) { sb.Append(",\"diag_error\":\"").Append(Esc(e.Message)).Append("\""); }
+    try {
+      string gdir = game != null ? Path.GetDirectoryName(game.FileName) : "";
+      if (string.IsNullOrEmpty(gdir)) { string wp = ProcPath(p); if (!string.IsNullOrEmpty(wp)) gdir = Path.GetDirectoryName(wp); }
+      sb.Append(",\"game_file\":").Append(GameFile(gdir));
+    } catch (Exception e) { sb.Append(",\"game_file_error\":\"").Append(Esc(e.Message)).Append("\""); }
     sb.Append("}");
     return sb.ToString();
   }
@@ -101,6 +106,22 @@ public static class GmnIntegrity {
     }
     sb.Append("]}");
     return sb.ToString();
+  }
+  static string ProcPath(Process p) {
+    IntPtr h = OpenProcess(0x1000, false, p.Id);
+    if (h == IntPtr.Zero) return "";
+    try { StringBuilder b = new StringBuilder(1024); int n = b.Capacity; return QueryFullProcessImageName(h, 0, b, ref n) ? b.ToString() : ""; } finally { CloseHandle(h); }
+  }
+  // Game.dll on disk: size / version / sha256 — readable even when the process is elevated (crowd baseline on the server)
+  static string GameFile(string dir) {
+    if (string.IsNullOrEmpty(dir)) return "null";
+    string path = Path.Combine(dir, "Game.dll");
+    if (!File.Exists(path)) return "null";
+    string sha = "", ver = ""; long size = 0;
+    try { size = new FileInfo(path).Length; } catch { }
+    try { ver = FileVersionInfo.GetVersionInfo(path).FileVersion ?? ""; } catch { }
+    try { using (FileStream fs = File.OpenRead(path)) using (System.Security.Cryptography.SHA256 s = System.Security.Cryptography.SHA256.Create()) { sha = BitConverter.ToString(s.ComputeHash(fs)).Replace("-", "").ToLowerInvariant(); } } catch { }
+    return "{\"path\":\"" + Esc(path) + "\",\"size\":" + size + ",\"version\":\"" + Esc(ver) + "\",\"sha256\":\"" + sha + "\"}";
   }
   static uint RvaToOff(List<uint[]> secs, uint rva) { foreach (uint[] s in secs) { if (rva >= s[0] && rva < s[0] + Math.Max(s[1], s[2])) return rva - s[0] + s[3]; } return rva; }
   static string CheckGame(Process p, ProcessModule m) {
@@ -172,7 +193,7 @@ Add-Type -TypeDefinition $code -Language CSharp -ReferencedAssemblies System.Man
 
 let _scriptPath = null;
 function scriptPath(dir) {
-  const p = path.join(dir, 'gmn-integrity-v3.ps1');
+  const p = path.join(dir, 'gmn-integrity-v4.ps1');
   if (_scriptPath === p && fs.existsSync(p)) return p;
   fs.writeFileSync(p, PS.replace(/\r?\n/g, '\r\n'), 'ascii');
   _scriptPath = p; return p;

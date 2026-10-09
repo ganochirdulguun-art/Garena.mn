@@ -10,6 +10,7 @@ const dbModulePath = path.join(serverDir, 'src', 'config', 'db.js');
 Object.assign(process.env, { NODE_ENV: 'test', JWT_SECRET: 'test-secret', SKIP_DB_MIGRATIONS: 'true', OWNER_USER_IDS: '1' });
 let pass = 0; const ok = (n) => { pass++; console.log('PASS ' + n); };
 
+const wc3info = {};
 const users = { 1: { id: 1, username: 'Owner' }, 2: { id: 2, username: 'Cheater' }, 3: { id: 3, username: 'Normal' }, 4: { id: 4, username: 'GAdmin' }, 5: { id: 5, username: 'R901Admin' }, 6: { id: 6, username: 'Other' } };
 for (const u of Object.values(users)) Object.assign(u, { banned: false, ban_reason: null, maphack_warnings: 0 });
 const cases = []; let seq = 0; const ignores = new Set();
@@ -23,6 +24,8 @@ async function query(sql, p = []) {
   if (s.startsWith('UPDATE users SET maphack_warnings = COALESCE(maphack_warnings, 0) + 1')) { const u = users[p[0]]; u.maphack_warnings++; return { rows: [{ maphack_warnings: u.maphack_warnings, discord_id: null, username: u.username, banned: u.banned }] }; }
   if (s.startsWith('INSERT INTO maphack_events')) return { rows: [] };
   if (s.startsWith('SELECT id FROM anticheat_cases WHERE user_id = $1 AND kind = $2')) return { rows: cases.filter((c) => c.user_id === Number(p[0]) && c.kind === p[1] && (c.tool || '') === p[2] && ['new', 'nominated'].includes(c.status)).slice(-1) };
+  if (s.startsWith('INSERT INTO anticheat_wc3_info')) { const u = Number(p[0]); const w = wc3info[u] || (wc3info[u] = { user_id: u, verified: true, unverified_hits: 0, sessions: 0, cause: null, diag: null, game_sha: null, game_size: null, game_ver: null, game_path: null, last_at: new Date().toISOString() }); w.verified = p[1]; w.unverified_hits += p[2]; w.sessions += 1; w.cause = p[3] ?? w.cause; w.diag = p[4] ? JSON.parse(p[4]) : w.diag; w.game_sha = p[5] ?? w.game_sha; w.game_size = p[6] ?? w.game_size; w.game_ver = p[7] ?? w.game_ver; w.game_path = p[8] ?? w.game_path; return { rows: [] }; }
+  if (s.startsWith('SELECT w.*, u.username FROM anticheat_wc3_info')) return { rows: Object.values(wc3info).map((w) => ({ ...w, username: users[w.user_id].username })) };
   if (s.startsWith('UPDATE anticheat_cases SET hits = hits + 1')) { const c = cases.find((x) => x.id === p[0]); c.hits++; if (p[2] != null) c.room_id = p[2]; const nd = JSON.parse(p[1]); if (c.detail?.warned_at) { nd.warned_at = c.detail.warned_at; nd.warn_count = c.detail.warn_count; } c.detail = nd; return { rows: [] }; }
   if (s.startsWith('SELECT hits, detail, severity FROM anticheat_cases WHERE id = $1')) { const c = cases.find((x) => x.id === p[0]); return { rows: c ? [{ hits: c.hits, detail: c.detail, severity: c.severity }] : [] }; }
   if (s.startsWith('UPDATE anticheat_cases SET detail = $2::jsonb WHERE id = $1')) { const c = cases.find((x) => x.id === p[0]); c.detail = JSON.parse(p[1]); return { rows: [] }; }
@@ -118,23 +121,18 @@ require.cache[dbModulePath] = { id: dbModulePath, filename: dbModulePath, loaded
   r = await call(6, 'POST', '/anticheat/report', { kind: 'memory', tool: 'Game.dll', detail: { sig: 'room-test' } }); j = await r.json();
   cases.find((c) => c.id === j.case_id).room_id = 901;
   r = await call(5, 'POST', `/anticheat/cases/${j.case_id}/dismiss`, { ignore: true }); j = await r.json(); assert.equal(j.ignored, 0); assert.equal(ignores.has('memory|room-test'), false); ok('Room ADMIN үл тоох жагсаалтад нэмж чадахгүй');
-  // ── Шалгагдаагүй WC3 (unverified): DM анхааруулга + 3 дахь удаад эскалаци (эзэн 2026-10-09) ──
-  const dms = [];
-  acc.setSystemDM(async (uid, text) => { dms.push({ uid: String(uid), text }); return true; });
-  const unvNotified = () => emitted.filter((e) => e.ev === 'staff:notify' && e.d.kind === 'unverified');
-  const n0 = unvNotified().length;
-  r = await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', cause: 'RUNASADMIN: war3.exe', sig: 'unverified' } }); j = await r.json();
-  const uc = cases.find((c) => c.id === j.case_id);
-  assert.equal(dms.length, 1); assert.equal(dms[0].uid, '3'); assert.match(dms[0].text, /Run this program as an administrator/); assert.match(dms[0].text, /RUNASADMIN: war3\.exe/); assert.match(dms[0].text, /бан авч болно/);
-  assert.ok(uc.detail.warned_at); assert.equal(uc.detail.warn_count, 1); ok('unverified хэрэг → тоглогчид DM анхааруулга (шалтгаан + засах заавар + бан сануулга)');
-  await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', sig: 'unverified' } });
-  assert.equal(dms.length, 1); assert.equal(uc.hits, 2); assert.ok(uc.detail.warned_at); ok('12 цагийн дотор давтвал DM дахин илгээхгүй, warned_at хадгалагдана (detail солигдсон ч)');
-  await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', sig: 'unverified' } });
-  assert.equal(uc.hits, 3); assert.equal(uc.severity, 'high'); assert.equal(unvNotified().filter((e) => e.to === 1 && /3 удаа/.test(e.d.tool)).length, 1); assert.equal(unvNotified().filter((e) => e.to === 1 && /3 удаа/.test(e.d.tool))[0].d.severity, 'high'); ok('3 дахь удаад хэрэг «high» болж ADMIN-д дахин мэдэгдэнэ (автомат бан үгүй)');
-  uc.detail.warned_at = Date.now() - 25 * 3600e3; acc._warnedAt.clear();
-  await acc.warnPendingOnConnect(3);
-  assert.equal(dms.length, 2); ok('24 цагийн дараа дахин холбогдоход сануулга дахин очно');
-  await acc.warnPendingOnConnect(3); assert.equal(dms.length, 2); ok('саяхан сануулсан бол холбогдоход давхар илгээхгүй');
+  // ── WC3 сессийн мэдээлэл (эзэн 2026-10-10): elevated WC3 = хэрэг биш, мэдээлэл; Game.dll хэш ──
+  const nCases = cases.length;
+  r = await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'x', detail: { reason: 'Access is denied', cause: 'RUNASADMIN: war3.exe', diag: { parent: 'Frozen Throne' }, game_file: { path: 'C:/W3/Game.dll', size: 12042240, version: '1.26.0.6401', sha256: 'aa'.repeat(32) } } }); j = await r.json();
+  assert.equal(r.status, 200); assert.equal(j.case_id, null); assert.equal(cases.length, nCases);
+  assert.equal(wc3info[3].unverified_hits, 1); assert.equal(wc3info[3].verified, false); assert.equal(wc3info[3].cause, 'RUNASADMIN: war3.exe'); assert.equal(wc3info[3].game_sha, 'aa'.repeat(32));
+  ok('unverified → хэрэг нээхгүй, анхааруулгагүй; wc3_info-д шалтгаан + Game.dll хэш');
+  await call(3, 'POST', '/anticheat/report', { kind: 'wc3info', tool: 'x', detail: { game_file: { sha256: 'aa'.repeat(32), size: 12042240 } } });
+  assert.equal(wc3info[3].sessions, 2); assert.equal(wc3info[3].verified, true); assert.equal(wc3info[3].unverified_hits, 1); ok('шалгагдсан сесс → sessions+1, verified=true');
+  await call(6, 'POST', '/anticheat/report', { kind: 'wc3info', tool: 'x', detail: { game_file: { sha256: 'bb'.repeat(32), size: 11000000 } } });
+  r = await call(1, 'GET', '/anticheat/wc3info'); j = await r.json();
+  assert.equal(r.status, 200); assert.equal(j.rows.length, 2); assert.equal(j.hashes['aa'.repeat(32)], 1); assert.equal(j.hashes['bb'.repeat(32)], 1); ok('GET /wc3info (эзэн): мөрүүд + Game.dll хэшийн тархалт');
+  r = await call(5, 'GET', '/anticheat/wc3info'); assert.equal(r.status, 403); ok('Room ADMIN wc3info харахгүй');
   srv.close();
   console.log(`\n=== accases: ${pass} PASS ===`); process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

@@ -630,7 +630,7 @@ function showIntegrityBlindModal(d = {}) {
   document.body.appendChild(ov);
   document.getElementById('ac-blind-close').onclick = () => ov.remove();
 }
-try { window.api?.onIntegrityBlind?.((d) => showIntegrityBlindModal(d || {})); } catch {}
+// 2026-10-10 эзэн: administrator эрхтэй WC3-д анхааруулга/шаардлага тавихгүй — popup-ийг идэвхгүй болгов (RunAsInvoker асаалт шийднэ)
 
 async function init() {
   // MapHack анхааруулгыг бүх цонхонд сонсоно (тоглолт эхлүүлэхэд илэрвэл)

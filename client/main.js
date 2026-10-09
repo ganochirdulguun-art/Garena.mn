@@ -1498,10 +1498,12 @@ async function runIntegrityCheck() {
       const dg = r.diag || {};
       const cause = integrity.blindCause(dg);
       const diag = { self_admin: !!dg.self_admin, path: String(dg.path || '').slice(0, 200), elevated: String(dg.elevated || '?'), parent: String(dg.parent || '').slice(0, 80), compat: (Array.isArray(dg.compat) ? dg.compat : []).slice(0, 6).map((x) => String(x).slice(0, 160)) };
-      const sentNow = await send('unverified', 'WC3 администраторын эрхтэй — шалгах боломжгүй', { reason: String(blindReason).slice(0, 120), sig: 'unverified', cause, diag }, 'review');
-      if (sentNow !== null || !_icBlindShown) { _icBlindShown = true; broadcastToWindows('game:integrity-blind', { reason: String(blindReason).slice(0, 120), cause }); }
+      // Эзэн 2026-10-10: зөрчил биш, анхааруулга/хэрэг үгүй — зөвхөн мэдээлэл (шалтгаан, Game.dll файлын хэш) серверт
+      await send('unverified', 'WC3 администраторын эрхтэй — шалгах боломжгүй', { reason: String(blindReason).slice(0, 120), sig: 'unverified', cause, diag, game_file: r.game_file || null }, 'info');
       return;
     }
+    // Шалгагдсан сесс: Game.dll файлын хэш — олонхоос өөр файлтай хүн эзний самбарт харагдана
+    await send('wc3info', 'WC3 файлын мэдээлэл', { sig: 'wc3info', game_file: r.game_file || null }, 'info');
     const { blocked, unknown } = integrity.classifyModules(r.modules, _maphackList, wc3DirFromSettings(), r.mod_info || {});
     if (blocked.length) {
       await send('module', blocked[0], { modules: blocked, sig: blocked.map((x) => x.toLowerCase()).sort().join(',') }, 'high');
@@ -1591,8 +1593,11 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   try { replayService.addReplayDir(path.join(path.dirname(game.path), 'replay')); } catch {}
   // spawn нь «Run as administrator» / антивирус / хамгаалалттай хавтас үед 'error' event биш ШУУД EPERM/EACCES шиддэг
   // (2026-10-04: LoDMaSTAAAA-д «spawn EPERM» toast гарч WC3 нээгдээгүй) → Windows ShellExecute (UAC асууна)-ээр нээнэ.
+  // RunAsInvoker (2026-10-10, эзэн «administrator эрхээрээ тоглож л байг»): «Run as administrator» тохиргоо/manifest-ийг үл хэрэгсэж
+  // WC3-ийг Garena.mn-ий (энгийн) эрхээр асаана → UAC асуулгагүй, тоглогч юу ч өөрчлөхгүй, хамгаалалт WC3-ийг шалгаж чадна.
+  // Хэрэв ингэж асахгүй бол (ховор: loader admin шаарддаг) 6с-ийн дараа энгийнээр дахин асаана.
   let proc;
-  try { proc = spawn(game.path, [], { detached: false, stdio: 'ignore' }); }
+  try { proc = spawn(game.path, [], { detached: false, stdio: 'ignore', env: { ...process.env, __COMPAT_LAYER: 'RunAsInvoker' } }); }
   catch (e) {
     console.error('[Game] spawn алдаа (sync):', e.code, e.message);
     const err = await shell.openPath(game.path).catch((x) => String(x?.message || x));
@@ -1621,7 +1626,18 @@ ipcMain.handle('game:launch', async (_, gameType) => {
   proc.on('exit', () => {
     _gameProc = null;
     if (Date.now() - launchedAt > 20000 || process.platform !== 'win32') { broadcastToWindows('game:exited'); return; }
-    watchWar3Exit();
+    // Launcher (Frozen Throne.exe) гарсан: 6с-ийн дараа war3.exe асаагүй бол RunAsInvoker тохироогүй → энгийнээр дахин
+    setTimeout(async () => {
+      if ((await isWar3Running()) !== false) { watchWar3Exit(); return; }
+      console.warn('[Game] RunAsInvoker-ээр WC3 асаагүй — энгийнээр дахин асаана');
+      try {
+        const p2 = spawn(game.path, [], { detached: false, stdio: 'ignore' });
+        _gameProc = p2;
+        p2.once('error', () => { if (_gameProc === p2) _gameProc = null; shell.openPath(game.path).catch(() => {}); });
+        p2.on('exit', () => { if (_gameProc === p2) _gameProc = null; watchWar3Exit(); });
+      } catch { shell.openPath(game.path).catch(() => {}); }
+      watchWar3Exit();
+    }, 6000);
   });
 
   return true;
