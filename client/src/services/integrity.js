@@ -51,7 +51,55 @@ public static class GmnIntegrity {
       try { sb.Append(",\"game\":").Append(CheckGame(p, game)); }
       catch (Exception e) { sb.Append(",\"game\":{\"error\":\"").Append(Esc(e.Message)).Append("\"}"); }
     }
+    try { sb.Append(",\"diag\":").Append(Diag(p)); } catch (Exception e) { sb.Append(",\"diag_error\":\"").Append(Esc(e.Message)).Append("\""); }
     sb.Append("}");
+    return sb.ToString();
+  }
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder buf, ref int size);
+  [DllImport("advapi32.dll", SetLastError = true)] static extern bool OpenProcessToken(IntPtr h, uint access, out IntPtr tok);
+  [DllImport("advapi32.dll", SetLastError = true)] static extern bool GetTokenInformation(IntPtr tok, int cls, out int info, int len, out int ret);
+  // Diagnostics when the process cannot be read (elevated war3): who started it, compat flags, our own elevation
+  static string Diag(Process p) {
+    StringBuilder sb = new StringBuilder("{");
+    bool selfAdmin = false;
+    try { selfAdmin = new System.Security.Principal.WindowsPrincipal(System.Security.Principal.WindowsIdentity.GetCurrent()).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator); } catch { }
+    sb.Append("\"self_admin\":").Append(selfAdmin ? "true" : "false");
+    string path = ""; string elev = "?";
+    IntPtr h = OpenProcess(0x1000, false, p.Id);
+    if (h != IntPtr.Zero) {
+      try {
+        StringBuilder b = new StringBuilder(1024); int n = b.Capacity;
+        if (QueryFullProcessImageName(h, 0, b, ref n)) path = b.ToString();
+        IntPtr tok;
+        if (OpenProcessToken(h, 0x0008, out tok)) {
+          int info, ret;
+          if (GetTokenInformation(tok, 20, out info, 4, out ret)) elev = info != 0 ? "1" : "0";
+          CloseHandle(tok);
+        }
+      } finally { CloseHandle(h); }
+    }
+    sb.Append(",\"path\":\"").Append(Esc(path)).Append("\",\"elevated\":\"").Append(elev).Append("\"");
+    string parent = "";
+    try {
+      using (System.Management.ManagementObjectSearcher s = new System.Management.ManagementObjectSearcher("SELECT ParentProcessId FROM Win32_Process WHERE ProcessId=" + p.Id)) {
+        foreach (System.Management.ManagementObject o in s.Get()) { int ppid = Convert.ToInt32(o["ParentProcessId"]); try { parent = Process.GetProcessById(ppid).ProcessName; } catch { parent = "#" + ppid + " (closed)"; } }
+      }
+    } catch (Exception e) { parent = "? " + e.Message; }
+    sb.Append(",\"parent\":\"").Append(Esc(parent)).Append("\"");
+    sb.Append(",\"compat\":[");
+    int k = 0;
+    foreach (Microsoft.Win32.RegistryKey root in new Microsoft.Win32.RegistryKey[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine }) {
+      try {
+        using (Microsoft.Win32.RegistryKey key = root.OpenSubKey("Software\\Microsoft\\Windows NT\\CurrentVersion\\AppCompatFlags\\Layers")) {
+          if (key == null) continue;
+          foreach (string name in key.GetValueNames()) {
+            string ln = name.ToLowerInvariant();
+            if (ln.Contains("war3") || ln.Contains("frozen throne") || ln.Contains("warcraft")) { if (k++ > 0) sb.Append(","); sb.Append("\"").Append(Esc(name + " = " + Convert.ToString(key.GetValue(name)))).Append("\""); }
+          }
+        }
+      } catch { }
+    }
+    sb.Append("]}");
     return sb.ToString();
   }
   static uint RvaToOff(List<uint[]> secs, uint rva) { foreach (uint[] s in secs) { if (rva >= s[0] && rva < s[0] + Math.Max(s[1], s[2])) return rva - s[0] + s[3]; } return rva; }
@@ -118,13 +166,13 @@ public static class GmnIntegrity {
   }
 }
 '@
-Add-Type -TypeDefinition $code -Language CSharp
+Add-Type -TypeDefinition $code -Language CSharp -ReferencedAssemblies System.Management
 [Console]::Out.Write([GmnIntegrity]::Run())
 `;
 
 let _scriptPath = null;
 function scriptPath(dir) {
-  const p = path.join(dir, 'gmn-integrity-v2.ps1');
+  const p = path.join(dir, 'gmn-integrity-v3.ps1');
   if (_scriptPath === p && fs.existsSync(p)) return p;
   fs.writeFileSync(p, PS.replace(/\r?\n/g, '\r\n'), 'ascii');
   _scriptPath = p; return p;
@@ -178,4 +226,16 @@ function classifyModules(mods, blocklist, wc3Dir, info = {}) {
   return { blocked, unknown: unknown.slice(0, 40) };
 }
 
-module.exports = { probe, classifyModules, _PS: PS };
+/** «Шалгах боломжгүй» (elevated WC3) үеийн шалтгааныг хүнд ойлгомжтой нэг мөрөөр — тоглогчид ба ADMIN-д (2026-10-09). */
+function blindCause(d = {}) {
+  const compat = (Array.isArray(d.compat) ? d.compat : []).map(String);
+  const ra = compat.find((c) => /RUNASADMIN|ELEVATECREATEPROCESS/i.test(c));
+  if (ra) return `«Run as administrator» тохиргоотой: ${ra.split(' = ')[0].split(/[\\/]/).pop()}`;
+  const par = String(d.parent || '').trim();
+  if (par && !/^(frozen throne|warcraft iii|war3|garena\.mn|#\d+)/i.test(par)) return `WC3-ийг өөр програм нээсэн: ${par}`;
+  if (d.elevated === '0') return 'WC3 администраторын эрхгүй ч уншигдсангүй — антивирус/хамгаалалтын програм хаасан байж магадгүй';
+  if (d.self_admin) return 'Garena.mn өөрөө администраторын эрхтэй ч WC3 уншигдсангүй';
+  return 'WC3 администраторын эрхээр ажиллаж байна' + (par ? ` (нээсэн: ${par})` : '');
+}
+
+module.exports = { probe, classifyModules, blindCause, _PS: PS };

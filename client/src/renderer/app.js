@@ -610,7 +610,7 @@ function showMaphackModal(data) {
 }
 
 // Хамгаалалт WC3-ийг шалгаж чадаагүй (WC3 администраторын эрхээр ажиллаж байна) — зөрчил биш, засах заавар (эзэн 2026-10-08)
-function showIntegrityBlindModal() {
+function showIntegrityBlindModal(d = {}) {
   if (new URLSearchParams(location.search).get('mode')) return;   // зөвхөн үндсэн цонхонд (өрөөний iframe давхар гаргахгүй)
   if (document.getElementById('ac-blind-overlay')) return;
   const ov = document.createElement('div');
@@ -620,8 +620,8 @@ function showIntegrityBlindModal() {
     <div class="maphack-card">
       <div class="mh-icon">⚠️</div>
       <h2>MapHack-ийн хамгаалалт ажиллаж чадсангүй</h2>
-      <p class="mh-tool">Warcraft III <b>администраторын эрхээр</b> (эсвэл өөр програмаас) ажиллаж байгаа тул Garena.mn тоглоомыг шалгаж чадахгүй байна.</p>
-      <p class="mh-warn">Энэ нь зөрчил <b>биш</b>, гэхдээ ADMIN-д мэдэгдлээ. Засахын тулд:<br>
+      <p class="mh-tool">Warcraft III <b>администраторын эрхээр</b> (эсвэл өөр програмаас) ажиллаж байгаа тул Garena.mn тоглоомыг шалгаж чадахгүй байна.${d.cause ? `<br>Шалтгаан: <b>${escHtml(d.cause)}</b>` : ''}</p>
+      <p class="mh-warn">Энэ нь зөрчил <b>биш</b>, гэхдээ ADMIN-д мэдэгдлээ. <b>Засахгүй үргэлжлүүлбэл ADMIN шалгаж бан авч болно.</b> Засахын тулд:<br>
         1. Warcraft III-аа хаана.<br>
         2. war3.exe / Frozen Throne.exe дээр баруун товч → <b>Properties → Compatibility</b> → «Run this program as an administrator»-ийг арилгана.<br>
         3. GarenaTotal зэрэг өөр програмаар биш, <b>Garena.mn-ийн START / LAN НЭЭХ</b>-ээр нээнэ.</p>
@@ -630,7 +630,7 @@ function showIntegrityBlindModal() {
   document.body.appendChild(ov);
   document.getElementById('ac-blind-close').onclick = () => ov.remove();
 }
-try { window.api?.onIntegrityBlind?.(() => showIntegrityBlindModal()); } catch {}
+try { window.api?.onIntegrityBlind?.((d) => showIntegrityBlindModal(d || {})); } catch {}
 
 async function init() {
   // MapHack анхааруулгыг бүх цонхонд сонсоно (тоглолт эхлүүлэхэд илэрвэл)

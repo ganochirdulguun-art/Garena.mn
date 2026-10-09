@@ -1495,8 +1495,11 @@ async function runIntegrityCheck() {
     // Эзний шийдвэр (2026-10-08, A): тоглогчид шалтгаан + засах аргыг харуулж, ADMIN-д «шалгалт ажиллаагүй» гэж мэдэгдэнэ.
     const blindReason = [r.modules_error, r.game && r.game.error].filter(Boolean).find((x) => /denied|access/i.test(String(x)));
     if (blindReason) {
-      const sentNow = await send('unverified', 'WC3 администраторын эрхтэй — шалгах боломжгүй', { reason: String(blindReason).slice(0, 120), sig: 'unverified' }, 'review');
-      if (sentNow !== null || !_icBlindShown) { _icBlindShown = true; broadcastToWindows('game:integrity-blind', { reason: String(blindReason).slice(0, 120) }); }
+      const dg = r.diag || {};
+      const cause = integrity.blindCause(dg);
+      const diag = { self_admin: !!dg.self_admin, path: String(dg.path || '').slice(0, 200), elevated: String(dg.elevated || '?'), parent: String(dg.parent || '').slice(0, 80), compat: (Array.isArray(dg.compat) ? dg.compat : []).slice(0, 6).map((x) => String(x).slice(0, 160)) };
+      const sentNow = await send('unverified', 'WC3 администраторын эрхтэй — шалгах боломжгүй', { reason: String(blindReason).slice(0, 120), sig: 'unverified', cause, diag }, 'review');
+      if (sentNow !== null || !_icBlindShown) { _icBlindShown = true; broadcastToWindows('game:integrity-blind', { reason: String(blindReason).slice(0, 120), cause }); }
       return;
     }
     const { blocked, unknown } = integrity.classifyModules(r.modules, _maphackList, wc3DirFromSettings(), r.mod_info || {});

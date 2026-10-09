@@ -247,6 +247,15 @@ app.set('onlineUserIds', () => new Set([...onlineUsers.values()].map((u) => Stri
 require('./routes/roles').setIO(io);
 liveRoutes.setIO(io);
 require('./routes/acCases').setIO(io);
+// Хакны хамгаалалтын анхааруулга — «Garena.mn» системийн хэрэглэгчээс DM (DB-д хадгалагдана, бүх хувилбарын клиент харна) (2026-10-09)
+require('./routes/acCases').setSystemDM(async (uid, text) => {
+  const sysId = Number(process.env.SYSTEM_USER_ID || 291);
+  let saved = null;
+  try { saved = await socialRoutes.saveMessage(sysId, uid, text); } catch {}
+  const msg = { fromUsername: 'Garena.mn', fromUserId: String(sysId), text, time: saved?.created_at?.toISOString?.() || new Date().toISOString(), id: saved?.id || null, system: true };
+  io.to(`user:${String(uid)}`).emit('private:message', msg);
+  return true;
+});
 // Party (2026-10-08): гишүүдийн онлайн төлөв, одоогийн Room
 require('./routes/party').setup({
   io,
@@ -699,6 +708,7 @@ io.on('connection', (socket) => {
       userSockets.set(userId, socket.id);
       socket.join(`user:${userId}`);
       try { require('./routes/party').onRegister(socket, userId); } catch {}   // дахин холбогдоход party хэвээр
+      try { require('./routes/acCases').warnPendingOnConnect(userId).catch(() => {}); } catch {}   // шалгагдаагүй WC3 — сануулга
     }
     io.emit('lobby:online_users', onlineUsersList());
     // Лобби чатын сүүлийн 50 мессеж илгээх

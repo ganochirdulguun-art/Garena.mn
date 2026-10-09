@@ -23,7 +23,11 @@ async function query(sql, p = []) {
   if (s.startsWith('UPDATE users SET maphack_warnings = COALESCE(maphack_warnings, 0) + 1')) { const u = users[p[0]]; u.maphack_warnings++; return { rows: [{ maphack_warnings: u.maphack_warnings, discord_id: null, username: u.username, banned: u.banned }] }; }
   if (s.startsWith('INSERT INTO maphack_events')) return { rows: [] };
   if (s.startsWith('SELECT id FROM anticheat_cases WHERE user_id = $1 AND kind = $2')) return { rows: cases.filter((c) => c.user_id === Number(p[0]) && c.kind === p[1] && (c.tool || '') === p[2] && ['new', 'nominated'].includes(c.status)).slice(-1) };
-  if (s.startsWith('UPDATE anticheat_cases SET hits = hits + 1')) { const c = cases.find((x) => x.id === p[0]); c.hits++; if (p[2] != null) c.room_id = p[2]; return { rows: [] }; }
+  if (s.startsWith('UPDATE anticheat_cases SET hits = hits + 1')) { const c = cases.find((x) => x.id === p[0]); c.hits++; if (p[2] != null) c.room_id = p[2]; const nd = JSON.parse(p[1]); if (c.detail?.warned_at) { nd.warned_at = c.detail.warned_at; nd.warn_count = c.detail.warn_count; } c.detail = nd; return { rows: [] }; }
+  if (s.startsWith('SELECT hits, detail, severity FROM anticheat_cases WHERE id = $1')) { const c = cases.find((x) => x.id === p[0]); return { rows: c ? [{ hits: c.hits, detail: c.detail, severity: c.severity }] : [] }; }
+  if (s.startsWith('UPDATE anticheat_cases SET detail = $2::jsonb WHERE id = $1')) { const c = cases.find((x) => x.id === p[0]); c.detail = JSON.parse(p[1]); return { rows: [] }; }
+  if (s.startsWith("UPDATE anticheat_cases SET severity = 'high'")) { const c = cases.find((x) => x.id === p[0]); c.severity = 'high'; return { rows: [] }; }
+  if (s.startsWith("SELECT id, hits, detail FROM anticheat_cases WHERE user_id = $1 AND kind = 'unverified'")) return { rows: cases.filter((c) => c.user_id === Number(p[0]) && c.kind === 'unverified' && ['new', 'nominated'].includes(c.status)).slice(-1) };
   if (s.startsWith('INSERT INTO anticheat_cases')) { const c = { id: ++seq, user_id: Number(p[0]), kind: p[1], tool: p[2], severity: p[3], detail: JSON.parse(p[4]), room_id: p[5], hits: 1, status: 'new' }; cases.push(c); return { rows: [{ id: c.id }] }; }
   if (s.startsWith('SELECT username FROM users WHERE id = $1')) return { rows: users[p[0]] ? [{ username: users[p[0]].username }] : [] };
   if (s.startsWith('SELECT c.*, u.username')) { const c = cases.find((x) => String(x.id) === String(p[0])); return { rows: c ? [{ ...c, username: users[c.user_id].username, discord_id: null }] : [] }; }
@@ -114,6 +118,23 @@ require.cache[dbModulePath] = { id: dbModulePath, filename: dbModulePath, loaded
   r = await call(6, 'POST', '/anticheat/report', { kind: 'memory', tool: 'Game.dll', detail: { sig: 'room-test' } }); j = await r.json();
   cases.find((c) => c.id === j.case_id).room_id = 901;
   r = await call(5, 'POST', `/anticheat/cases/${j.case_id}/dismiss`, { ignore: true }); j = await r.json(); assert.equal(j.ignored, 0); assert.equal(ignores.has('memory|room-test'), false); ok('Room ADMIN үл тоох жагсаалтад нэмж чадахгүй');
+  // ── Шалгагдаагүй WC3 (unverified): DM анхааруулга + 3 дахь удаад эскалаци (эзэн 2026-10-09) ──
+  const dms = [];
+  acc.setSystemDM(async (uid, text) => { dms.push({ uid: String(uid), text }); return true; });
+  const unvNotified = () => emitted.filter((e) => e.ev === 'staff:notify' && e.d.kind === 'unverified');
+  const n0 = unvNotified().length;
+  r = await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', cause: 'RUNASADMIN: war3.exe', sig: 'unverified' } }); j = await r.json();
+  const uc = cases.find((c) => c.id === j.case_id);
+  assert.equal(dms.length, 1); assert.equal(dms[0].uid, '3'); assert.match(dms[0].text, /Run this program as an administrator/); assert.match(dms[0].text, /RUNASADMIN: war3\.exe/); assert.match(dms[0].text, /бан авч болно/);
+  assert.ok(uc.detail.warned_at); assert.equal(uc.detail.warn_count, 1); ok('unverified хэрэг → тоглогчид DM анхааруулга (шалтгаан + засах заавар + бан сануулга)');
+  await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', sig: 'unverified' } });
+  assert.equal(dms.length, 1); assert.equal(uc.hits, 2); assert.ok(uc.detail.warned_at); ok('12 цагийн дотор давтвал DM дахин илгээхгүй, warned_at хадгалагдана (detail солигдсон ч)');
+  await call(3, 'POST', '/anticheat/report', { kind: 'unverified', tool: 'WC3 админ', detail: { reason: 'Access is denied', sig: 'unverified' } });
+  assert.equal(uc.hits, 3); assert.equal(uc.severity, 'high'); assert.equal(unvNotified().filter((e) => e.to === 1 && /3 удаа/.test(e.d.tool)).length, 1); assert.equal(unvNotified().filter((e) => e.to === 1 && /3 удаа/.test(e.d.tool))[0].d.severity, 'high'); ok('3 дахь удаад хэрэг «high» болж ADMIN-д дахин мэдэгдэнэ (автомат бан үгүй)');
+  uc.detail.warned_at = Date.now() - 25 * 3600e3; acc._warnedAt.clear();
+  await acc.warnPendingOnConnect(3);
+  assert.equal(dms.length, 2); ok('24 цагийн дараа дахин холбогдоход сануулга дахин очно');
+  await acc.warnPendingOnConnect(3); assert.equal(dms.length, 2); ok('саяхан сануулсан бол холбогдоход давхар илгээхгүй');
   srv.close();
   console.log(`\n=== accases: ${pass} PASS ===`); process.exit(0);
 })().catch((e) => { console.error('FAIL', e); process.exit(1); });

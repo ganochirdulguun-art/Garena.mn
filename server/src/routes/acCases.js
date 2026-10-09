@@ -14,9 +14,12 @@ let db; try { db = require('../config/db'); } catch { db = null; }
 const router = express.Router();
 let _io = null;
 function setIO(io) { _io = io; }
+// Тоглогчид системийн DM илгээх (index.js тохируулна): (userId, text) → true/false
+let _dm = null;
+function setSystemDM(fn) { _dm = typeof fn === 'function' ? fn : null; }
 
 const KINDS = ['process', 'module', 'memory', 'fogclick', 'report', 'unverified'];
-const KIND_LABEL = { process: 'Хориотой програм', module: 'WC3-д сэжигтэй DLL', memory: 'Game.dll санах ой өөрчлөгдсөн', fogclick: 'FOGCLICK (replay)', report: 'Тоглогчийн гомдол' };
+const KIND_LABEL = { process: 'Хориотой програм', module: 'WC3-д сэжигтэй DLL', memory: 'Game.dll санах ой өөрчлөгдсөн', fogclick: 'FOGCLICK (replay)', report: 'Тоглогчийн гомдол', unverified: 'Шалгагдаагүй WC3 (elevated)' };
 
 async function dbOk() { if (!db) return false; try { await db.query('SELECT 1'); return true; } catch { return false; } }
 async function ensureTables() {
@@ -109,7 +112,9 @@ async function openCase({ userId, kind, tool, detail, roomId = null, severity = 
     let id, fresh = false;
     if (ex.rows[0]) {
       id = ex.rows[0].id;
-      await db.query('UPDATE anticheat_cases SET hits = hits + 1, last_at = NOW(), detail = $2::jsonb, room_id = COALESCE($3, room_id) WHERE id = $1', [id, JSON.stringify(cleanDetail(detail)), roomId]);
+      // detail-ийг клиентийн шинэ мэдээллээр солихдоо анхааруулгын түүхийг (warned_at/warn_count) хадгална
+      await db.query(`UPDATE anticheat_cases SET hits = hits + 1, last_at = NOW(), room_id = COALESCE($3, room_id),
+        detail = $2::jsonb || jsonb_strip_nulls(jsonb_build_object('warned_at', detail->'warned_at', 'warn_count', detail->'warn_count')) WHERE id = $1`, [id, JSON.stringify(cleanDetail(detail)), roomId]);
     } else {
       const r = await db.query(`INSERT INTO anticheat_cases (user_id, kind, tool, severity, detail, room_id) VALUES ($1,$2,$3,$4,$5::jsonb,$6) RETURNING id`,
         [userId, kind, t, severity === 'high' ? 'high' : 'review', JSON.stringify(cleanDetail(detail)), roomId]);
@@ -120,8 +125,59 @@ async function openCase({ userId, kind, tool, detail, roomId = null, severity = 
       notify({ case_id: id, user_id: userId, username: u.username || `#${userId}`, kind, kind_label: KIND_LABEL[kind], tool: t, severity, room_id: roomId }, roomId);
       console.log(`[AntiCheat] хэрэг #${id}: ${u.username || userId} — ${KIND_LABEL[kind]} «${t}» (${severity})`);
     }
+    if (kind === 'unverified') { try { await afterUnverified(id, userId, roomId); } catch (e) { console.warn('[acCases] анхааруулга:', e.message); } }
     return { id, fresh };
   } catch (e) { console.error('[acCases] openCase:', e.message); return null; }
+}
+
+// ── «Шалгагдаагүй WC3» (elevated) — тоглогчид анхааруулга, давтвал ADMIN-д эскалаци (эзэн 2026-10-09) ──
+//  Шийтгэл автоматаар өгөхгүй (эзний дүрэм) — анхааруулга + hits 3/6/10 дээр хэргийг «high» болгож ADMIN-д дахин мэдэгдэнэ.
+const WARN_EVERY_MS = 12 * 3600e3;
+const ESCALATE_AT = [3, 6, 10];
+const _warnedAt = new Map();   // userId → ts (олон socket-оос давхар DM илгээхгүй)
+function warnText(hits, cause) {
+  return [
+    '⚠ Garena.mn — хамгаалалтын анхааруулга',
+    `Таны Warcraft III администраторын эрхээр (эсвэл өөр програмаас) ажиллаж байгаа тул MapHack-ийн шалгалт таныг шалгаж чадсангүй${hits > 1 ? ` (${hits} удаа)` : ''}.${cause ? ` Шалтгаан: ${cause}.` : ''} Энэ нь зөрчил биш, гэхдээ шалгагдаагүй тоглолтыг ADMIN-ууд хянадаг.`,
+    'Засах: 1) WC3-аа хаа. 2) war3.exe ба Frozen Throne.exe дээр баруун товч → Properties → Compatibility → «Run this program as an administrator»-ийг арилга. 3) WC3-ийг зөвхөн Garena.mn-ийн START / LAN НЭЭХ товчоор нээ (loader, өөр програмаар биш).',
+    'Засахгүй үргэлжлүүлбэл ADMIN шалгаж account тань бан авч болно. Асуулт байвал ADMIN-д хандана уу.',
+  ].join('\n\n');
+}
+const parseDetail = (v) => { try { return (typeof v === 'string' ? JSON.parse(v) : v) || {}; } catch { return {}; } };
+async function sendWarn(id, userId, hits, d) {
+  if (!_dm) return false;
+  const now = Date.now();
+  if (now - (_warnedAt.get(String(userId)) || 0) < 60e3) return false;
+  _warnedAt.set(String(userId), now);
+  const ok = await _dm(userId, warnText(hits, d.cause));
+  if (ok === false) return false;
+  d.warned_at = now; d.warn_count = (Number(d.warn_count) || 0) + 1;
+  await db.query('UPDATE anticheat_cases SET detail = $2::jsonb WHERE id = $1', [id, JSON.stringify(d)]);
+  console.log(`[AntiCheat] анхааруулга → user #${userId} (хэрэг #${id}, ${hits} удаа, ${d.warn_count}-р)`);
+  return true;
+}
+async function afterUnverified(id, userId, roomId) {
+  const row = (await db.query('SELECT hits, detail, severity FROM anticheat_cases WHERE id = $1', [id])).rows[0];
+  if (!row) return;
+  const d = parseDetail(row.detail);
+  const hits = Number(row.hits) || 1;
+  if (Date.now() - (Number(d.warned_at) || 0) > WARN_EVERY_MS) await sendWarn(id, userId, hits, d);
+  if (ESCALATE_AT.includes(hits)) {
+    if (row.severity !== 'high') await db.query(`UPDATE anticheat_cases SET severity = 'high' WHERE id = $1`, [id]);
+    const u = (await db.query('SELECT username FROM users WHERE id = $1', [userId])).rows[0] || {};
+    notify({ case_id: id, user_id: userId, username: u.username || `#${userId}`, kind: 'unverified', kind_label: KIND_LABEL.unverified, tool: `${hits} удаа — анхааруулгыг үл тоосон`, severity: 'high', room_id: roomId }, roomId);
+    console.log(`[AntiCheat] эскалаци — ${u.username || userId}: шалгагдаагүй WC3 ${hits} удаа`);
+  }
+}
+/** Хэрэглэгч холбогдоход: нээлттэй «unverified» хэрэгтэй бол 24 цагт нэг удаа дахин сануулна (хуучин хэргүүдэд ч). */
+async function warnPendingOnConnect(userId) {
+  if (!_dm || !userId || !await dbOk()) return;
+  const rows = (await db.query(`SELECT id, hits, detail FROM anticheat_cases WHERE user_id = $1 AND kind = 'unverified' AND status IN ('new','nominated') AND last_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`, [userId])).rows;
+  for (const row of rows) {
+    const d = parseDetail(row.detail);
+    if (Date.now() - (Number(d.warned_at) || 0) < 24 * 3600e3) continue;
+    await sendWarn(row.id, userId, Number(row.hits) || 1, d);
+  }
 }
 
 /** Бан: users.banned + цол хураах + socket салгах. Зөвхөн эзэн дуудна.
@@ -249,4 +305,4 @@ router.get('/users/:uid/status', authMW, staffOrRoomAdmin, async (req, res) => {
   } catch { return res.status(500).json({ error: 'Server error' }); }
 });
 
-module.exports = { router, ensureTables, setIO, openCase, banUser, KINDS, KIND_LABEL, _scopeOf: scopeOf };
+module.exports = { router, ensureTables, setIO, setSystemDM, openCase, banUser, warnPendingOnConnect, warnText, KINDS, KIND_LABEL, _scopeOf: scopeOf, _warnedAt };
