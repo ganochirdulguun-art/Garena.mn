@@ -11,8 +11,12 @@
  *
  * Бүх харилцаа НЭГ TCP порт (RELAY_PORT) дээр — эхний мөр newline-delimited JSON handshake:
  *   {"t":"register","game":G,"key":K,"name":N}  → хост control (KEY шаардлагатай)
- *   {"t":"joiner","game":G}                      → joiner data (game байх ёстой)
- *   {"t":"hostdata","game":G,"session":S}        → хост data (session хүлээгдэж байх ёстой)
+ *   {"t":"joiner","game":G,"rc":1}               → joiner data (game байх ёстой); rc=1 → reconnect чадвартай (2026-10-10), relay
+ *       {"t":"rc","session":S,"recv":0}\n гэж хариулна; rc-гүй хуучин клиентэд хариу бичихгүй (түүхий байт л).
+ *   {"t":"hostdata","game":G,"session":S,"rc":1} → хост data (session хүлээгдэж байх ёстой)
+ *   {"t":"joiner"|"hostdata",…,"rc":1,"resume":1,"session":S,"recv":N} → ТАСАРСАН хөлийг сэргээх (GProxy++ маяг):
+ *       recv = peer-ийн хүлээн авсан нийт байт → relay тэр offset-оос replay; хариу {"t":"rc","session":S,"recv":M} → peer
+ *       M-ээс хойшхи байтаа дахин илгээнэ. Тасарсан хөлийг RELAY_RC_HOLD_MS (55с) барина (rcsession.js).
  *   {"t":"capture","game":G,"key":HMAC}          → ХОСТ-ТАЛЫН бичлэг (Ш3, 2026-09-28): mesh (P2P) тоглолтод урсгал relay-ээр
  *       дамждаггүй тул хост клиент өөрөө бичиж энд урсгана. key = HMAC-SHA256(RELAY_REPORT_KEY, G)[:32] (зөвхөн хост мэднэ).
  *       Хариу {"t":"capture_ok","offset":N}
@@ -24,8 +28,12 @@
 'use strict';
 const net = require('net');
 
+const { RcSession, rcReply } = require('./rcsession');
+
 const CFG = {
   PORT: Number(process.env.RELAY_PORT || 7000),
+  RC_HOLD_MS: Number(process.env.RELAY_RC_HOLD_MS || 55000),        // тасарсан хөлийг хүлээх (клиентийн window 50с-ээс урт)
+  RC_RING_BYTES: Number(process.env.RELAY_RC_RING || 2 * 1024 * 1024),
   KEY: process.env.RELAY_KEY || process.env.BOT_KEY || '',
   PUBLIC_IP: process.env.PUBLIC_IP || '',
   SESSION_TIMEOUT_MS: Number(process.env.RELAY_SESSION_TIMEOUT_MS || 15000),
@@ -33,7 +41,16 @@ const CFG = {
   MAX_HANDSHAKE: 8192,
 };
 
-const hosts = new Map();   // gameId -> { control, name, sessions: Map<sid,{joiner,leftover,timer}> }
+const hosts = new Map();   // gameId -> { control, name, sessions: Map<sid,{ses,timer}> (хост хараахан холбогдоогүй), nocap }
+const rcSessions = new Map();   // `${game}|${sid}` -> RcSession (амьд splice; тасарсан хөлийг сэргээхэд хайна)
+const rcKey = (game, sid) => `${game}|${sid}`;
+function rcCountFor(game) { let n = 0; for (const k of rcSessions.keys()) if (k.startsWith(game + '|')) n++; return n; }
+// Хост control салсан: pending session-уудыг хаана; capture-ийг амьд session-ууд дуусах/хост эргэж ирэх хүртэл (RC_HOLD) хойшлуулна
+const capHoldTimers = new Map();
+function maybeFinalize(game) {
+  if (hosts.has(game) || rcCountFor(game) > 0) return;
+  capFinalize(game);
+}
 let sidCounter = 1;
 let joinerCount = 0;
 
@@ -55,7 +72,9 @@ const CAP_MAX_BYTES = Number(process.env.RELAY_CAPTURE_MAX || 60 * 1024 * 1024);
 if (CAP_ON) { try { fs.mkdirSync(CAP_DIR, { recursive: true }); } catch (e) { log('capture dir алдаа: ' + e.message); } }
 const captures = new Map(); // gameId -> { file, ws, bytes, primary, primarySid, sidOf:Map, joiners:{sid:name}, socks:Set, onData, capped, startedAt }
 
-function capAttach(gameId, hostSock, sid, joinerSock, joinerLeftover) {
+// 2026-10-10: capture нь socket биш SESSION-д суурилна (хөл тасарч сэргэхэд ч бичлэг үргэлжилнэ): ses 'hostdata' = хост→joiner байт,
+// 'joinerdata' = joiner→хост (REQJOIN нэр), 'close' = session дууссан → өөр session-д шилжинэ.
+function capAttach(gameId, ses, sid) {
   if (!CAP_ON) return;
   try {
     let cap = captures.get(gameId);
@@ -66,19 +85,18 @@ function capAttach(gameId, hostSock, sid, joinerSock, joinerLeftover) {
       cap = { file, ws, bytes: 0, primary: null, primarySid: null, sidOf: new Map(), joiners: {}, socks: new Set(), onData: null, capped: false, startedAt: Date.now() };
       captures.set(gameId, cap);
     }
-    cap.socks.add(hostSock);
-    cap.sidOf.set(hostSock, sid);
-    hostSock.on('close', () => { try { cap.socks.delete(hostSock); cap.sidOf.delete(hostSock); if (cap.primary === hostSock) capPromote(gameId); } catch {} });
-    hostSock.on('error', () => { try { cap.socks.delete(hostSock); } catch {} });
-    if (!cap.primary) { capSetPrimary(gameId, hostSock); cap.primarySid = sid; }
-    capJoinerName(cap, sid, joinerSock, joinerLeftover);   // joiner-ийн WC3 нэр (REQJOIN) — дүнд нэр тааруулахад
+    cap.socks.add(ses);
+    cap.sidOf.set(ses, sid);
+    ses.on('close', () => { try { cap.socks.delete(ses); cap.sidOf.delete(ses); if (cap.primary === ses) capPromote(gameId); } catch {} });
+    if (!cap.primary) { capSetPrimary(gameId, ses); cap.primarySid = sid; }
+    capJoinerName(cap, sid, ses);   // joiner-ийн WC3 нэр (REQJOIN) — дүнд нэр тааруулахад
   } catch (e) { /* capture хэзээ ч splice-ыг эвдэхгүй */ }
 }
 // Joiner→host урсгалын ЭХНИЙ пакет = W3GS_REQJOIN (F7 1E len hostCounter[4] entryKey[4] ?[1] port[2] peerKey[4] name\0 …).
 // Capture нь host→joiner чиглэл тул joiner-ийн ӨӨРИЙН нэр тэнд байдаггүй — энд passive уншиж хадгална.
-function capJoinerName(cap, sid, sock, leftover) {
+function capJoinerName(cap, sid, ses) {
   try {
-    let buf = Buffer.from(leftover || []);
+    let buf = Buffer.alloc(0);
     const tryParse = () => {
       const i = buf.indexOf(Buffer.from([0xF7, 0x1E]));
       if (i < 0 || buf.length < i + 20) return false;
@@ -88,18 +106,17 @@ function capJoinerName(cap, sid, sock, leftover) {
       if (name) { cap.joiners[String(sid)] = name; log(`joiner нэр sid=${sid} name=${name}`); }
       return true;
     };
-    if (tryParse()) return;
     const onData = (d) => {
-      try { buf = Buffer.concat([buf, d]); if (tryParse() || buf.length > 2048) sock.removeListener('data', onData); }
-      catch { try { sock.removeListener('data', onData); } catch {} }
+      try { buf = Buffer.concat([buf, d]); if (tryParse() || buf.length > 2048) ses.removeListener('joinerdata', onData); }
+      catch { try { ses.removeListener('joinerdata', onData); } catch {} }
     };
-    sock.on('data', onData);
-    sock.once('close', () => { try { sock.removeListener('data', onData); } catch {} });
+    ses.on('joinerdata', onData);
+    ses.once('close', () => { try { ses.removeListener('joinerdata', onData); } catch {} });
   } catch {}
 }
-function capSetPrimary(gameId, hostSock) {
+function capSetPrimary(gameId, ses) {
   const cap = captures.get(gameId); if (!cap) return;
-  cap.primary = hostSock;
+  cap.primary = ses;
   cap.onData = (d) => {
     try {
       if (cap.capped) return;
@@ -108,7 +125,7 @@ function capSetPrimary(gameId, hostSock) {
       cap.ws.write(d);   // fire-and-forget; backpressure-ыг үл тоомсорлоно (санах ойд буферлэнэ)
     } catch {}
   };
-  try { hostSock.on('data', cap.onData); } catch {}
+  try { ses.on('hostdata', cap.onData); } catch {}
 }
 function capPromote(gameId) {
   const cap = captures.get(gameId); if (!cap) return;
@@ -241,6 +258,7 @@ const server = net.createServer((sock) => {
       if (!game) { sock.destroy(); return; }
       const old = hosts.get(game);
       if (old) { try { old.control.destroy(); } catch {} }
+      if (capHoldTimers.has(game)) { clearTimeout(capHoldTimers.get(game)); capHoldTimers.delete(game); }   // хост эргэж ирэв — capture үргэлжилнэ
       const h = { control: sock, name: String(msg.name || ''), sessions: new Map(), nocap: !!msg.nocap };
       hosts.set(game, h);
       // 2026-10-01: хостын PC унтарсан/интернэт тасарсан үед FIN ирэхгүй тул control socket үүрд нээлттэй үлддэг
@@ -252,27 +270,44 @@ const server = net.createServer((sock) => {
       sock.on('close', () => {
         if (hosts.get(game) === h) {
           hosts.delete(game);
-          for (const s of h.sessions.values()) { clearTimeout(s.timer); try { s.joiner.destroy(); } catch {} }
-          capFinalize(game);   // тоглоом дуусав — capture файлыг хаана
-          log('host салав game=' + game.slice(0, 12));
+          for (const s of h.sessions.values()) { clearTimeout(s.timer); try { s.ses.close('host-left'); } catch {} }
+          // Тоглоом дуусав — capture-ийг амьд session-ууд (сэргэх боломжтой хөлүүд) дуусах хүртэл хойшлуулна (reconnect)
+          const tm = setTimeout(() => { capHoldTimers.delete(game); for (const [k, ses] of rcSessions) if (k.startsWith(game + '|')) ses.close('host-gone'); maybeFinalize(game); }, CFG.RC_HOLD_MS + 2000);
+          if (tm.unref) tm.unref();
+          capHoldTimers.set(game, tm);
+          log('host салав game=' + game.slice(0, 12) + (rcCountFor(game) ? ` (${rcCountFor(game)} session сэргэхийг хүлээнэ)` : ''));
         }
       });
+
+    } else if ((t === 'joiner' || t === 'hostdata') && msg.resume) {
+      // ── Тасарсан хөлийг сэргээх (GProxy++ маяг, 2026-10-10) ──
+      const game = String(msg.game || ''), sid = String(msg.session || '');
+      const ses = rcSessions.get(rcKey(game, sid));
+      const leg = t === 'joiner' ? 'A' : 'B';
+      if (!ses) { log(`resume: session олдсонгүй ${leg} sid=${sid}`); try { sock.write(rcReply(sid, { ok: false, error: 'no-session' })); } catch {} sock.destroy(); return; }
+      const r = ses.attach(leg, sock, { rc: true, recv: Number(msg.recv) || 0, leftover: null, resume: true, preface: (x) => rcReply(sid, x) });
+      if (!r.ok) { try { sock.write(rcReply(sid, r)); } catch {} log(`resume амжилтгүй ${leg} sid=${sid}: ${r.error}`); sock.destroy(); return; }
+      if (leftover && leftover.length) ses._onData(leg, sock, leftover);
+      log(`resume ${leg === 'A' ? 'joiner' : 'host'} sid=${sid} game=${game.slice(0, 12)}`);
 
     } else if (t === 'joiner') {
       const game = String(msg.game || '');
       const h = hosts.get(game);
       if (!h) { log('joiner: game олдсонгүй ' + game.slice(0, 12)); sock.destroy(); return; }
       const sid = String(sidCounter++);
-      sock.pause();
+      const ses = new RcSession({ id: sid, holdMs: CFG.RC_HOLD_MS, ringBytes: CFG.RC_RING_BYTES, log });
+      rcSessions.set(rcKey(game, sid), ses);
+      ses.on('close', (reason) => { rcSessions.delete(rcKey(game, sid)); const s = h.sessions.get(sid); if (s && s.ses === ses) { clearTimeout(s.timer); h.sessions.delete(sid); } log(`session хаагдав sid=${sid} (${reason})`); maybeFinalize(game); });
+      if (msg.rc) { try { sock.write(rcReply(sid, { ok: true, recv: 0 })); } catch {} }
+      ses.attach('A', sock, { rc: !!msg.rc, leftover });   // хост холбогдох хүртэл байтууд ring-д хадгалагдана
       const timer = setTimeout(() => {
-        if (h.sessions.get(sid)) { h.sessions.delete(sid); log('session timeout sid=' + sid); try { sock.destroy(); } catch {} }
+        if (h.sessions.get(sid)) { h.sessions.delete(sid); log('session timeout sid=' + sid); ses.close('host-timeout'); }
       }, CFG.SESSION_TIMEOUT_MS);
-      h.sessions.set(sid, { joiner: sock, leftover, timer });
+      h.sessions.set(sid, { ses, timer });
       joinerCount++;
       try { h.control.write(JSON.stringify({ t: 'newjoiner', game, session: sid }) + '\n'); }
-      catch { clearTimeout(timer); h.sessions.delete(sid); sock.destroy(); return; }
-      log('joiner ирлээ game=' + game.slice(0, 12) + ' sid=' + sid);
-      sock.on('close', () => { const s = h.sessions.get(sid); if (s && s.joiner === sock) { clearTimeout(s.timer); h.sessions.delete(sid); } });
+      catch { clearTimeout(timer); h.sessions.delete(sid); ses.close('control-write'); return; }
+      log('joiner ирлээ game=' + game.slice(0, 12) + ' sid=' + sid + (msg.rc ? ' rc' : ''));
 
     } else if (t === 'hostdata') {
       const game = String(msg.game || '');
@@ -282,10 +317,11 @@ const server = net.createServer((sock) => {
       const s = h.sessions.get(sid);
       if (!s) { log('hostdata: session олдсонгүй sid=' + sid); sock.destroy(); return; }
       clearTimeout(s.timer); h.sessions.delete(sid);
-      try { s.joiner.resume(); } catch {}
-      splice(sock, s.joiner, leftover, s.leftover);
-      if (!h.nocap) capAttach(game, sock, sid, s.joiner, s.leftover);   // PASSIVE tee — splice-ыг хөндөхгүй (nocap = хост өөрөө бичнэ)
-      log('splice хийв game=' + game.slice(0, 12) + ' sid=' + sid);
+      if (msg.rc) { try { sock.write(rcReply(sid, { ok: true, recv: 0 })); } catch {} }
+      const r = s.ses.attach('B', sock, { rc: !!msg.rc, leftover });   // joiner-ийн хуримтлагдсан байт (REQJOIN) хост руу очно
+      if (!r.ok) { s.ses.close('attach-' + r.error); return; }
+      if (!h.nocap) capAttach(game, s.ses, sid);   // PASSIVE tee — splice-ыг хөндөхгүй (nocap = хост өөрөө бичнэ)
+      log('splice хийв game=' + game.slice(0, 12) + ' sid=' + sid + (msg.rc ? ' rc' : ''));
 
     } else if (t === 'capture') {
       handleHostCapture(sock, msg, leftover);
@@ -300,7 +336,7 @@ server.on('error', (e) => { log('server алдаа: ' + e.message); process.exit
 server.listen(CFG.PORT, () => log('relay сонсож байна PORT=' + CFG.PORT + ' public=' + (CFG.PUBLIC_IP || '(тохируулаагүй)')));
 
 // Статус лог
-setInterval(() => { if (hosts.size) log('идэвхтэй: ' + hosts.size + ' host, нийт ' + joinerCount + ' joiner'); }, 60000);
+setInterval(() => { if (hosts.size || rcSessions.size) log('идэвхтэй: ' + hosts.size + ' host, ' + rcSessions.size + ' session, нийт ' + joinerCount + ' joiner'); }, 60000);
 
 process.on('SIGTERM', () => { try { server.close(); } catch {} process.exit(0); });
 // Нэг холболтын алдаа бүх тоглолтыг унагаахгүй — логлоод үргэлжилнэ (аудит 2026-10-02)

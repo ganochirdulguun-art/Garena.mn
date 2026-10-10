@@ -85,7 +85,7 @@ function _localBindInfo() {
   return { ip: a.address, bcast };
 }
 
-const WC3_PORT = 6112;
+const WC3_PORT = Number(process.env.GMN_WC3_PORT) || 6112;   // GMN_WC3_PORT — зөвхөн автомат тестэд (хуурамч WC3)
 const W3_HEADER = 0xF7;
 const W3_SEARCHGAME = 0x2F;
 const W3_GAMEINFO = 0x30;
@@ -530,6 +530,141 @@ async function _bestRtt(ip, port) {
   for (let i = 0; i < 3; i++) { const r = await _rttTcp(ip, port, 1500); if (r != null && (best == null || r < best)) best = r; }
   return best;
 }
+
+// ═══════════════════════════════════════════════════════════
+// RECONNECT (GProxy++ маяг, 2026-10-10, эзэн): сүлжээ тасрахад локал WC3-ийг амьд барьж, relay/хосттой дахин холбогдоно.
+// local = WC3-ийн socket (127.0.0.1 — хэзээ ч тасрахгүй), up = relay/mesh руу гарах socket (тасарч болно).
+// Протокол: эхний мөр hello (rc:1) → сервер {"t":"rc","session":S,"recv":N}\n хариулна (хуучин relay хариулахгүй — эхний байт
+// 0xF7 бол түүхий гэж үзнэ → сэргээх боломжгүй, өмнөх шигээ ажиллана). Тасарвал RC_WINDOW_MS дотор {resume:1,session,recv}-ээр
+// дахин холбогдож, сервер алдагдсан байтыг replay хийнэ, бид recv offset-оос хойшхийгээ дахин илгээнэ.
+// WC3-д (зөвхөн joiner тал) W3GS_CHAT_FROM_HOST-оор «холболт тасарлаа / сэргэлээ» гэж харуулна.
+// ═══════════════════════════════════════════════════════════
+const { Ring: RcRing, RcSession, rcReply } = require('./rcsession');
+const RC_WINDOW_MS = Number(process.env.GMN_RC_WINDOW_MS || 50000);   // relay-ийн hold (55с)-ээс богино
+const RC_RING_BYTES = 2 * 1024 * 1024;
+
+// W3GS_CHAT_FROM_HOST (0x0F): F7 0F len(2) nTo(1) toPid fromPid flag(1) [extra(4) if in-game] msg\0
+function w3ChatPacket(pid, text, inGame) {
+  const msg = Buffer.from(String(text).slice(0, 200) + '\0', 'utf8');
+  const head = inGame ? Buffer.from([0xF7, 0x0F, 0, 0, 1, pid, pid, 0x20, 0, 0, 0, 0]) : Buffer.from([0xF7, 0x0F, 0, 0, 1, pid, pid, 0x10]);
+  const b = Buffer.concat([head, msg]); b.writeUInt16LE(b.length, 2); return b;
+}
+// Серверээс ирсэн урсгалын W3GS фреймийг мөшгөнө: өөрийн pid (SLOTINFOJOIN 0x04), тоглоом эхэлсэн (COUNTDOWN_END 0x0B), мөн
+// ПАКЕТИЙН ХИЛ (buf хоосон = сүүлийн пакет бүтэн хүрсэн). Чат мэдэгдлийг зөвхөн хил дээр оруулна — хагас пакетийн дунд
+// оруулбал WC3-ийн фрейм эвдэрч унана. Фрейм танигдахаа больвол (broken) хэзээ ч оруулахгүй.
+function w3Tracker() {
+  const t = { pid: null, inGame: false, buf: Buffer.alloc(0), broken: false, pending: null };
+  t.feed = (d) => {
+    if (t.broken) return;
+    t.buf = t.buf.length ? Buffer.concat([t.buf, d]) : Buffer.from(d);
+    while (t.buf.length >= 4) {
+      if (t.buf[0] !== 0xF7) { t.broken = true; t.buf = Buffer.alloc(0); return; }
+      const len = t.buf.readUInt16LE(2); if (len < 4) { t.broken = true; t.buf = Buffer.alloc(0); return; }
+      if (t.buf.length < len) return;   // хагас пакет — хил биш
+      const id = t.buf[1];
+      if (id === 0x04 && len >= 7) { const sz = t.buf.readUInt16LE(4); if (6 + sz < len) t.pid = t.buf[6 + sz]; }
+      else if (id === 0x0B) t.inGame = true;
+      t.buf = t.buf.subarray(len);
+    }
+    if (t.buf.length > 65536) { t.broken = true; t.buf = Buffer.alloc(0); }
+  };
+  t.aligned = () => !t.broken && t.buf.length === 0;
+  return t;
+}
+
+/**
+ * local ↔ up сэргээгддэг холбоос. connect() шинэ up socket буцаана (холбогдоогүй), hello({resume,session,recv}) → эхний мөр (JSON).
+ * chatTo = локал WC3 нь joiner (CHAT_FROM_HOST хүлээн авна) бол true. onLinked(upSock, first) — анхны холболтод (capture attach г.м.).
+ */
+function makeResumable({ local, connect, hello, label = 'rc', chatTo = false, onLinked = null, onClosed = null, windowMs = RC_WINDOW_MS }) {
+  const st = { local, up: null, session: null, sentLocal: 0, recvUp: 0, ring: new RcRing(RC_RING_BYTES), linked: false, closed: false,
+               hdr: Buffer.alloc(0), awaitHdr: false, dropAt: 0, retry: null, attemptTimer: null, noticeTimer: null, firstLinked: false };
+  const trk = chatTo ? w3Tracker() : null;
+  const chat = (text) => {
+    if (!trk || trk.pid == null || trk.broken) return;
+    if (!trk.aligned()) { trk.pending = text; return; }   // хагас пакетийн дунд — дараагийн пакетийн хил дээр
+    try { local.write(w3ChatPacket(trk.pid, text, trk.inGame)); } catch {}
+  };
+  const closeAll = (why) => {
+    if (st.closed) return; st.closed = true;
+    clearTimeout(st.retry); clearTimeout(st.attemptTimer); clearInterval(st.noticeTimer);
+    const u = st.up; st.up = null; try { u && u.destroy(); } catch {} try { local.destroy(); } catch {}
+    bblog(`${label}: хаагдав (${why})`); try { onClosed?.(why); } catch {}
+  };
+  const deliver = (d) => {
+    st.recvUp += d.length; try { local.write(d); } catch {}
+    if (trk) { trk.feed(d); if (trk.pending && trk.aligned()) { const p = trk.pending; trk.pending = null; chat(p); } }
+  };
+  local.on('data', (d) => { st.sentLocal += d.length; st.ring.push(Buffer.from(d)); if (st.up && st.linked) { try { st.up.write(d); } catch {} } });
+  local.on('error', () => closeAll('local-error')); local.on('close', () => closeAll('local-closed'));
+  const link = (resume) => {
+    if (st.closed) return;
+    let u; try { u = connect(); } catch (e) { bblog(`${label}: connect алдаа ${e.message}`); if (resume) scheduleRetry(); else closeAll('connect-failed'); return; }
+    st.up = u; st.linked = false; st.awaitHdr = true; st.hdr = Buffer.alloc(0);
+    try { u.setNoDelay(true); } catch {}
+    clearTimeout(st.attemptTimer);
+    st.attemptTimer = setTimeout(() => { if (st.up === u && !st.linked) { try { u.destroy(); } catch {} } }, 8000);   // нэг оролдлого ≤8с
+    u.on('connect', () => {
+      if (st.up !== u) return;
+      try { u.write(hello({ resume, session: st.session, recv: st.recvUp }) + '\n'); } catch {}
+      if (!resume) { st.linked = true; try { local.resume(); } catch {} if (!st.firstLinked) { st.firstLinked = true; try { onLinked?.(u, true); } catch {} } }
+    });
+    u.on('data', (d) => {
+      if (st.up !== u) return;
+      if (st.awaitHdr) {
+        st.hdr = st.hdr.length ? Buffer.concat([st.hdr, d]) : Buffer.from(d);
+        if (st.hdr[0] !== 0x7B) { st.awaitHdr = false; const b = st.hdr; st.hdr = Buffer.alloc(0); if (resume) { closeAll('resume-no-header'); return; } deliver(b); return; }   // хуучин relay: түүхий байт
+        const nl = st.hdr.indexOf(0x0a); if (nl < 0) return;
+        let m = null; try { m = JSON.parse(st.hdr.subarray(0, nl).toString('utf8')); } catch {}
+        const rest = st.hdr.subarray(nl + 1); st.hdr = Buffer.alloc(0); st.awaitHdr = false;
+        if (!m || m.t !== 'rc' || m.error) {
+          bblog(`${label}: rc алдаа ${m && m.error}`);
+          // Сэргээх боломжгүй (session дууссан = нөгөө тал жинхэнээсээ гарсан, эсвэл буфер хэтэрсэн) → тэр даруй хаана
+          if (resume) { closeAll('resume-' + ((m && m.error) || 'bad-header')); return; }
+        }
+        else {
+          st.session = m.session || st.session;
+          if (resume) {
+            const rep = st.ring.from(Number(m.recv) || 0);
+            if (!rep) { closeAll('resume-gap'); return; }
+            for (const b of rep) { try { u.write(b); } catch {} }
+            st.linked = true; st.dropAt = 0; clearInterval(st.noticeTimer); clearTimeout(st.retry);
+            bblog(`${label}: холболт СЭРГЭВ (session ${st.session}, replay ${rep.reduce((s, b) => s + b.length, 0)}B)`);
+            chat('Garena.mn: холболт сэргэлээ ✓');
+          }
+        }
+        if (rest.length) deliver(rest);
+        return;
+      }
+      deliver(d);
+    });
+    const gone = () => {
+      if (st.up !== u) return;
+      st.up = null; st.linked = false; clearTimeout(st.attemptTimer);
+      if (st.closed || local.destroyed) return;
+      if (!st.session) { closeAll(resume ? 'resume-failed' : 'up-closed'); return; }   // хуучин relay / анх холбогдож чадаагүй
+      if (!st.dropAt) {
+        st.dropAt = Date.now();
+        bblog(`${label}: холболт ТАСАРЛАА — ${Math.round(windowMs / 1000)}с дотор дахин холбоно`);
+        chat(`Garena.mn: холболт тасарлаа — ${Math.round(windowMs / 1000)} сек дотор дахин холбож байна…`);
+        clearInterval(st.noticeTimer);
+        st.noticeTimer = setInterval(() => { const left = Math.round((windowMs - (Date.now() - st.dropAt)) / 1000); if (left > 0) chat(`Garena.mn: дахин холбож байна… (${left} сек үлдлээ)`); }, 10000);
+      }
+      scheduleRetry();
+    };
+    u.on('error', gone); u.on('close', gone);
+  };
+  const scheduleRetry = () => {
+    clearTimeout(st.retry);
+    if (st.closed) return;
+    if (Date.now() - st.dropAt > windowMs) { closeAll('reconnect-timeout'); return; }
+    st.retry = setTimeout(() => link(true), st.up === null && Date.now() - st.dropAt < 400 ? 300 : 1500);   // эхний оролдлого шууд, дараа нь 1.5с тутам
+  };
+  try { local.pause(); } catch {}
+  link(false);
+  return { close: () => closeAll('stop'), get session() { return st.session; }, get up() { return st.up; }, _st: st };
+}
+
 function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoints }) {
   stopLanJoin();
   stopBotBridge(); stopHost(); stopFinder();   // 6112-ийг булаах бусад socket-уудыг цэвэрлэнэ
@@ -570,28 +705,27 @@ function startLanJoin({ relayIp, relayPort, game, gameInfoB64, localPort, endpoi
     state.conns.add(client);
     client.setNoDelay(true);
     client.pause();   // handshake илгээх хүртэл WC3-ийн байтыг түр саатуулна
-    let up = null, linked = false;
-    const done = () => { state.conns.delete(client); try { client.destroy(); } catch {} try { up?.destroy(); } catch {} };
-    const dial = (ip, port, isDirect) => {
-      const u = net.connect(Number(port), ip); up = u; u.setNoDelay(true);
-      const t = isDirect ? setTimeout(() => { if (!linked) { try { u.destroy(); } catch {} } }, 2500) : null;
-      u.on('connect', () => {
-        clearTimeout(t); linked = true;
-        try { u.write(JSON.stringify({ t: 'joiner', game: state.game }) + '\n'); } catch {}
-        client.pipe(u); u.pipe(client);
-        client.resume();
-        bblog(`LAN join: WC3 холболт → ${isDirect ? 'ШУУД ' + ip : 'relay ' + ip}`);
+    // Зам: шууд (mesh) сонгогдсон бол эхлээд түүгээр; 2.5с-д холбогдохгүй бол relay. Сэргээхдээ ижил замаар (session тэнд байна).
+    let path = (state.useDirect && state.direct) ? 'direct' : 'relay';
+    let rc = null, directTried = false;
+    const startLink = () => {
+      rc = makeResumable({
+        local: client, label: `LAN join (${path})`, chatTo: true,
+        connect: () => (path === 'direct' ? net.connect(state.direct.port, state.direct.ip) : net.connect(state.relayPort, state.relayIp)),
+        hello: ({ resume, session, recv }) => JSON.stringify(resume ? { t: 'joiner', game: state.game, rc: 1, resume: 1, session, recv } : { t: 'joiner', game: state.game, rc: 1 }),
+        onLinked: (u) => bblog(`LAN join: WC3 холболт → ${path === 'direct' ? 'ШУУД ' + state.direct.ip : 'relay ' + state.relayIp}`),
+        onClosed: () => { state.conns.delete(client); state.conns.delete(rc); },
       });
-      u.on('error', () => {});
-      u.on('close', () => {
-        clearTimeout(t);
-        if (!linked && isDirect) { state.useDirect = false; bblog('LAN join: шууд холболт амжилтгүй → relay'); return dial(state.relayIp, state.relayPort, false); }
-        done();
-      });
+      state.conns.add(rc);
     };
-    if (state.useDirect && state.direct) dial(state.direct.ip, state.direct.port, true);
-    else dial(state.relayIp, state.relayPort, false);
-    client.on('error', done); client.on('close', done);
+    if (path === 'direct') {
+      // mesh заримдаа холбогдохгүй (DERP/firewall) — 2.5с-д хариу ирэхгүй бол relay руу (WC3-ийн socket-ыг хааж болохгүй тул probe-оор шалгана)
+      const probe = net.connect(state.direct.port, state.direct.ip);
+      const pt = setTimeout(() => { try { probe.destroy(); } catch {} }, 2500);
+      probe.on('connect', () => { clearTimeout(pt); try { probe.destroy(); } catch {} directTried = true; startLink(); });
+      probe.on('error', () => {}); probe.on('close', () => { clearTimeout(pt); if (!directTried) { directTried = true; state.useDirect = false; path = 'relay'; bblog('LAN join: шууд холболт амжилтгүй → relay'); startLink(); } });
+    } else startLink();
+    client.on('error', () => { state.conns.delete(client); }); client.on('close', () => { state.conns.delete(client); });
   });
   state.server.on('error', (e) => bblog('lanjoin tcp: ' + e.message));
   // БҮХ интерфэйст сонсоно (зөвхөн 127.0.0.1 биш). GAMEINFO нь LAN IP-ээс цацагддаг тул
@@ -636,7 +770,7 @@ function stopLanJoin() {
   if (!s.hidden) _decreate(s, _hostCounter(s.packet));   // WC3 LAN жагсаалтаас арилгана (сүүдэр үлдээхгүй)
   { const u = s.udp; setTimeout(() => { try { u?.close(); } catch {} }, 900); }
   try { s.server?.close(); } catch {}
-  s.conns.forEach((c) => { try { c.destroy(); } catch {} });
+  s.conns.forEach((c) => { try { (c.close || c.destroy).call(c); } catch {} });
   bblog('LAN join зогслоо');
 }
 
@@ -752,17 +886,18 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo,
   });
 
   // per-joiner: relay-ийн hostdata холболт ↔ локал WC3
+  // Хостын relay хөл (hostdata) ч сэргээгддэг: хостын интернэт түр тасарвал локал WC3-ийн холболт хэвээр, relay-тэй дахин нийлнэ (2026-10-10)
   const openHostData = (session) => {
-    const hd = net.connect(state.relayPort, state.relayIp);
     const wc3 = net.connect(WC3_PORT, '127.0.0.1');
-    state.conns.add(hd); state.conns.add(wc3);
-    let hdOk = false, wc3Ok = false, spliced = false;
-    const done = () => { state.conns.delete(hd); state.conns.delete(wc3); try { hd.destroy(); } catch {} try { wc3.destroy(); } catch {} };
-    const maybeSplice = () => { if (spliced || !hdOk || !wc3Ok) return; spliced = true; hd.pipe(wc3); wc3.pipe(hd); state.hc?.attach(wc3, session, hd, null); };
-    hd.setNoDelay(true); wc3.setNoDelay(true);
-    hd.on('connect', () => { try { hd.write(JSON.stringify({ t: 'hostdata', game: state.game, session }) + '\n'); } catch {} hdOk = true; maybeSplice(); });
-    wc3.on('connect', () => { wc3Ok = true; maybeSplice(); });
-    hd.on('error', done); wc3.on('error', done); hd.on('close', done); wc3.on('close', done);
+    state.conns.add(wc3);
+    const rc = makeResumable({
+      local: wc3, label: `LAN host sid=${session}`, chatTo: false,
+      connect: () => net.connect(state.relayPort, state.relayIp),
+      hello: ({ resume, session: sid, recv }) => JSON.stringify(resume ? { t: 'hostdata', game: state.game, session, rc: 1, resume: 1, recv } : { t: 'hostdata', game: state.game, session, rc: 1 }),
+      onLinked: (hd) => { try { state.hc?.attach(wc3, session, hd, null); } catch {} },
+      onClosed: () => { state.conns.delete(wc3); state.conns.delete(rc); },
+    });
+    state.conns.add(rc);
     bblog(`LAN host: joiner session=${session} → локал WC3`);
   };
 
@@ -802,17 +937,30 @@ function startLanHost({ relayIp, relayPort, game, relayKey, wc3Name, onGameInfo,
           let m = null; try { m = JSON.parse(buf.subarray(0, nl).toString('utf8')); } catch {}
           if (!m || m.t !== 'joiner' || String(m.game) !== state.game) { sock.destroy(); return; }
           const leftover = buf.subarray(nl + 1);
+          // Тасарсан шууд (mesh) joiner-ийг сэргээх (GProxy++ маяг): session-оо олж A хөлд дахин холбоно
+          if (m.resume) {
+            const ses = state.dsess?.get(String(m.session));
+            if (!ses) { try { sock.write(rcReply(m.session, { ok: false, error: 'no-session' })); } catch {} sock.destroy(); return; }
+            const r = ses.attach('A', sock, { rc: true, recv: Number(m.recv) || 0, resume: true, preface: (x) => rcReply(m.session, x) });
+            if (!r.ok) { try { sock.write(rcReply(m.session, r)); } catch {} sock.destroy(); return; }
+            if (leftover.length) ses._onData('A', sock, leftover);
+            bblog(`LAN host: ШУУД joiner sid=${m.session} сэргэв`);
+            return;
+          }
           const sid = 'd' + (++state.dsid);
-          const wc3 = net.connect(WC3_PORT, '127.0.0.1'); wc3.setNoDelay(true); state.conns.add(wc3);
-          sock.pause();
+          const ses = new RcSession({ id: sid, holdMs: 55000, log: bblog });
+          (state.dsess || (state.dsess = new Map())).set(sid, ses);
+          state.conns.add(ses);
+          ses.on('close', () => { state.dsess?.delete(sid); state.conns.delete(ses); });
+          if (m.rc) { try { sock.write(rcReply(sid, { ok: true, recv: 0 })); } catch {} }
+          ses.attach('A', sock, { rc: !!m.rc, leftover });
+          const wc3 = net.connect(WC3_PORT, '127.0.0.1'); wc3.setNoDelay(true);
           wc3.on('connect', () => {
-            if (leftover.length) { try { wc3.write(leftover); } catch {} }
-            sock.pipe(wc3); wc3.pipe(sock); sock.resume();
+            ses.attach('B', wc3, { rc: false });   // локал WC3 — сэргээгдэхгүй (хаагдвал session дуусна)
             state.hc?.attach(wc3, sid, sock, leftover);
-            bblog(`LAN host: ШУУД (mesh) joiner ${sock.remoteAddress} sid=${sid} → локал WC3`);
+            bblog(`LAN host: ШУУД (mesh) joiner ${sock.remoteAddress} sid=${sid} → локал WC3${m.rc ? ' rc' : ''}`);
           });
-          const done = () => { state.conns.delete(sock); state.conns.delete(wc3); try { sock.destroy(); } catch {} try { wc3.destroy(); } catch {} };
-          wc3.on('error', done); wc3.on('close', done); sock.on('close', done);
+          wc3.on('error', () => ses.close('wc3-error'));
         };
         sock.on('data', onHs); sock.on('error', () => {}); sock.on('close', () => { clearTimeout(hsTimer); state.conns.delete(sock); });
       });
@@ -837,7 +985,7 @@ function stopLanHost() {
   try { s.control?.destroy(); } catch {}
   try { s.listener?.close(); } catch {}
   try { s.hc?.end(); } catch {}   // бичлэгийг дуусгаж relay-д тайлан эхлүүлнэ
-  s.conns.forEach((c) => { try { c.destroy(); } catch {} });
+  s.conns.forEach((c) => { try { (c.close || c.destroy).call(c); } catch {} });
   bblog('LAN host зогслоо');
 }
 
