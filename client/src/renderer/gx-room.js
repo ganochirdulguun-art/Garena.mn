@@ -64,6 +64,7 @@
     else if (d.type === 'back') { showTab('lobby'); }
     // RGC маягийн доод цэс (FORUM / LADDER / SHOP) → үндсэн цонхны таб (зөвхөн зөвшөөрөгдсөн)
     else if (d.type === 'tab' && ['discord', 'ranking', 'premium', 'lobby'].includes(d.tab)) { showTab(d.tab); }
+    else if (d.type === 'join-room' && d.room) { try { joinRoomByMention(String(d.room)); } catch {} }   // чатын #өрөө mention (шигтгэсэн өрөөнөөс)
   });
   // Зүүн цэсний ногоон «одоогийн өрөө» карт → шигтгэсэн өрөө рүү
   document.addEventListener('click', (e) => {

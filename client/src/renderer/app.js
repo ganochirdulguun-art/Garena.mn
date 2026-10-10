@@ -331,6 +331,7 @@ async function connectSocket() {
     _roomsRefreshTimer = setTimeout(() => {
       const lobbyTab = document.getElementById('tab-lobby');
       if (lobbyTab?.classList.contains('active')) loadRooms();
+      else if (isRoomMode()) refreshRoomNames();   // #өрөө mention-д нэрс шинэ байх
     }, 300);
   });
 
@@ -714,6 +715,7 @@ async function init() {
     if (!user) { window.close(); return; }
     currentUser = user;
     await connectSocket();
+    refreshRoomNames();   // чатын #өрөө mention (бүх өрөөний нэр) — хүлээхгүй
 
     // Тоглолтын үр дүн (replay watcher) — өрөөний цонхонд харуулна
     window.api.onGameResult((data) => showGameResult(data));
@@ -4504,7 +4506,7 @@ function knownChatNames() {
 // @mention parse: escHtml() дараа дуудна — аюулгүй HTML оруулна.
 // Танигдсан нэрийг хамгийн урт таарцаар (зайтай/кирилл нэр) — эс бөгөөс @үсэг/тоо дараалал.
 function parseMentions(escapedText, triggerSound) {
-  if (!escapedText || escapedText.indexOf('@') === -1) return escapedText;
+  if (!escapedText || escapedText.indexOf('@') === -1) return parseRoomMentions(escapedText);   // @ байхгүй ч #өрөө байж болно
   const myName = currentUser?.username ? escHtml(currentUser.username).toLowerCase() : '';
   const names = knownChatNames().map(n => escHtml(n)).sort((a, b) => b.length - a.length);
   const wordCh = /[\p{L}\p{N}_]/u;
@@ -4537,8 +4539,73 @@ function parseMentions(escapedText, triggerSound) {
     i += len;
   }
   if (mentionedMe && triggerSound) playSound('notify');
+  return parseRoomMentions(out);
+}
+
+// ── #Өрөө mention (эзэн 2026-10-10): «#Room 10», «#WC3 Room 3», «#CS 1.6 Room 2», «#<дурын өрөөний нэр>» → дарахад тэр өрөө рүү орно ──
+// Бүх өрөө (нийтийн Room 1..N + хэрэглэгчийн нээсэн өрөө) — нэрийг roomsCache-аас хамгийн урт таарцаар; «Room N» товчлол = WC3 Room N.
+const ROOM_MENTION_SHORT = /^(?:(wc3|cs ?1\.6|quake ?iii|red ?alert ?2)\s*)?room\s*(\d{1,3})(?![\p{L}\p{N}_])/iu;
+function knownRoomNames() {
+  const seen = new Set(), out = [];
+  for (const r of Object.values(roomsCache || {})) { const n = String(r?.name || '').replace(/\s+/g, ' ').trim(); if (n.length >= 2 && !seen.has(n.toLowerCase())) { seen.add(n.toLowerCase()); out.push(n); } }
   return out;
 }
+function parseRoomMentions(html) {
+  if (!html || html.indexOf('#') === -1) return html;
+  const names = knownRoomNames().map((n) => escHtml(n)).sort((a, b) => b.length - a.length);
+  const wordCh = /[\p{L}\p{N}_]/u;
+  // Зөвхөн tag-ийн гадна талын текстэд (parseMentions-ийн <span>, зураг гэх мэтийг эвдэхгүй)
+  return html.split(/(<[^>]+>)/).map((part) => {
+    if (part.startsWith('<') || part.indexOf('#') === -1) return part;
+    const s = part; let out = '', i = 0;
+    while (i < s.length) {
+      const at = s.indexOf('#', i);
+      if (at === -1) { out += s.slice(i); break; }
+      out += s.slice(i, at); i = at + 1;
+      if (at > 0 && wordCh.test(s[at - 1])) { out += '#'; continue; }   // «C#», «a#1» гэх мэт
+      const rest = s.slice(i), low = rest.toLowerCase();
+      let len = 0;
+      const hit = names.find((n) => low.startsWith(n.toLowerCase()) && !wordCh.test(rest[n.length] || ''));
+      if (hit) len = hit.length;
+      else { const m = rest.match(ROOM_MENTION_SHORT); if (m) len = m[0].length; }
+      if (!len) { out += '#'; continue; }
+      const raw = rest.slice(0, len);   // escHtml хийгдсэн текст — attr-д аюулгүй
+      out += `<span class="mention room-mention" data-room="${raw}" title="«${raw}» өрөө рүү орох">#${raw}</span>`;
+      i += len;
+    }
+    return out;
+  }).join('');
+}
+// Mention-ийн бичвэрээс өрөөг олно: нэр яг таарвал тэр; эс бөгөөс «[тоглоом] Room N» → тухайн тоглоомын N-р нийтийн өрөө (анхдагч WC3)
+function findRoomByMention(label) {
+  const key = String(label || '').replace(/\s+/g, ' ').trim().toLowerCase(); if (!key) return null;
+  const list = Object.values(roomsCache || {});
+  const byName = list.find((r) => String(r?.name || '').replace(/\s+/g, ' ').trim().toLowerCase() === key);
+  if (byName) return byName;
+  const m = key.match(/^(?:(wc3|cs ?1\.6|quake ?iii|red ?alert ?2)\s*)?room\s*(\d{1,3})$/);
+  if (!m) return null;
+  const n = Number(m[2]), pref = (m[1] || 'wc3').replace(/\s+/g, '');
+  const gameRe = ({ wc3: /warcraft|wc3|frozen/i, 'cs1.6': /counter|cs/i, quakeiii: /quake/i, redalert2: /red ?alert/i })[pref] || /warcraft/i;
+  return list.find((r) => r?.kind === 'channel' && Number(r.channel_no) === n && gameRe.test(String(r.game_type || ''))) || null;
+}
+async function refreshRoomNames() {   // iframe (өрөөний цонх)-д лобби жагсаалт ачаалагддаггүй → mention-д зориулж нэрсийг авна
+  try { const rooms = await window.api.getRooms(); if (Array.isArray(rooms)) { roomsCache = {}; rooms.forEach((r) => { roomsCache[String(r.id)] = r; }); } } catch {}
+}
+async function joinRoomByMention(label) {
+  if (isRoomMode() && window.parent !== window) { try { window.parent.postMessage({ gx: true, type: 'join-room', room: String(label || '') }, '*'); } catch {} return; }   // шигтгэсэн өрөө → үндсэн цонх
+  let room = findRoomByMention(label);
+  if (!room) { await refreshRoomNames(); room = findRoomByMention(label); }
+  if (!room) { showToast(`«${label}» өрөө олдсонгүй (хаагдсан байж магадгүй)`, 'warning'); return; }
+  const curId = String(window.gxRoom?.roomId || currentRoom?.id || '');
+  if (curId && curId === String(room.id)) { try { showTab(window.gxRoom?.roomId ? 'roomview' : 'room'); } catch {} return; }   // аль хэдийн энэ өрөөнд
+  try { await joinRoom(String(room.id), room.name, room.game_type, !!room.has_password, room.host_id); }
+  catch (err) { showToast(`Алдаа: ${ipcErr(err)}`, 'error'); }
+}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest?.('.room-mention'); if (!el) return;
+  e.preventDefault(); e.stopPropagation();
+  joinRoomByMention(el.dataset.room);
+}, true);
 
 // ── Мессежид хариулах (reply) ────────────────────────────
 const CHAT_REPLY_BTN = '<button type="button" class="msg-reply" title="Хариулах" aria-label="Хариулах"><svg class="btn-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></button>';
@@ -4619,8 +4686,10 @@ function setupMentionAutocomplete(inputId) {
   let dropdown = null;
   let activeIdx = -1;
   let names = [];
+  let trig = '@';   // '@' = хэрэглэгч, '#' = өрөө (2026-10-10)
 
   function getNames() {
+    if (trig === '#') return knownRoomNames();   // бүх өрөө: нийтийн Room 1..N + нээлттэй өрөөнүүд
     // Онлайн, найз, чатад бичсэн, өрөөний гишүүд — өөрийгөө хасна
     const me = currentUser?.username;
     const list = knownChatNames().filter(n => n !== me);
@@ -4641,7 +4710,7 @@ function setupMentionAutocomplete(inputId) {
       input.parentElement.appendChild(dropdown);
     }
     dropdown.innerHTML = filtered.map((n, i) =>
-      `<div class="mention-dropdown-item${i === activeIdx ? ' active' : ''}" data-name="${escHtml(n)}">@${escHtml(n)}</div>`
+      `<div class="mention-dropdown-item${i === activeIdx ? ' active' : ''}" data-name="${escHtml(n)}">${trig}${escHtml(n)}</div>`
     ).join('');
     dropdown.querySelectorAll('.mention-dropdown-item').forEach(el => {
       el.addEventListener('mousedown', (e) => {
@@ -4655,9 +4724,9 @@ function setupMentionAutocomplete(inputId) {
     const v = input.value;
     const cursor = input.selectionStart;
     const before = v.slice(0, cursor);
-    const atIdx = before.lastIndexOf('@');
+    const atIdx = before.lastIndexOf(trig);
     if (atIdx === -1) { close(); return; }
-    input.value = before.slice(0, atIdx) + '@' + name + ' ' + v.slice(cursor);
+    input.value = before.slice(0, atIdx) + trig + name + ' ' + v.slice(cursor);
     input.focus();
     const newPos = atIdx + name.length + 2;
     input.setSelectionRange(newPos, newPos);
@@ -4668,17 +4737,18 @@ function setupMentionAutocomplete(inputId) {
     const v = input.value;
     const cursor = input.selectionStart;
     const before = v.slice(0, cursor);
-    const atIdx = before.lastIndexOf('@');
+    const aIdx = before.lastIndexOf('@'), hIdx = before.lastIndexOf('#');
+    const atIdx = Math.max(aIdx, hIdx); trig = hIdx > aIdx ? '#' : '@';
     if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== ' ')) { close(); return; }
     const query = before.slice(atIdx + 1).toLowerCase();
-    if (!query || query.length > 24) { close(); return; }
+    if (trig === '#' ? query.length > 40 : (!query || query.length > 24)) { close(); return; }   // «#» ганцаараа → өрөөний жагсаалт
     const all = getNames();
     // Зайтай нэр (жишээ «Tom Noiton») бичиж байхад ч санал болгосоор; эхлэлээр нь эхэлж, дараа нь агуулгаар
     const starts = all.filter(n => n.toLowerCase().startsWith(query));
     const inner = /\s/.test(query) ? [] : all.filter(n => !starts.includes(n) && n.toLowerCase().includes(query));
     const filtered = starts.concat(inner).slice(0, 6);
     if (filtered.length === 0) { close(); return; }
-    names = filtered; activeIdx = 0;
+    names = filtered; activeIdx = query ? 0 : -1;   // «#» ганцаараа бол Enter мессежээ илгээнэ (сонголт автоматаар биш)
     render(filtered);
   });
 
@@ -4888,7 +4958,7 @@ const ONBOARDING_STEPS = [
 
   // ── Чат & Найзууд ──
   { target: '[data-tab="chat"]',     title: 'Чат таб',        text: 'Нийтийн чат болон хувийн мессеж (DM) энд байна. Найзуудтай шууд чатлах боломжтой.', category: 'Чат', icon: '💬' },
-  { target: '#lobby-chat-input',     title: 'Нийтийн чат',    text: 'Бүх хэрэглэгчидтэй чатлах боломжтой. @нэр бичвэл mention хийнэ.', category: 'Чат', icon: '🌐' },
+  { target: '#lobby-chat-input',     title: 'Нийтийн чат',    text: 'Бүх хэрэглэгчидтэй чатлах боломжтой. @нэр бичвэл хүнийг, #Room 10 (эсвэл #өрөөний нэр) бичвэл өрөөг дурдана — дарахад шууд орно.', category: 'Чат', icon: '🌐' },
 
   // ── Бусад табууд ──
   { target: '[data-tab="discord"]',  title: 'Discord серверүүд', text: 'Монголын Warcraft Discord серверүүдийн жагсаалт. Өөрийн серверээ нэмж болно.', category: 'Табууд', icon: '🎙️' },

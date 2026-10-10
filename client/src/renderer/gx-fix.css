@@ -155,6 +155,9 @@ body.gx #gx-content:has(#tab-roomview.active) { display: flex; flex-direction: c
 body.gx #gx-content:has(#tab-roomview.active) > .gx-mesh-banner { flex: none; margin: 10px 16px 0; }
 body.gx #gx-content:has(#tab-roomview.active) > #tab-roomview.active { flex: 1; min-height: 0; height: auto !important; }
 /* @everyone (2026-10-01) — эзэн/админы бүгдэд хандсан мессеж */
+/* #өрөө mention — чатаас дарж орох (2026-10-10) */
+body.gx .mention.room-mention, .mention.room-mention { color: #16a34a !important; background: rgba(22,163,74,.13) !important; padding: 0 5px; border-radius: 4px; font-weight: 800; cursor: pointer; text-decoration: none; white-space: nowrap; }
+body.gx .mention.room-mention:hover, .mention.room-mention:hover { filter: brightness(1.15); text-decoration: underline; }
 body.gx .mention.mention-all, body .mention.mention-all { color: #fff !important; background: var(--gx-accent, #e11d2e) !important; padding: 0 5px; border-radius: 4px; font-weight: 800; }
 .msg.mention-all-row { background: var(--gx-amber-soft, rgba(217,119,6,.13)); border-radius: 8px; box-shadow: inset 3px 0 0 var(--gx-amber, #d97706); }
 .msg.gl.mention-all-row { padding-left: 8px !important; }
